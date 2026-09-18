@@ -31,6 +31,7 @@ class ManifestServiceTest {
         service.generateManifest(
             items = listOf(item("a", "2026-01-15T00:00:00.000Z"), item("b", "2026-02-15T00:00:00.000Z")),
             deviceHash = "device",
+            totalSizeBytes = 0L,
         )
         assertTrue("baseline must be empty until a sync or load happens", service.partitionHashes().isEmpty())
     }
@@ -110,9 +111,9 @@ class ManifestServiceTest {
         service.initialize()
         val birth = Instant.parse("2026-03-01T00:00:00.000Z")
 
-        service.generateManifest(items = emptyList(), deviceHash = "device", now = birth)
+        service.generateManifest(items = emptyList(), deviceHash = "device", totalSizeBytes = 0L, now = birth)
         service.updateAfterSync(mapOf("2026/01" to "jan"), Instant.now())
-        val second = service.generateManifest(items = emptyList(), deviceHash = "device")
+        val second = service.generateManifest(items = emptyList(), deviceHash = "device", totalSizeBytes = 0L)
 
         assertEquals(birth, second.created)
     }
@@ -130,6 +131,7 @@ class ManifestServiceTest {
                 item("c", "2026-05-15T00:00:00.000Z"),
             ),
             deviceHash = "device",
+            totalSizeBytes = 0L,
         )
         val ids = manifest.chunks.map { it.id }
         assertEquals(listOf("2026/01", "2026/05", "2026/11"), ids)

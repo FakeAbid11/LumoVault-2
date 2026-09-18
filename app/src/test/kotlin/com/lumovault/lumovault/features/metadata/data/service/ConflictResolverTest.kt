@@ -143,8 +143,8 @@ class ConflictResolverTest {
 
     @Test
     fun `status changes do not create a conflict`() {
-        val local = item(status = MediaStatus.uploaded)
-        val remote = item(status = MediaStatus.pending)
+        val local = item().copy(status = MediaStatus.uploaded)
+        val remote = item().copy(status = MediaStatus.pending)
         assertNull(resolver.resolve(local, remote))
     }
 }

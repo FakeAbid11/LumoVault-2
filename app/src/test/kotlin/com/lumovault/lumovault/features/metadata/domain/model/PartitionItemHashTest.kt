@@ -130,24 +130,25 @@ class PartitionItemHashTest {
     @Test
     fun `toJson is sparse and round-trips`() {
         val source = item(
-            fileName = "IMG_1.jpg",
             telegramMessageId = "42",
-            fileSize = 1024,
-            width = 1920,
-            height = 1080,
             isFavorite = true,
             tags = listOf("trip"),
             aiLabels = listOf("beach"),
             supersededMessageIds = listOf("40"),
-            status = MediaStatus.uploaded,
+        ).copy(
+            fileName = "IMG_1.jpg",
+            fileSize = 1024,
+            width = 1920,
+            height = 1080,
             locationName = "Nice",
             description = "sunset",
             albumName = "Summer",
             deviceFolder = "Camera",
             isDateUserSet = true,
+            status = MediaStatus.uploaded,
         )
         val parsed = PartitionItem.fromJson(source.toJson())!!
-        assertEquals(source.copy(), parsed.copy())
+        assertEquals(source, parsed)
     }
 
     @Test

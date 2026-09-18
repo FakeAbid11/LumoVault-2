@@ -206,7 +206,7 @@ class SyncService(
     suspend fun syncToTelegram(
         uploadPartition: suspend (partitionId: String, json: String) -> Unit,
         uploadManifest: suspend (manifestJson: String) -> Unit,
-        allItems: () -> List<PartitionItem>,
+        allItems: suspend () -> List<PartitionItem>,
         totalSizeBytes: Long,
         now: Instant = Instant.now(),
     ): Int {
