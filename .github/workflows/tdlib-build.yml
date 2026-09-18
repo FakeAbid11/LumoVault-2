@@ -113,9 +113,15 @@ jobs:
           exit $fail
 
       - name: Commit prebuilt TDLib
+        # The build takes ~40 min, so main usually moves underneath us. The
+        # commit only ever touches tdlib-prebuilt/, so a rebase cannot conflict
+        # in practice -- but without it the push is rejected and 40 minutes of
+        # compile time is lost with the ephemeral runner.
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tdlib-prebuilt
           git commit -m "Build official TDLib ($TDLIB_REF, JNI) for $ABIS" || echo "Nothing to commit"
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
           git push
