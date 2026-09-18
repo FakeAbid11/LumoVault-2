@@ -18,16 +18,17 @@ import java.time.Instant
 class SyncServiceTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private val scope = kotlinx.coroutines.CoroutineScope(dispatcher)
 
     private fun services(): Triple<PartitionService, ManifestService, SyncService> {
-        val partitions = PartitionService(InMemoryPartitionStore(), dispatcher)
-        val manifest = ManifestService(InMemoryManifestStore(), dispatcher)
+        val partitions = PartitionService(InMemoryPartitionStore(), scope)
+        val manifest = ManifestService(InMemoryManifestStore(), scope)
         val sync = SyncService(
             partitionService = partitions,
             manifestService = manifest,
             store = InMemorySyncLogStore(),
             debounceMs = 100L,
-            coroutineScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            coroutineScope = scope,
         )
         return Triple(partitions, manifest, sync)
     }

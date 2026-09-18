@@ -172,8 +172,12 @@ class PartitionItemHashTest {
     fun `fromJson tolerates an out-of-range status ordinal`() {
         // A corrupt byte must degrade one item, not take down the partition:
         // fromJsonString gives up on a throw for the whole document.
-        val json = item().toJson().toMutableMap().apply {
-            put("st", kotlinx.serialization.json.JsonPrimitive(97))
+        val source = item().toJson()
+        val json = kotlinx.serialization.json.buildJsonObject {
+            source.forEach { (key, value) ->
+                if (key == "st") put(key, kotlinx.serialization.json.JsonPrimitive(97))
+                else put(key, value)
+            }
         }
         val parsed = PartitionItem.fromJson(json)
         assertEquals(MediaStatus.excluded, parsed?.status)
