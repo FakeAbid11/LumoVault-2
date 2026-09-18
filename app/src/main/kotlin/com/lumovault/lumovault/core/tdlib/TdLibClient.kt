@@ -141,13 +141,13 @@ class TdLibClient(
      *
      * @throws TdLibException on a TDLib error or timeout.
      */
-    suspend fun <T : TdApi.Object> send(request: TdApi.Function<out TdApi.Object>): TdApi.Object {
+    suspend fun send(request: TdApi.Function<out TdApi.Object>): TdApi.Object {
         val client = this.client
         check(initialized && client != null) {
             TdLibException(code = "CLIENT_NOT_INITIALIZED", message = "TDLib client is not initialized")
         }
         val deferred = CompletableDeferred<TdApi.Object>()
-        client.send(request) { result ->
+        client.send(request) { result: TdApi.Object ->
             deferred.complete(result)
         }
         val result = try {
@@ -166,7 +166,7 @@ class TdLibClient(
 
     /** Fire-and-forget variant for requests whose reply we do not need. */
     fun sendFireAndForget(request: TdApi.Function<out TdApi.Object>) {
-        client?.send(request) { /* reply dropped */ }
+        client?.send(request) { _: TdApi.Object -> /* reply dropped */ }
     }
 
     /**
@@ -201,6 +201,7 @@ class TdLibClient(
 
     suspend fun getAuthorizationState(): TdApi.AuthorizationState =
         send(TdApi.GetAuthorizationState()) as TdApi.AuthorizationState
+
 
     suspend fun isAuthenticated(): Boolean = try {
         getAuthorizationState() is TdApi.AuthorizationStateReady

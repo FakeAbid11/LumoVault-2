@@ -1,13 +1,10 @@
 package com.lumovault.lumovault.core.tdlib
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.SecureRandom
-import javax.crypto.KeyGenerator
 
 /**
  * Generates and persists the TDLib database encryption key.
@@ -33,7 +30,7 @@ class TdLibKeyStore(context: Context) {
             context,
             PREF_NAME,
             masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SCM,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
