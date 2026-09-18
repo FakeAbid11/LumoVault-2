@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -106,10 +107,9 @@ class TelegramAuthRepository(
                 // real state rather than concluding "not signed in" from it.
                 try {
                     val settled = withTimeout(BOOTSTRAP_TIMEOUT) {
-                        client.updates.first { update ->
-                            update is TdLibClient.Update.AuthorizationState &&
-                                update.state !is TdApi.AuthorizationStateWaitTdlibParameters
-                        }
+                        client.updates
+                            .filterIsInstance<TdLibClient.Update.AuthorizationState>()
+                            .first { it.state !is TdApi.AuthorizationStateWaitTdlibParameters }
                     }
                     syncAuthState(settled.state)
                 } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
@@ -192,7 +192,9 @@ class TelegramAuthRepository(
         // UNDISPATCHED so the subscription is registered before the send below
         // runs; a lazily-scheduled collector would miss the reply update.
         val subscription = async(start = CoroutineStart.UNDISPATCHED) {
-            client.updates.first { it is TdLibClient.Update.AuthorizationState }
+            client.updates
+                .filterIsInstance<TdLibClient.Update.AuthorizationState>()
+                .first()
         }
         try {
             client.send(request)
