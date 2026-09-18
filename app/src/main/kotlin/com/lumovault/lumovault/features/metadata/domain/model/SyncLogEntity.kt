@@ -1,6 +1,7 @@
 package com.lumovault.lumovault.features.metadata.domain.model
 
 import com.lumovault.lumovault.features.metadata.data.util.Timestamps
+import com.lumovault.lumovault.features.metadata.data.util.strictBooleanOrNull
 import kotlinx.serialization.json.JsonObject
 
 import kotlinx.serialization.json.buildJsonObject
