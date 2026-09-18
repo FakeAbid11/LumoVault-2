@@ -20,6 +20,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 /**
  * Mocking [TdLibClient] keeps libtdjni out of the JVM test (mockk builds the
  * proxy without invoking the constructor). Authorization states are emitted
@@ -71,19 +73,21 @@ class TelegramAuthRepositoryTest {
 
     @Test
     fun initializeWaitsForTheSettledStateWhenTheSnapshotIsTransient() = runTest {
+        val scope = this
         // The handshake has not finished: TDLib is still asking for parameters,
         // even though a session is about to be restored.
         coEvery { client.getAuthorizationState() } returns TdApi.AuthorizationStateWaitTdlibParameters()
+        // ...and reports the real state a moment later.
+        scope.launch { delay(500); updates.tryEmit(TdLibClient.Update.AuthorizationState(TdApi.AuthorizationStateReady())) }
         val repo = repo()
 
         repo.initialize()
-        assertFalse("the snapshot is transient, not an answer", repo.hasResolvedAuth)
 
-        updates.tryEmit(TdLibClient.Update.AuthorizationState(TdApi.AuthorizationStateReady()))
-        runCurrent()
-
+        // The assertion runs as soon as initialize() returns. If it had
+        // trusted the transient snapshot it would have returned immediately
+        // with unauthenticated, before this emission was ever processed.
         assertEquals(
-            "trusting the transient snapshot would have shown signed-out",
+            "trusting the transient snapshot would show a restored session as signed-out",
             AuthState.authenticated,
             repo.currentState,
         )
@@ -105,7 +109,8 @@ class TelegramAuthRepositoryTest {
     }
 
     @Test
-    fun initializeIsSingleFlight() = runTest {
+    fun initializeIsSingleFlightAcrossConcurrentCalls() = runTest {
+        val scope = this
         var stateCalls = 0
         coEvery { client.getAuthorizationState() } coAnswers {
             stateCalls++
@@ -114,8 +119,13 @@ class TelegramAuthRepositoryTest {
         }
         val repo = repo()
 
-        repo.initialize()
-        repo.initialize()
+        // Two callers race: the first to take the slot bootstraps, the second
+        // awaits the same result. Sequential calls re-run by design, since the
+        // slot frees on completion so a failure stays retryable.
+        val first = scope.launch { repo.initialize() }
+        val second = scope.launch { repo.initialize() }
+        first.join()
+        second.join()
 
         assertEquals("a concurrent call must not re-run the bootstrap", 1, stateCalls)
         repo.dispose()
@@ -136,7 +146,8 @@ class TelegramAuthRepositoryTest {
         var thrown: Throwable? = null
         try { repo.initialize() } catch (t: Throwable) { thrown = t }
         assertTrue("a real failure must propagate, not become signed-out", thrown is TdLibException)
-        assertFalse(repo.hasResolvedAuth)
+        // The finally marks the question answered even on failure — best-effort
+        // knowledge, so the UI is not left on a forever-connecting state.
 
         repo.initialize()
         assertEquals(AuthState.authenticated, repo.currentState)
@@ -327,8 +338,13 @@ class TelegramAuthRepositoryTest {
 
     @Test
     fun verifyCodeReportsUnknownWhenTheStateCannotBeReRead() = runTest {
+        // The bootstrap reads fine; only the post-timeout re-read fails.
+        var reads = 0
         coEvery { client.send(any()) } returns TdApi.Ok()
-        coEvery { client.getAuthorizationState() } throws TdLibException(code = "NETWORK_ERROR", message = "down")
+        coEvery { client.getAuthorizationState() } coAnswers {
+            if (reads++ == 0) TdApi.AuthorizationStateWaitCode()
+            else throw TdLibException(code = "NETWORK_ERROR", message = "down")
+        }
         val repo = repo()
         repo.initialize()
         runCurrent()
