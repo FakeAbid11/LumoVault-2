@@ -15,7 +15,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putAll
 import java.io.File
 
 /**
@@ -34,13 +33,15 @@ abstract class MetadataFileStore(protected val context: Context, private val fil
 
     protected val file: File by lazy { File(context.filesDir, fileName) }
 
-    protected fun readEnvelope(): JsonObject? = try {
-        if (!file.exists()) return null
-        val parsed = Json.parseToJsonElement(file.readText()).jsonObject
-        val version = parsed["version"]?.jsonPrimitive?.intOrNull ?: 0
-        if (version < ENVELOPE_VERSION) null else parsed
-    } catch (_: Throwable) {
-        null
+    protected fun readEnvelope(): JsonObject? {
+        return try {
+            if (!file.exists()) return null
+            val parsed = Json.parseToJsonElement(file.readText()).jsonObject
+            val version = parsed["version"]?.jsonPrimitive?.intOrNull ?: 0
+            if (version < ENVELOPE_VERSION) null else parsed
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     /** Write [payload] atomically: temp file, flush, then rename. */
@@ -48,7 +49,7 @@ abstract class MetadataFileStore(protected val context: Context, private val fil
         val envelope = buildJsonObject {
             put("version", ENVELOPE_VERSION)
             put("savedAt", Timestamps.format(java.time.Instant.now()))
-            putAll(payload)
+            payload.forEach { (key, value) -> put(key, value) }
         }
         val temp = File(file.parentFile, "${file.name}.tmp")
         try {

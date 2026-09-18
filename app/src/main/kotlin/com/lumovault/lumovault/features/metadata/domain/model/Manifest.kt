@@ -35,14 +35,16 @@ data class ManifestChunk(
     }
 
     companion object {
-        fun fromJson(obj: JsonObject): ManifestChunk? = try {
-            ManifestChunk(
-                id = obj["id"]?.jsonPrimitive?.content ?: return null,
-                count = obj["count"]?.jsonPrimitive?.intOrNull ?: 0,
-                hash = obj["hash"]?.jsonPrimitive?.content ?: return null,
-            )
-        } catch (_: Throwable) {
-            null
+        fun fromJson(obj: JsonObject): ManifestChunk? {
+            return try {
+                ManifestChunk(
+                    id = obj["id"]?.jsonPrimitive?.content ?: return null,
+                    count = obj["count"]?.jsonPrimitive?.intOrNull ?: 0,
+                    hash = obj["hash"]?.jsonPrimitive?.content ?: return null,
+                )
+            } catch (_: Throwable) {
+                null
+            }
         }
     }
 }
@@ -86,30 +88,34 @@ data class Manifest(
          * Parses a manifest, or null if it is not one. A missing
          * `schema_version` means v1 — the field was not always present.
          */
-        fun fromJsonString(text: String): Manifest? = try {
-            fromJson(Json.parseToJsonElement(text).jsonObject)
-        } catch (_: Throwable) {
-            null
+        fun fromJsonString(text: String): Manifest? {
+            return try {
+                fromJson(Json.parseToJsonElement(text).jsonObject)
+            } catch (_: Throwable) {
+                null
+            }
         }
 
-        fun fromJson(obj: JsonObject): Manifest? = try {
-            val app = obj["app"]?.jsonPrimitive?.content
-            if (app != null && app != APP_NAME) return null
-            val chunks = (obj["chunks"] as? kotlinx.serialization.json.JsonArray)
-                ?.mapNotNull { (it as? JsonObject)?.let(ManifestChunk::fromJson) }
-                .orEmpty()
-            Manifest(
-                schemaVersion = obj["schema_version"]?.jsonPrimitive?.intOrNull ?: 1,
-                created = Timestamps.parseOrNull(obj["created"]?.jsonPrimitive?.content)
-                    ?: return null,
-                deviceHash = obj["device_hash"]?.jsonPrimitive?.content ?: return null,
-                totalMedia = obj["total_media"]?.jsonPrimitive?.longOrNull ?: 0L,
-                totalSizeBytes = obj["total_size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
-                lastSync = Timestamps.parseOrNull(obj["last_sync"]?.jsonPrimitive?.content),
-                chunks = chunks,
-            )
-        } catch (_: Throwable) {
-            null
+        fun fromJson(obj: JsonObject): Manifest? {
+            return try {
+                val app = obj["app"]?.jsonPrimitive?.content
+                if (app != null && app != APP_NAME) return null
+                val chunks = (obj["chunks"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { (it as? JsonObject)?.let(ManifestChunk::fromJson) }
+                    .orEmpty()
+                Manifest(
+                    schemaVersion = obj["schema_version"]?.jsonPrimitive?.intOrNull ?: 1,
+                    created = Timestamps.parseOrNull(obj["created"]?.jsonPrimitive?.content)
+                        ?: return null,
+                    deviceHash = obj["device_hash"]?.jsonPrimitive?.content ?: return null,
+                    totalMedia = obj["total_media"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    totalSizeBytes = obj["total_size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    lastSync = Timestamps.parseOrNull(obj["last_sync"]?.jsonPrimitive?.content),
+                    chunks = chunks,
+                )
+            } catch (_: Throwable) {
+                null
+            }
         }
     }
 }

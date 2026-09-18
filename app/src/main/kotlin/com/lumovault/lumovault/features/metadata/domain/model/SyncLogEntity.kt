@@ -2,7 +2,7 @@ package com.lumovault.lumovault.features.metadata.domain.model
 
 import com.lumovault.lumovault.features.metadata.data.util.Timestamps
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanStrictOrNull
+
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,7 +42,7 @@ data class SyncLogEntity(
                 timestamp = Timestamps.parseOrNull(obj["timestamp"]?.jsonPrimitive?.content)
                     ?: Instant.now(),
                 details = obj["details"]?.jsonPrimitive?.content,
-                success = obj["success"]?.jsonPrimitive?.booleanStrictOrNull ?: true,
+                success = obj["success"]?.jsonPrimitive?.strictBooleanOrNull ?: true,
                 error = obj["error"]?.jsonPrimitive?.content,
             )
         } catch (_: Throwable) {

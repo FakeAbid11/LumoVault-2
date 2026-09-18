@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.booleanStrictOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -137,18 +136,18 @@ data class PartitionItem(
                     width = obj["w"]?.jsonPrimitive?.intOrNull ?: 0,
                     height = obj["ht"]?.jsonPrimitive?.intOrNull ?: 0,
                     durationMs = obj["d"]?.jsonPrimitive?.longOrNull,
-                    isFavorite = obj["fav"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
-                    isHidden = obj["hid"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
-                    isArchived = obj["arc"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
-                    isTrashed = obj["trash"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
+                    isFavorite = obj["fav"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
+                    isHidden = obj["hid"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
+                    isArchived = obj["arc"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
+                    isTrashed = obj["trash"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
                     trashedAt = Timestamps.parseOrNull(obj["trasht"]?.jsonPrimitive?.contentOrNull),
-                    isDeleted = obj["del"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
+                    isDeleted = obj["del"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
                     deletedAt = Timestamps.parseOrNull(obj["delt"]?.jsonPrimitive?.contentOrNull),
                     albumName = obj["alb"]?.jsonPrimitive?.contentOrNull,
                     deviceFolder = obj["fol"]?.jsonPrimitive?.contentOrNull,
                     description = obj["desc"]?.jsonPrimitive?.contentOrNull,
                     tags = obj.stringList("tags"),
-                    isDateUserSet = obj["dus"]?.jsonPrimitive?.booleanStrictOrNull ?: false,
+                    isDateUserSet = obj["dus"]?.jsonPrimitive?.strictBooleanOrNull ?: false,
                     locationName = obj["locn"]?.jsonPrimitive?.contentOrNull,
                     aiLabels = obj.stringList("ail"),
                     status = MediaStatus.fromIndex(obj["st"]?.jsonPrimitive?.intOrNull ?: 0),

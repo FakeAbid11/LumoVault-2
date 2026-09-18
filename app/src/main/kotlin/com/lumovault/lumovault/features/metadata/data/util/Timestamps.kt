@@ -36,3 +36,18 @@ object Timestamps {
         }
     }
 }
+
+/**
+ * Strict boolean parse for a JSON primitive: only the literal `"true"` is true.
+ *
+ * The boolean fields on [com.lumovault.lumovault.features.metadata.domain.model.PartitionItem]
+ * are sparse — they are written only when true — so anything else under that
+ * key is corruption, and falling back to the default rather than to a lenient
+ * true keeps one bad byte from silently trashing an item's state.
+ */
+val kotlinx.serialization.json.JsonPrimitive.strictBooleanOrNull: Boolean?
+    get() = when (content) {
+        "true" -> true
+        "false" -> false
+        else -> null
+    }
