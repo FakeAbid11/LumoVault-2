@@ -79,9 +79,9 @@ class MediaScannerService @Inject constructor(
         MediaStore.MediaColumns.BUCKET_ID,
         MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
         MediaStore.MediaColumns.RELATIVE_PATH,
-        MediaStore.MediaColumns.LATITUDE,
-        MediaStore.MediaColumns.LONGITUDE,
         MediaStore.MediaColumns.DURATION,
+        // Note: MediaStore no longer exposes LATITUDE/LONGITUDE (removed in
+        // API 29). Coordinates are read from EXIF in the metadata pass.
     )
 
     /**
@@ -129,10 +129,10 @@ class MediaScannerService @Inject constructor(
                         bucketId = c.getStringOrNull(MediaStore.MediaColumns.BUCKET_ID),
                         bucketName = c.getStringOrNull(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME),
                         relativePath = c.getStringOrNull(MediaStore.MediaColumns.RELATIVE_PATH),
-                        // Null on API 29+ unless ACCESS_MEDIA_LOCATION is held;
-                        // EXIF extraction backfills these in the metadata pass.
-                        latitude = c.getDoubleOrNull(MediaStore.MediaColumns.LATITUDE),
-                        longitude = c.getDoubleOrNull(MediaStore.MediaColumns.LONGITUDE),
+                        // MediaStore dropped LATITUDE/LONGITUDE in API 29;
+                        // the metadata pass reads them from EXIF instead.
+                        latitude = null,
+                        longitude = null,
                         isVideo = isVideo,
                     ),
                 )
