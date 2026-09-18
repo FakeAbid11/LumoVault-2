@@ -1,6 +1,5 @@
 package com.lumovault.lumovault.core.tdlib
 
-import io.mockk.atLeast
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -273,7 +272,7 @@ class TdLibConnectionManagerTest {
         advanceTimeBy(60_000) // two heartbeat intervals
         advanceUntilIdle()
 
-        coVerify(atLeast(2)) { client.send(any()) }
+        coVerify(atLeast = 2) { client.send(any()) }
     }
 
     @Test
