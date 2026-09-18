@@ -1,9 +1,11 @@
 package com.lumovault.lumovault.core.tdlib
 
+import org.drinkless.tdlib.TdApi
+
 /**
  * Semantic Telegram error codes.
  *
- * **The load-bearing detail**: TDLib's JSON/typed `Error.code` is an HTTP-style
+ * **The load-bearing detail**: TDLib's [TdApi.Error.code] is an HTTP-style
  * number (400/401/429). The *semantic* identifier (`PHONE_NUMBER_INVALID`,
  * `FLOOD_WAIT_30`) lives in [TdApi.Error.message]. Code that switched on the
  * numeric code matched nothing and silently failed every request.
@@ -80,9 +82,7 @@ object TdLibErrors {
 class TdLibException(
     val code: String,
     message: String,
-    val displayMessage: String = TdLibErrors.userFacingMessage(
-        TdApi.Error(0, message.ifEmpty { code }),
-    ),
+    val displayMessage: String = userFacingMessageFor(code, message),
 ) : Exception(message.ifEmpty { code }) {
 
     val isFloodWait: Boolean get() = code.startsWith("FLOOD_WAIT")
@@ -92,5 +92,8 @@ class TdLibException(
     companion object {
         fun from(error: TdApi.Error): TdLibException =
             TdLibException(code = TdLibErrors.semanticCode(error), message = error.message)
+
+        private fun userFacingMessageFor(code: String, message: String): String =
+            TdLibErrors.userFacingMessage(TdApi.Error(0, message.ifEmpty { code }))
     }
 }
