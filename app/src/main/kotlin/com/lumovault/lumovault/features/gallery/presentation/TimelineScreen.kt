@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
@@ -27,7 +27,7 @@ import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineScreen(
-    onOpenItem: (MediaItemEntity) -> Unit,
+    onOpenItem: (index: Int) -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
@@ -73,8 +73,8 @@ fun TimelineScreen(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                items(items, key = { it.localId }) { item ->
-                    MediaGridTile(item = item, onClick = { onOpenItem(item) })
+                itemsIndexed(items, key = { _, item -> item.localId }) { index, item ->
+                    MediaGridTile(item = item, onClick = { onOpenItem(index) })
                 }
             }
         }

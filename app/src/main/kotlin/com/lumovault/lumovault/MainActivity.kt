@@ -21,8 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.lumovault.lumovault.core.navigation.LumoVaultNavGraph
 import com.lumovault.lumovault.core.theme.LumoVaultTheme
-import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -69,9 +69,6 @@ private fun GalleryEntry() {
             }
         }
     } else {
-        TimelineScreen(
-            onOpenItem = { },
-            onOpenSettings = { },
-        )
+        LumoVaultNavGraph()
     }
 }
