@@ -1,5 +1,7 @@
 package com.lumovault.lumovault.core.auth
 
+import com.lumovault.lumovault.core.tdlib.TdLibClient
+import com.lumovault.lumovault.core.tdlib.TdLibException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
