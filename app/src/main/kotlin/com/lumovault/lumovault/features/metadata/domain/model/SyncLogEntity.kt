@@ -2,9 +2,12 @@ package com.lumovault.lumovault.features.metadata.domain.model
 
 import com.lumovault.lumovault.features.metadata.data.util.Timestamps
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanStrictOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import java.time.Instant
 
 /**

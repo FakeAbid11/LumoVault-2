@@ -8,11 +8,14 @@ import com.lumovault.lumovault.features.metadata.domain.model.SyncLogEntity
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putAll
 import java.io.File
 
 /**
@@ -34,7 +37,7 @@ abstract class MetadataFileStore(protected val context: Context, private val fil
     protected fun readEnvelope(): JsonObject? = try {
         if (!file.exists()) return null
         val parsed = Json.parseToJsonElement(file.readText()).jsonObject
-        val version = parsed["version"]?.jsonPrimitive?.intOrNullSafe ?: 0
+        val version = parsed["version"]?.jsonPrimitive?.intOrNull ?: 0
         if (version < ENVELOPE_VERSION) null else parsed
     } catch (_: Throwable) {
         null
@@ -152,6 +155,3 @@ class SyncLogFileStore(context: Context) : MetadataFileStore(context, "sync_log.
         const val MAX_ENTRIES = 1000
     }
 }
-
-private val kotlinx.serialization.json.JsonPrimitive.intOrNullSafe: Int?
-    get() = this.intOrNull

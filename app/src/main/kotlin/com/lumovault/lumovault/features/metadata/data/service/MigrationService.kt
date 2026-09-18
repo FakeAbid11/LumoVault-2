@@ -21,7 +21,7 @@ import com.lumovault.lumovault.features.metadata.domain.model.MetadataPartition
  */
 class MigrationService {
 
-    fun interface Migration {
+    interface Migration {
         val targetVersion: Int
     }
 
