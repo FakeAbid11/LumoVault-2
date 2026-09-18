@@ -96,7 +96,13 @@ class ManifestService(
             chunks = chunks,
             schemaVersion = Manifest.CURRENT_SCHEMA_VERSION,
         )
-        // Note: partitionHashes is intentionally left untouched.
+        // The manifest document is stored so the next regeneration can carry
+        // `created` forward and updateAfterSync has something to merge into.
+        // Note: partitionHashes is intentionally left untouched — advancing it
+        // here is the bug that made every partition look clean and suppressed
+        // all re-uploads.
+        current = manifest
+        persist()
         manifest
     }
 
@@ -123,7 +129,33 @@ class ManifestService(
     }
 
     private fun updateAfterSyncInternal(uploadedChunks: Map<String, String>, syncTime: Instant) {
-        val existing = current ?: return
+        // The baseline advances for the uploaded chunks regardless of whether a
+        // manifest document exists yet — a first sync has nothing to merge into
+        // but must still record what it just pushed, or the next pass re-uploads
+        // everything.
+        val baseline = partitionHashes.toMutableMap()
+        uploadedChunks.forEach { (id, hash) -> baseline[id] = hash }
+        partitionHashes = baseline
+
+        val existing = current
+        if (existing == null) {
+            // No manifest to merge into; record exactly what was uploaded. The
+            // counts come from the live partition set if the caller noted them.
+            val chunks = uploadedChunks.map { (id, hash) ->
+                ManifestChunk(id = id, count = partitionsForChunkCount[id] ?: 0, hash = hash)
+            }.sortedBy { it.id }
+            current = Manifest(
+                created = syncTime,
+                deviceHash = "",
+                totalMedia = chunks.sumOf { it.count.toLong() },
+                totalSizeBytes = 0L,
+                lastSync = syncTime,
+                chunks = chunks,
+            )
+            persist()
+            return
+        }
+
         val chunksById = existing.chunks.associateBy { it.id }.toMutableMap()
 
         // Overwrite only the uploaded ids; everything else is carried forward.
@@ -138,11 +170,6 @@ class ManifestService(
             totalMedia = merged.sumOf { it.count.toLong() },
             lastSync = syncTime,
         )
-
-        // The baseline advances only for the uploaded chunks.
-        val baseline = partitionHashes.toMutableMap()
-        uploadedChunks.forEach { (id, hash) -> baseline[id] = hash }
-        partitionHashes = baseline
 
         persist()
     }

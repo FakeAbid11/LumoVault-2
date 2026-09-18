@@ -70,13 +70,14 @@ class SyncServiceTest {
         var flushCount = 0
         sync.flushHandler = { flushCount++ }
 
-        repeat(5) { i ->
+        repeat(5) {
             sync.enqueueChange("a", "update")
-            advanceTimeBy(50L) // less than the 100 ms window
+            advanceTimeBy(50L) // less than the 100 ms window, so the timer keeps re-arming
+            assertEquals("no flush while the stream is running", 0, flushCount)
         }
+        // Only once the stream stops does the window finally close.
         advanceUntilIdle()
-
-        assertEquals("each enqueue re-arms the timer", 0, flushCount)
+        assertEquals(1, flushCount)
     }
 
     @Test
@@ -109,13 +110,19 @@ class SyncServiceTest {
 
         sync.enqueueChange("a", "create")
         sync.enqueueChange("a", "update")
-        advanceUntilIdle()
+        assertEquals(2, sync.pendingCount)
 
-        // First attempt coalesced to one entry; the retry re-expanded to two,
-        // because the re-queue uses the raw batch, not the coalesced list.
+        // The flush fails; the raw batch (2 entries) goes back on the queue
+        // rather than the coalesced view (1 entry).
+        advanceTimeBy(100L)
+        assertEquals(1, attempts)
+        assertEquals(2, sync.pendingCount)
+
+        // The retry succeeds and drains the queue.
+        advanceUntilIdle()
         assertEquals(2, attempts)
+        assertEquals(0, sync.pendingCount)
         assertEquals(1, seen[0].size)
-        assertEquals(2, seen[1].size)
     }
 
     @Test
