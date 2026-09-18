@@ -25,7 +25,12 @@ data class AlbumEntity(
         ForeignKey(entity = AlbumEntity::class, parentColumns = ["id"], childColumns = ["album_id"], onDelete = ForeignKey.CASCADE),
         ForeignKey(entity = MediaItemEntity::class, parentColumns = ["local_id"], childColumns = ["media_id"], onDelete = ForeignKey.CASCADE),
     ],
-    indices = [Index(value = ["album_id", "media_id"], unique = true)],
+    indices = [
+        Index(value = ["album_id", "media_id"], unique = true),
+        // media_id lookups (albumsForMedia) can't use the composite index,
+        // whose leading column is album_id.
+        Index(value = ["media_id"], name = "idx_album_items_media_id"),
+    ],
 )
 data class AlbumItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

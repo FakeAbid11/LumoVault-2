@@ -26,6 +26,9 @@ enum class MediaStatus { pending, uploading, uploaded, failed, excluded }
         Index(value = ["created_at"], name = "idx_media_items_created_at"),
         Index(value = ["is_favorite"], name = "idx_media_items_is_favorite"),
         Index(value = ["is_trashed", "trashed_at"], name = "idx_media_items_trashed_trashed_at"),
+        // local_id is the row identity referenced by album_items.media_id;
+        // SQLite requires a unique index on any FK-referenced column.
+        Index(value = ["local_id"], unique = true, name = "idx_media_items_local_id"),
     ],
 )
 data class MediaItemEntity(
