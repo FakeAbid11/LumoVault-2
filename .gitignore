@@ -1,0 +1,24 @@
+# Gradle / build
+.gradle/
+build/
+*/build/
+app/build/
+tdlib-prebuilt/*/lib*.so.tmp
+
+# TDLib source checkout (built and committed by CI into tdlib-prebuilt/)
+td/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local config — never commit credentials
+local.properties
+*.keystore
+*.jks
+key.properties
+
+# OS
+.DS_Store
+Thumbs.db

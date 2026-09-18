@@ -1,0 +1,121 @@
+name: Build TDLib
+
+# Compiles the official TDLib (github.com/tdlib/td) with JNI enabled for the
+# ABIs the app ships, then commits libtdjni.so + the generated Java bindings
+# into tdlib-prebuilt/ so the app build never has to compile C++.
+#
+# This is expensive (~30-60 min per ABI on a 2-core runner). It only runs on
+# manual dispatch or when this file changes, and its output is cached.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tdlib_version:
+        description: "TDLib git tag or commit"
+        required: false
+        default: "v1.8.33"
+  push:
+    paths:
+      - ".github/workflows/tdlib-build.yml"
+
+env:
+  TDLIB_VERSION: ${{ github.event.inputs.tdlib_version || 'v1.8.33' }}
+  NDK_VERSION: "27.2.12479018"
+  CMAKE_VERSION: "3.22.1"
+  ABIS: "arm64-v8a x86_64"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK + NDK + CMake
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            ndk;${{ env.NDK_VERSION }}
+            cmake;${{ env.CMAKE_VERSION }}
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Cache TDLib sources
+        uses: actions/cache@v4
+        with:
+          path: td
+          key: tdlib-src-${{ env.TDLIB_VERSION }}
+
+      - name: Clone TDLib
+        run: |
+          if [ ! -d td/.git ]; then
+            git clone --depth 1 --branch "$TDLIB_VERSION" https://github.com/tdlib/td td
+          else
+            echo "Using cached TDLib source"
+          fi
+
+      - name: Cache TDLib build outputs
+        id: tdlib-cache
+        uses: actions/cache@v4
+        with:
+          path: tdlib-prebuilt
+          key: tdlib-prebuilt-${{ env.TDLIB_VERSION }}-${{ env.ABIS }}
+
+      - name: Build TDLib for all ABIs
+        if: steps.tdlib-cache.outputs.cache-hit != 'true'
+        working-directory: td
+        run: |
+          # The official example/android/build.sh cross-compiles OpenSSL,
+          # zlib and TDLib itself with the NDK toolchain, with JNI enabled.
+          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          export ANDROID_NDK_VERSION="$NDK_VERSION"
+          cd example/android
+          ./build.sh
+
+      - name: Collect prebuilt library and Java bindings
+        if: steps.tdlib-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          mkdir -p tdlib-prebuilt/src/main/java
+          # libtdjni.so per ABI
+          find td/example/android/libs -name 'libtdjni.so' -print0 | while IFS= read -r -d '' so; do
+            abi=$(basename "$(dirname "$so")")
+            mkdir -p "tdlib-prebuilt/$abi"
+            cp "$so" "tdlib-prebuilt/$abi/"
+          done
+          # Generated org.drinkless.tdlib.Client + TdApi sources
+          find td -name 'Client.java' -path '*drinkless*' -print0 | xargs -0 -I{} cp {} tdlib-prebuilt/src/main/java/org/drinkless/tdlib/ 2>/dev/null || \
+            find td -name 'Client.java' -print0 | xargs -0 -I{} cp {} tdlib-prebuilt/src/main/java/
+          find td -name 'TdApi.java' -print0 | xargs -0 -I{} cp {} tdlib-prebuilt/src/main/java/
+          echo "=== tdlib-prebuilt tree ==="
+          find tdlib-prebuilt -type f | sort
+
+      - name: Verify outputs
+        if: steps.tdlib-cache.outputs.cache-hit != 'true'
+        run: |
+          fail=0
+          for abi in $ABIS; do
+            [ -f "tdlib-prebuilt/$abi/libtdjni.so" ] || { echo "MISSING libtdjni.so for $abi"; fail=1; }
+          done
+          [ -f tdlib-prebuilt/src/main/java/org/drinkless/tdlib/Client.java ] || { echo "MISSING Client.java"; fail=1; }
+          [ -f tdlib-prebuilt/src/main/java/org/drinkless/tdlib/TdApi.java ] || { echo "MISSING TdApi.java"; fail=1; }
+          exit $fail
+
+      - name: Commit prebuilt TDLib
+        if: steps.tdlib-cache.outputs.cache-hit != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tdlib-prebuilt
+          git commit -m "Build official TDLib $TDLIB_VERSION (JNI) for $ABIS" || echo "Nothing to commit"
+          git push
