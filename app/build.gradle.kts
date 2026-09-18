@@ -38,25 +38,28 @@ android {
             // produced by .github/workflows/tdlib-build.yml and committed under
             // tdlib-prebuilt/ (absent until that workflow runs once).
             java.srcDirs("../tdlib-prebuilt/src/main/java")
-            // The prebuilt tree also carries tdlib-prebuilt/build-<abi>-Java/
-            // duplicates of the .so, which are NOT valid jniLibs ABI directory
-            // names and break mergeDebugNativeLibs. Copy only the real ABIs into
-            // a generated jniLibs root instead of pointing srcDirs at the tree.
-            jniLibs.srcDir(layout.buildDirectory.dir("generated/tdlibJniLibs"))
+            // jniLibs is wired below, after the copy task that stages only the
+            // valid ABI directories out of the prebuilt tree.
         }
     }
 }
 
 // Populates the generated jniLibs root from tdlib-prebuilt/<abi>/libtdjni.so.
-tasks.register<Copy>("installTdlibPrebuiltJniLibs") {
+//
+// The prebuilt tree also carries build-<abi>-Java/ copies of libtdjni.so, which
+// are NOT valid jniLibs ABI directory names and break the merge. Copying only
+// the real ABIs into a generated root keeps the tree as the source of truth.
+//
+// Passing the TaskProvider itself (not a plain path) as the srcDir makes Gradle
+// treat the copy task's output as a buildable input, so the implicit dependency
+// on the merge tasks is registered automatically — a bare build-directory path
+// trips Gradle's dependency validation on mergeDebugJniLibFolders.
+val installTdlibPrebuiltJniLibs = tasks.register<Copy>("installTdlibPrebuiltJniLibs") {
     from("../tdlib-prebuilt")
     into(layout.buildDirectory.dir("generated/tdlibJniLibs"))
     include("arm64-v8a/**", "x86_64/**")
 }
-// mergeNativeLibs consumes the jniLibs source dirs, so it must not run before
-// they are populated.
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("NativeLibs") }
-    .configureEach { dependsOn("installTdlibPrebuiltJniLibs") }
+android.sourceSets.getByName("main").jniLibs.srcDir(installTdlibPrebuiltJniLibs)
 
 android {
 
