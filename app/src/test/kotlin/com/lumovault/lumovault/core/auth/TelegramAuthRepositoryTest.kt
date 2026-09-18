@@ -107,7 +107,7 @@ class TelegramAuthRepositoryTest {
     @Test
     fun initializeIsSingleFlight() = runTest {
         var stateCalls = 0
-        coEvery { client.getAuthorizationState() } answers {
+        coEvery { client.getAuthorizationState() } coAnswers {
             stateCalls++
             delay(500)
             TdApi.AuthorizationStateReady()
@@ -408,7 +408,7 @@ class TelegramAuthRepositoryTest {
 
     @Test
     fun authStaysUnresolvedUntilTdLibActuallyAnswers() = runTest {
-        coEvery { client.getAuthorizationState() } answers {
+        coEvery { client.getAuthorizationState() } coAnswers {
             delay(1_000)
             TdApi.AuthorizationStateWaitPhoneNumber()
         }
