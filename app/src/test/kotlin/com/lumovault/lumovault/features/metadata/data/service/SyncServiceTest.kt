@@ -113,8 +113,9 @@ class SyncServiceTest {
         assertEquals(2, sync.pendingCount)
 
         // The flush fails; the raw batch (2 entries) goes back on the queue
-        // rather than the coalesced view (1 entry).
-        advanceTimeBy(100L)
+        // rather than the coalesced view (1 entry). Past the 100 ms debounce
+        // but short of the 200 ms retry, so only the failed attempt has run.
+        advanceTimeBy(150L)
         assertEquals(1, attempts)
         assertEquals(2, sync.pendingCount)
 
