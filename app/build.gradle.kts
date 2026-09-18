@@ -38,9 +38,27 @@ android {
             // produced by .github/workflows/tdlib-build.yml and committed under
             // tdlib-prebuilt/ (absent until that workflow runs once).
             java.srcDirs("../tdlib-prebuilt/src/main/java")
-            jniLibs.srcDirs("src/main/jniLibs", "../tdlib-prebuilt")
+            // The prebuilt tree also carries tdlib-prebuilt/build-<abi>-Java/
+            // duplicates of the .so, which are NOT valid jniLibs ABI directory
+            // names and break mergeDebugNativeLibs. Copy only the real ABIs into
+            // a generated jniLibs root instead of pointing srcDirs at the tree.
+            jniLibs.srcDir(layout.buildDirectory.dir("generated/tdlibJniLibs"))
         }
     }
+}
+
+// Populates the generated jniLibs root from tdlib-prebuilt/<abi>/libtdjni.so.
+tasks.register<Copy>("installTdlibPrebuiltJniLibs") {
+    from("../tdlib-prebuilt")
+    into(layout.buildDirectory.dir("generated/tdlibJniLibs"))
+    include("arm64-v8a/**", "x86_64/**")
+}
+// mergeNativeLibs consumes the jniLibs source dirs, so it must not run before
+// they are populated.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("NativeLibs") }
+    .configureEach { dependsOn("installTdlibPrebuiltJniLibs") }
+
+android {
 
     buildTypes {
         release {
