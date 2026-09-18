@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import com.lumovault.lumovault.core.tdlib.TdLibClient
 import com.lumovault.lumovault.core.tdlib.TdLibException
@@ -68,9 +69,14 @@ class TelegramAuthRepository(
     private val initLock = Any()
     @Volatile private var initializeInFlight: Deferred<Unit>? = null
 
-    override suspend fun initialize() {
+    override suspend fun initialize() = supervisorScope {
+        // supervisorScope, not the raw scope: a failed bootstrap completes the
+        // Deferred exceptionally, and in a non-supervised scope that exception
+        // cancels the parent on top of being rethrown to the awaiter. Callers
+        // catch it — a retryable connect failure must not look like a
+        // scope-wide crash.
         val deferred = synchronized(initLock) {
-            initializeInFlight ?: scope.async {
+            initializeInFlight ?: async {
                 try {
                     initializeNow()
                 } finally {
