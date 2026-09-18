@@ -55,6 +55,7 @@ class TdLibClient(
         data class MessagesDeleted(val chatId: Long, val messageIds: LongArray) : Update
     }
 
+    private val ownsScope = coroutineScope == null
     private val scope = coroutineScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Buffered so a burst of updates does not suspend the native receive thread.
@@ -231,7 +232,7 @@ class TdLibClient(
 
     fun dispose() {
         close()
-        scope.cancel()
+        if (ownsScope) scope.cancel()
     }
 
     private companion object {
