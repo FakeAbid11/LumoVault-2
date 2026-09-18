@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import com.lumovault.lumovault.core.tdlib.TdLibClient
+import com.lumovault.lumovault.core.tdlib.TdLibException
 import org.drinkless.tdlib.TdApi
 import kotlin.time.Duration.Companion.seconds
 
