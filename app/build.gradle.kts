@@ -69,6 +69,11 @@ android {
     }
 }
 
+ksp {
+    // Room writes its schema JSON here so future migrations can be tested.
+    arg("room.schemaLocation", "${projectDir}/schemas")
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
