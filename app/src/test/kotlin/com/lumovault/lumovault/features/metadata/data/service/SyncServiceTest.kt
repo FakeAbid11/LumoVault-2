@@ -124,14 +124,12 @@ class SyncServiceTest {
         // grow 100, 200, 400 ms. Measured in virtual time.
         val (_, _, sync) = services()
         sync.initialize()
+        val scheduler = testScheduler
 
         val attemptTimes = mutableListOf<Long>()
-        // currentTime resolves against the TestScope receiver; wrapping it lets
-        // the flushHandler lambda read virtual time at each attempt.
-        fun clock(): Long = currentTime
         var failuresLeft = 3
         sync.flushHandler = {
-            attemptTimes += clock()
+            attemptTimes += scheduler.currentTime
             if (failuresLeft-- > 0) throw RuntimeException("channel down")
         }
 
