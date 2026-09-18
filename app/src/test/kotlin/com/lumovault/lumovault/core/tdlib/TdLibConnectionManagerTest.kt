@@ -9,11 +9,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,6 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * Mocking [TdLibClient] keeps the native client out of the JVM test: mockk
  * builds the proxy without invoking the constructor, so `Client`'s static
  * loader (which pulls in libtdjni) never runs.
+ *
+ * Timing notes: the heartbeat is an infinite `while (true) { delay(...) }`
+ * loop, so [kotlinx.coroutines.test.advanceUntilIdle] would advance virtual
+ * time forever and hang. Tests therefore drive the clock with
+ * [advanceTimeBy] only, flush immediate work with [runCurrent], and dispose
+ * the manager before returning so no coroutine outlives the test.
  */
 class TdLibConnectionManagerTest {
 
@@ -47,6 +52,7 @@ class TdLibConnectionManagerTest {
 
         assertEquals(ConnectionStatus.connected, manager.status.value)
         coVerify(exactly = 1) { client.initialize() }
+        manager.dispose()
     }
 
     @Test
@@ -57,6 +63,7 @@ class TdLibConnectionManagerTest {
         manager.connect()
 
         coVerify(exactly = 1) { client.initialize() }
+        manager.dispose()
     }
 
     @Test
@@ -92,9 +99,9 @@ class TdLibConnectionManagerTest {
         failing { manager.send(TdApi.GetAuthorizationState()) }
 
         assertEquals(ConnectionStatus.reconnecting, manager.status.value)
-        // The 1s backoff has not elapsed, so no attempt has been made.
-        advanceUntilIdle()
+        // The 1s backoff has not elapsed, so no reconnect attempt has run.
         coVerify(exactly = 1) { client.initialize() }
+        manager.dispose()
     }
 
     @Test
@@ -107,8 +114,8 @@ class TdLibConnectionManagerTest {
 
         assertEquals(ConnectionStatus.connected, manager.status.value)
         advanceTimeBy(5_000)
-        advanceUntilIdle()
         verify(exactly = 0) { client.close() }
+        manager.dispose()
     }
 
     @Test
@@ -122,24 +129,27 @@ class TdLibConnectionManagerTest {
     }
 
     /**
-     * The regression net for the reconnect bug: the scheduled path must not
-     * tear down a live native client. TDLib owns transport-level recovery and
-     * [TdLibClient.initialize] is idempotent, so this path is a state reset.
-     * Close-and-rebuild happens only on an explicit reconnect from connected.
+     * The regression net for the reconnect bug. The scheduled path must not
+     * tear down a live native client: TDLib owns transport-level recovery and
+     * [TdLibClient.initialize] is idempotent, so this path is a state reset,
+     * not a rebuild. [close] never happening is what keeps the client alive.
      */
     @Test
-    fun aScheduledReconnectRestoresConnectedWithoutRebuildingTheClient() = runTest {
+    fun aScheduledReconnectRestoresConnectedWithoutClosingTheClient() = runTest {
         val manager = manager()
         manager.connect()
         coEvery { client.send(any()) } throws TdLibException(code = "NETWORK_ERROR", message = "down")
         failing { manager.send(TdApi.GetAuthorizationState()) }
 
         advanceTimeBy(1_000) // initial backoff
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(ConnectionStatus.connected, manager.status.value)
         verify(exactly = 0) { client.close() }
-        coVerify(exactly = 1) { client.initialize() }
+        // connect() was entered twice — the original calls initialize() on
+        // every connect and relies on the client's own idempotency.
+        coVerify(exactly = 2) { client.initialize() }
+        manager.dispose()
     }
 
     @Test
@@ -152,6 +162,7 @@ class TdLibConnectionManagerTest {
         verify(exactly = 1) { client.close() }
         coVerify(exactly = 2) { client.initialize() }
         assertEquals(ConnectionStatus.connected, manager.status.value)
+        manager.dispose()
     }
 
     @Test
@@ -167,6 +178,7 @@ class TdLibConnectionManagerTest {
 
         manager.connect()
         coVerify(exactly = 2) { client.initialize() }
+        manager.dispose()
     }
 
     /**
@@ -187,17 +199,18 @@ class TdLibConnectionManagerTest {
 
         failing { manager.send(TdApi.GetAuthorizationState()) } // arms rung 1 (1s)
         advanceTimeBy(1_000) // fires, attempt 2 fails, arms rung 2 (2s)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(ConnectionStatus.reconnecting, manager.status.value)
 
         advanceTimeBy(1_000) // only halfway through rung 2
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("rung 2 must not have fired after 1s", ConnectionStatus.reconnecting, manager.status.value)
         assertEquals(2, attempt.get())
 
         advanceTimeBy(1_000) // rung 2 elapses
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(3, attempt.get())
+        manager.dispose()
     }
 
     @Test
@@ -215,42 +228,44 @@ class TdLibConnectionManagerTest {
         manager.connect()
 
         failing { manager.send(TdApi.GetAuthorizationState()) }
-        // Plenty of virtual time to walk every rung, including the 2-minute cap.
-        repeat(6) {
-            advanceTimeBy(120_000)
-            advanceUntilIdle()
-        }
+        // 10 minutes of virtual time — past every rung, including the cap.
+        advanceTimeBy(10L * 60 * 1000)
+        runCurrent()
 
         assertEquals(ConnectionStatus.failed, manager.status.value)
         // Initial connect + one attempt per rung; the MAX_RETRIES check stops
         // the ladder without arming another attempt.
         assertEquals(TdLibConnectionManager.MAX_RETRIES + 1, attempt.get())
 
-        // The rung widths are 1s, 2s, 4s ... 64s, then capped at 2 minutes. If
-        // the cap were missing the ladder would keep doubling past that.
+        // Rung widths are 1s, 2s, 4s ... 64s, then capped at 2 minutes. Without
+        // the cap the ladder would keep doubling past 120s.
         val gaps = attemptTimes.zipWithNext { a, b -> b - a }
         assertEquals(
             "the deep rungs must all sit at the cap",
             List(3) { TdLibConnectionManager.MAX_BACKOFF_MS },
             gaps.takeLast(3),
         )
+        manager.dispose()
     }
 
     @Test
     fun connectionReadyCancelsAnArmedReconnect() = runTest {
         val manager = manager()
         manager.connect()
+        runCurrent() // let the update collector subscribe
         coEvery { client.send(any()) } throws TdLibException(code = "NETWORK_ERROR", message = "down")
         failing { manager.send(TdApi.GetAuthorizationState()) }
         assertEquals(ConnectionStatus.reconnecting, manager.status.value)
 
-        // TDLib reports the transport healthy again before the timer fires.
+        // TDLib reports the transport healthy again, before the timer fires.
         updates.tryEmit(TdLibClient.Update.ConnectionReady(ready = true))
+        runCurrent()
 
         assertEquals(ConnectionStatus.connected, manager.status.value)
-        advanceTimeBy(5_000)
-        advanceUntilIdle()
+        advanceTimeBy(5_000) // the armed timer was cancelled, so nothing fires
+        runCurrent()
         verify(exactly = 0) { client.close() }
+        manager.dispose()
     }
 
     @Test
@@ -258,7 +273,7 @@ class TdLibConnectionManagerTest {
         val manager = manager() // never connected
 
         advanceTimeBy(120_000) // four heartbeat intervals
-        advanceUntilIdle()
+        runCurrent()
 
         coVerify(exactly = 0) { client.send(any()) }
     }
@@ -270,9 +285,10 @@ class TdLibConnectionManagerTest {
         coEvery { client.send(any()) } returns TdApi.AuthorizationStateReady()
 
         advanceTimeBy(60_000) // two heartbeat intervals
-        advanceUntilIdle()
+        runCurrent()
 
         coVerify(atLeast = 2) { client.send(any()) }
+        manager.dispose()
     }
 
     @Test
@@ -284,7 +300,9 @@ class TdLibConnectionManagerTest {
         manager.dispose()
 
         verify(exactly = 1) { client.close() }
-        assertTrue("the injected scope belongs to its owner, not to the manager",
-            scope.coroutineContext[Job]!!.isActive)
+        assertTrue(
+            "the injected scope belongs to its owner, not to the manager",
+            scope.coroutineContext[Job]!!.isActive,
+        )
     }
 }
