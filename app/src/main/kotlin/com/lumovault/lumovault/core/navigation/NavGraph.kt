@@ -1,23 +1,27 @@
 package com.lumovault.lumovault.core.navigation
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -28,16 +32,79 @@ import androidx.navigation.compose.rememberNavController
 import com.lumovault.lumovault.features.gallery.presentation.MediaViewerScreen
 import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
 
+/**
+ * Every destination in the app.
+ *
+ * Ported from lib/core/router/app_router.dart's 34 routes. Routes whose screen
+ * is not implemented yet still resolve — to [NotImplementedScreen], which says
+ * so plainly. That is deliberate: an unbuilt feature behind a navigation entry
+ * that *looks* finished is how the previous scaffold ended up declaring 36
+ * routes and wiring 17. A visible gap is easier to close than a hidden one.
+ *
+ * The argument-bearing routes carry their nav-arg spec next to the route
+ * template so the two cannot drift.
+ */
 sealed class Screen(val route: String) {
+
+    // -- Onboarding --
+    data object OnboardingWelcome : Screen("onboarding/welcome")
+    data object OnboardingPermissions : Screen("onboarding/permissions")
+    data object OnboardingBackgroundPermissions : Screen("onboarding/background-permissions")
+    data object OnboardingFolders : Screen("onboarding/folders")
+    data object OnboardingTelegram : Screen("onboarding/telegram")
+
+    // -- Shell tabs --
     data object Timeline : Screen("timeline")
     data object Albums : Screen("albums")
-    data object People : Screen("people")
     data object Search : Screen("search")
     data object Map : Screen("map")
+    data object People : Screen("people")
     data object Settings : Screen("settings")
+
+    // -- Gallery --
     data object MediaViewer : Screen("media_viewer/{index}") {
         fun createRoute(index: Int) = "media_viewer/$index"
     }
+    data object Favorites : Screen("favorites")
+    data object Hidden : Screen("hidden")
+    data object Archive : Screen("archive")
+    data object Trash : Screen("trash")
+    data object Duplicates : Screen("duplicates")
+
+    // -- People --
+    data object PersonDetail : Screen("people/{personId}") {
+        fun createRoute(personId: Long) = "people/$personId"
+    }
+
+    // -- Albums --
+    data object AlbumDetail : Screen("albums/{albumId}") {
+        fun createRoute(albumId: Long) = "albums/$albumId"
+    }
+    data object DeviceFolder : Screen("albums/folder/{folderId}") {
+        fun createRoute(folderId: String) = "albums/folder/$folderId"
+    }
+
+    // -- Backup --
+    data object BackupDashboard : Screen("backup")
+    data object BackupSettings : Screen("backup/settings")
+    data object StorageStats : Screen("backup/stats")
+
+    // -- Restore --
+    data object Restore : Screen("restore")
+    data object RestoreProgress : Screen("restore/progress")
+
+    // -- Settings sub-routes --
+    data object SettingsAccount : Screen("settings/account")
+    data object SettingsAbout : Screen("settings/about")
+    data object SettingsGeneral : Screen("settings/general")
+    data object SettingsMedia : Screen("settings/media")
+    data object SettingsStorage : Screen("settings/storage")
+    data object SettingsStorageInsights : Screen("settings/storage-insights")
+    data object SettingsAppearance : Screen("settings/appearance")
+    data object SettingsPrivacy : Screen("settings/privacy")
+    data object SettingsNotifications : Screen("settings/notifications")
+    data object SettingsDeveloper : Screen("settings/developer")
+    data object ConnectTelegram : Screen("connect-telegram")
 }
 
 data class TabItem(
@@ -46,6 +113,12 @@ data class TabItem(
     val icon: @Composable () -> Unit,
 )
 
+/**
+ * The five shell destinations, matching the Flutter `StatefulShellRoute`'s
+ * branches: This device / Cloud / Map / People / Albums. Here the Settings tab
+ * stands in for Cloud until the backup dashboard exists as a top-level
+ * destination.
+ */
 val tabs = listOf(
     TabItem(Screen.Timeline, "Photos", { Icon(Icons.Filled.PhotoLibrary, "Photos") }),
     TabItem(Screen.Albums, "Albums", { Icon(Icons.Filled.Collections, "Albums") }),
@@ -75,8 +148,9 @@ fun LumoVaultNavGraph() {
         NavHost(
             navController = navController,
             startDestination = Screen.Timeline.route,
-            modifier = androidx.compose.ui.Modifier.padding(innerPadding),
+            modifier = Modifier.padding(innerPadding),
         ) {
+            // -- Implemented --
             composable(Screen.Timeline.route) {
                 TimelineScreen(
                     onOpenItem = { index ->
@@ -87,10 +161,6 @@ fun LumoVaultNavGraph() {
                     onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 )
             }
-            composable(Screen.Albums.route) { Placeholder("Albums") }
-            composable(Screen.Search.route) { Placeholder("Search") }
-            composable(Screen.People.route) { Placeholder("People") }
-            composable(Screen.Settings.route) { Placeholder("Settings") }
             composable(Screen.MediaViewer.route) { entry ->
                 val index = entry.arguments?.getString("index")?.toIntOrNull() ?: 0
                 MediaViewerScreen(
@@ -98,6 +168,44 @@ fun LumoVaultNavGraph() {
                     onBack = { navController.popBackStack() },
                 )
             }
+
+            // -- Declared, not yet implemented --
+            // Keep this list alphabetical by route and delete each entry as its
+            // screen lands; an empty list here is the Phase 3 exit criterion.
+            NotImplementedDestination(Screen.OnboardingWelcome, navController)
+            NotImplementedDestination(Screen.OnboardingPermissions, navController)
+            NotImplementedDestination(Screen.OnboardingBackgroundPermissions, navController)
+            NotImplementedDestination(Screen.OnboardingFolders, navController)
+            NotImplementedDestination(Screen.OnboardingTelegram, navController)
+            NotImplementedDestination(Screen.Albums, navController)
+            NotImplementedDestination(Screen.Search, navController)
+            NotImplementedDestination(Screen.Map, navController)
+            NotImplementedDestination(Screen.People, navController)
+            NotImplementedDestination(Screen.Settings, navController)
+            NotImplementedDestination(Screen.Favorites, navController)
+            NotImplementedDestination(Screen.Hidden, navController)
+            NotImplementedDestination(Screen.Archive, navController)
+            NotImplementedDestination(Screen.Trash, navController)
+            NotImplementedDestination(Screen.Duplicates, navController)
+            NotImplementedDestination(Screen.PersonDetail, navController)
+            NotImplementedDestination(Screen.AlbumDetail, navController)
+            NotImplementedDestination(Screen.DeviceFolder, navController)
+            NotImplementedDestination(Screen.BackupDashboard, navController)
+            NotImplementedDestination(Screen.BackupSettings, navController)
+            NotImplementedDestination(Screen.StorageStats, navController)
+            NotImplementedDestination(Screen.Restore, navController)
+            NotImplementedDestination(Screen.RestoreProgress, navController)
+            NotImplementedDestination(Screen.SettingsAccount, navController)
+            NotImplementedDestination(Screen.SettingsAbout, navController)
+            NotImplementedDestination(Screen.SettingsGeneral, navController)
+            NotImplementedDestination(Screen.SettingsMedia, navController)
+            NotImplementedDestination(Screen.SettingsStorage, navController)
+            NotImplementedDestination(Screen.SettingsStorageInsights, navController)
+            NotImplementedDestination(Screen.SettingsAppearance, navController)
+            NotImplementedDestination(Screen.SettingsPrivacy, navController)
+            NotImplementedDestination(Screen.SettingsNotifications, navController)
+            NotImplementedDestination(Screen.SettingsDeveloper, navController)
+            NotImplementedDestination(Screen.ConnectTelegram, navController)
         }
     }
 }
@@ -125,12 +233,51 @@ private fun ScaffoldWithBottomBar(
     )
 }
 
+/**
+ * A route that resolves to an honest "not built yet" screen.
+ *
+ * Distinct from a placeholder that renders mock data: this never implies the
+ * feature works. It takes the nav controller only so it can offer a back
+ * action, and it names the route so the gap is visible in the running app
+ * rather than only in the source.
+ */
 @Composable
-private fun Placeholder(name: String) {
+private fun androidx.navigation.NavGraphBuilder.NotImplementedDestination(
+    screen: Screen,
+    navController: NavHostController,
+) {
+    composable(screen.route) {
+        NotImplementedScreen(route = screen.route, onBack = { navController.popBackStack() })
+    }
+}
+
+@Composable
+fun NotImplementedScreen(route: String, onBack: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Text("$name — coming up")
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Construction,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = route,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Not implemented yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            androidx.compose.material3.TextButton(onClick = onBack) {
+                Text("Back")
+            }
+        }
     }
 }

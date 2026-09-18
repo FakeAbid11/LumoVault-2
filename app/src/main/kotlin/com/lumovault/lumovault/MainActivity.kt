@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,8 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.lumovault.lumovault.core.navigation.LumoVaultNavGraph
-import com.lumovault.lumovault.core.theme.LumoVaultTheme
+import com.lumovault.lumovault.core.navigation.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -30,22 +27,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            LumoVaultTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    GalleryEntry()
-                }
-            }
+            // The theme itself is applied inside AppRoot, where it can read
+            // the persisted appearance settings; keeping a second theme wrapper
+            // here would double-wrap and ignore the user's choices.
+            AppRoot()
         }
     }
 }
 
+/**
+ * Media permission gate.
+ *
+ * Android 13 splits photo/video read access, so the whole set is requested at
+ * once and the result is re-checked rather than trusting the launch promise.
+ * The nav graph runs only after access is granted, so no screen has to
+ * defensively handle an empty MediaStore cursor.
+ */
 @Composable
-private fun GalleryEntry() {
-    // Android 13 splits photo/video read access; request the whole set at once
-    // and re-check the result rather than trusting the launch promise.
+fun MediaPermissionGate(content: @Composable () -> Unit) {
     val permissions = remember {
         buildList {
             add(Manifest.permission.READ_MEDIA_IMAGES)
@@ -69,6 +68,6 @@ private fun GalleryEntry() {
             }
         }
     } else {
-        LumoVaultNavGraph()
+        content()
     }
 }

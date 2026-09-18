@@ -28,6 +28,21 @@ jobs:
       - name: Gradle setup
         uses: gradle/actions/setup-gradle@v4
 
+      # Telegram credentials are injected as Gradle properties so they never
+      # land in a tracked file. Until these secrets exist, TdLibConfig
+      # .hasCredentials is false and the client fails with a clear API_ID_INVALID
+      # rather than an obscure TDLib error.
+      - name: Write Telegram credentials
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          if [ -n "$TELEGRAM_API_ID" ] && [ -n "$TELEGRAM_API_HASH" ]; then
+            mkdir -p ~/.gradle
+            printf 'TELEGRAM_API_ID=%s\nTELEGRAM_API_HASH=%s\n' \
+              "$TELEGRAM_API_ID" "$TELEGRAM_API_HASH" >> ~/.gradle/gradle.properties
+          fi
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
