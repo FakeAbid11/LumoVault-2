@@ -49,6 +49,9 @@ import com.lumovault.lumovault.features.gallery.data.service.DeviceFolder
  * [OnboardingViewModel.completeOnboarding] persists as `includedFolders`.
  *
  * The zero-selection warning dialog is carried over intact: the original
+ * passed with no warning while the backup scheduler silently rejected every
+ * photo, so Continue-with-none now asks first.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderSelectionScreen(
@@ -156,9 +159,6 @@ fun FolderSelectionScreen(
     }
 }
 
- * passed with no warning while the backup scheduler silently rejected every
- * photo, so Continue-with-none now asks first.
- */
 @Composable
 private fun FolderList(
     folders: List<DeviceFolder>,
