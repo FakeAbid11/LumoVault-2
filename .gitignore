@@ -22,3 +22,9 @@ key.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# local CI-watch helpers
+ci_*.txt
+ci_*.log
+ci_result.json
+watch_ci.ps1
