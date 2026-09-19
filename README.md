@@ -8,10 +8,13 @@ Navigation Compose.
 
 ## Status
 
-Active rewrite. The TDLib substrate (client, connection manager, auth), the
-metadata sync engine, the Room layer, the upload queue, and the gallery pipeline
-are ported and unit-tested. See the plan in the parent project's notes for the
-phase breakdown.
+Active rewrite. Ported and wired: TDLib substrate (client, connection manager,
+auth), metadata sync engine, Room layer, upload queue, gallery pipeline,
+albums, settings (hub + 10 sub-screens), app lock (PIN + biometric), onboarding
+(5 screens), people (list + detail), backup/restore screens (engines land in
+Phase 4 — their controls are visibly disabled, not fake), search, osmdroid map,
+and local folders. All 33 declared routes resolve; only the device-folder
+detail is still a stub.
 
 ## Requirements
 
