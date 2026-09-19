@@ -154,6 +154,7 @@ fun PersonDetailScreen(
     var showMovePicker by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     fun exitSelection() {

@@ -127,7 +127,7 @@ fun TrashScreen(
             count = ids.size,
             onDismiss = { pendingDelete = null },
             onConfirm = {
-                viewModel.deletePermanently(ids.toList())
+                viewModel.deletePermanently(ids)
                 selected = selected - ids
                 pendingDelete = null
             },

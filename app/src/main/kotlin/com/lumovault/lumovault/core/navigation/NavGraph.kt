@@ -49,7 +49,7 @@ import com.lumovault.lumovault.features.gallery.presentation.SearchScreen
 import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
 import com.lumovault.lumovault.features.gallery.presentation.TrashScreen
 import com.lumovault.lumovault.features.onboarding.presentation.BackgroundPermissionsScreen
-import com.lumovault.lumovault.features.onboarding.presentation.FolderSelectionScreen as OnboardingFolderSelectionScreen
+import com.lumovault.lumovault.features.onboarding.presentation.FolderSelectionScreen
 import com.lumovault.lumovault.features.onboarding.presentation.PermissionsScreen
 import com.lumovault.lumovault.features.onboarding.presentation.TelegramConnectScreen
 import com.lumovault.lumovault.features.onboarding.presentation.WelcomeScreen
@@ -300,7 +300,7 @@ fun LumoVaultNavGraph() {
                 )
             }
             composable(Screen.OnboardingFolders.route) {
-                OnboardingFolderSelectionScreen(
+                FolderSelectionScreen(
                     onNext = { navController.navigate(Screen.OnboardingTelegram.route) },
                     onBack = { navController.popBackStack() },
                 )
