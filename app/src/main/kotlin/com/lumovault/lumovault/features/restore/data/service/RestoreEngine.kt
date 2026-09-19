@@ -37,7 +37,7 @@ import javax.inject.Singleton
  *
  * Cross-app compatibility: media captions are the [CaptionMetadata] JSON
  * documented in docs/WIRE-FORMAT.md, so a backup written by the Flutter app
- * restores here, and vice versa. Documents named `metadata/*` (manifests and
+ * restores here, and vice versa. Documents named metadata/ (manifests and
  * partitions) are skipped when collecting media.
  */
 @Singleton
