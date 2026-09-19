@@ -48,7 +48,7 @@ class GallerySaveService @Inject constructor(
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             val filename = "lumo_${System.currentTimeMillis()}${extension(file.path)}"
-            saveToGallery(file, filename, MediaStore.Images.Media.CONTENT_TYPE, createdAt, latitude, longitude)
+            saveToGallery(file, filename, "image/jpeg", createdAt, latitude, longitude)
         } catch (e: Exception) {
             null
         }
@@ -71,7 +71,7 @@ class GallerySaveService @Inject constructor(
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             val filename = "lumo_${System.currentTimeMillis()}${extension(file.path)}"
-            saveToGallery(file, filename, MediaStore.Video.Media.CONTENT_TYPE, createdAt, latitude, longitude)
+            saveToGallery(file, filename, "video/mp4", createdAt, latitude, longitude)
         } catch (e: Exception) {
             null
         }

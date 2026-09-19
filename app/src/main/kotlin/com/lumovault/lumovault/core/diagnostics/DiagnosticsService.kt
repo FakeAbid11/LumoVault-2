@@ -94,10 +94,11 @@ class DiagnosticsService @Inject constructor(
      */
     suspend fun collect(): DiagnosticsInfo = withContext(Dispatchers.IO) {
         val dbFile = context.getDatabasePath("lumovault")
-        val totalMedia = mediaDao.all().size
-        val uploaded = mediaDao.all().count { it.status == MediaStatus.uploaded }
-        val pending = mediaDao.all().count { it.status == MediaStatus.pending }
-        val failed = mediaDao.all().count { it.status == MediaStatus.failed }
+        val allMedia = mediaDao.all()
+        val totalMedia = allMedia.size
+        val uploaded = allMedia.count { it.status == MediaStatus.uploaded }
+        val pending = allMedia.count { it.status == MediaStatus.pending }
+        val failed = allMedia.count { it.status == MediaStatus.failed }
 
         val stat = StatFs(Environment.getDataDirectory().path)
 

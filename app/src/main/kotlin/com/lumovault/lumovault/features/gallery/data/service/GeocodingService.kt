@@ -14,7 +14,6 @@ import java.net.URL
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
 
 /**
  * Reverse geocoding result with city, state, and country.
@@ -181,10 +180,19 @@ class GeocodingService @Inject constructor(
             val map = diskCache?.mapValues { (_, v) ->
                 v?.let { json.encodeToString(GeoResult.serializer(), it) }
             } ?: return
-            cacheFile.writeText(json.encodeToString(
-                MapSerializer(kotlinx.serialization.builtins.serializer<String>(), kotlinx.serialization.builtins.serializer<String>()),
-                map.mapValues { (_, v) -> v ?: "null" }
-            ))
+            // Simple JSON write: {"key":"value",...}
+            val jsonStr = buildString {
+                append("{")
+                var first = true
+                for ((k, v) in map) {
+                    if (!first) append(",")
+                    first = false
+                    append("\"$k\":")
+                    append(v ?: "null")
+                }
+                append("}")
+            }
+            cacheFile.writeText(jsonStr)
         } catch (_: Exception) {
             // Best-effort persistence.
         }
