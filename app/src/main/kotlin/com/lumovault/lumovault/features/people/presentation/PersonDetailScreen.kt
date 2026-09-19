@@ -64,6 +64,56 @@ import com.lumovault.lumovault.features.gallery.presentation.MediaGrid
 import java.io.File
 import kotlinx.coroutines.launch
 
+/** Header for the person detail: thumbnail avatar, name (or add-name), count. */
+@Composable
+private fun PersonHeader(
+    name: String?,
+    photoCount: Int,
+    thumbnailPath: String?,
+    onAddName: () -> Unit,
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(64.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (thumbnailPath != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(File(thumbnailPath)).crossfade(false).build(),
+                    contentDescription = name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(
+                name ?: stringResource(R.string.person_detail_unnamed),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W600),
+            )
+            Text(
+                stringResource(R.string.person_detail_photo_count, photoCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (name == null) {
+                TextButton(onClick = onAddName) {
+                    Text(stringResource(R.string.person_detail_add_name))
+                }
+            }
+        }
+    }
+}
+
 /**
  * One person: face avatar header, their photos, rename, merge, delete, and
  * correction mode ("this is not the person" / move to another person).
@@ -347,7 +397,7 @@ fun PersonDetailScreen(
                     showRemoveConfirm = false
                     scope.launch {
                         snackbarHostState.showSnackbar(
-                            snackbarMessage(R.string.person_detail_removed, ids.size),
+                            context.resources.getString(R.string.person_detail_removed, ids.size),
                         )
                     }
                 }) { Text(stringResource(R.string.person_detail_remove_faces_action), color = MaterialTheme.colorScheme.error) }

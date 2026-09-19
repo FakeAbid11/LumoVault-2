@@ -10,6 +10,7 @@ import androidx.room.Upsert
 import com.lumovault.lumovault.core.database.entity.FaceEntity
 import com.lumovault.lumovault.core.database.entity.FacePersonEntity
 import com.lumovault.lumovault.core.database.entity.FaceScanEntity
+import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 import com.lumovault.lumovault.core.database.entity.PersonEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -84,6 +85,9 @@ interface FaceDao {
      * face never rejoins via absorption or seeds a new cluster. */
     @Query("UPDATE faces SET person_id = NULL, excluded = 1 WHERE id IN (:faceIds)")
     suspend fun excludeFaces(faceIds: List<Long>)
+
+    @Query("SELECT * FROM media_items WHERE local_id IN (:mediaIds)")
+    suspend fun mediaItemsForPerson(mediaIds: List<String>): List<MediaItemEntity>
 
     @Query("SELECT * FROM faces WHERE person_id = :personId ORDER BY created_at DESC")
     suspend fun facesForPerson(personId: Long): List<FaceEntity>

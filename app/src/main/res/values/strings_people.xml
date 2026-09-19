@@ -53,4 +53,7 @@
     <string name="person_detail_move_to_another">Move to another person</string>
     <string name="person_detail_moved">Moved %1$d photos</string>
     <string name="person_detail_removed">Removed %1$d photos from this person</string>
+    <string name="person_detail_unnamed">Unnamed person</string>
+    <string name="person_detail_add_name">Add name</string>
+    <string name="person_detail_photo_count">%1$d photos</string>
 </resources>

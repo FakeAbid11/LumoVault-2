@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.lumovault.R
+import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 
 /**
  * The hidden-items view.

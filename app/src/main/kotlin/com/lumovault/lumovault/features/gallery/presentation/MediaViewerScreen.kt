@@ -60,7 +60,7 @@ fun MediaViewerScreen(
         topBar = {
             if (uiVisible) {
                 TopAppBar(
-                    title = { Text("${pagerState.currentPage + 1} / ${items.size}") },
+                    title = { Text("${pagerState.currentPage + 1} / ${source.size}") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -93,7 +93,7 @@ fun MediaViewerScreen(
                 .padding(padding),
         ) {
             HorizontalPager(state = pagerState) { page ->
-                val item = items[page]
+                val item = source[page]
                 ZoomableMedia(
                     item = item,
                     onTap = { uiVisible = !uiVisible },

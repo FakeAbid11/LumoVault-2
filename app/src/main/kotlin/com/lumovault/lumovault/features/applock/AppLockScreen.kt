@@ -13,9 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -129,7 +129,7 @@ fun AppLockScreen(
                     onBackspace = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
                 )
                 Spacer(Modifier.height(12.dp))
-                FilledButton(
+                Button(
                     onClick = {
                         viewModel.unlock(pin) { ok -> if (!ok) pin = "" }
                     },

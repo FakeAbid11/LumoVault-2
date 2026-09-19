@@ -48,7 +48,7 @@ class ClipTokenizer private constructor(
 
         private val TOKEN_PATTERN = Regex(
             """<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL, RegexOption.UNICODE),
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
 
         private val WHITESPACE_PATTERN = Regex("""\s+""")

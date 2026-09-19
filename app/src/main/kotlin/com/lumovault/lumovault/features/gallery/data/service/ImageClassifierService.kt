@@ -39,7 +39,7 @@ class ImageClassifierService @Inject constructor(
     suspend fun classify(bytes: ByteArray): List<String>? = mutex.withLock {
         val session = ensureSession()
         val bitmap = java.io.ByteArrayInputStream(bytes).use { stream ->
-            TensorPreprocessing.decodeDownsampled(stream, maxDecodeSide = INPUT_SIZE * 2)
+            TensorPreprocessing.decodeDownsampled(stream, maxSide = INPUT_SIZE * 2)
         } ?: return@withLock null
 
         try {
@@ -48,11 +48,11 @@ class ImageClassifierService @Inject constructor(
             val inputName = session.inputNames.first()
             val outputName = session.outputNames.first()
 
-            OnnxTensor.createTensor(modelHost.environment, input, shape).use { tensor ->
+            OnnxTensor.createTensor(modelHost.environment, java.nio.FloatBuffer.wrap(input), shape).use { tensor ->
                 val outputs = session.run(mapOf(inputName to tensor))
                 try {
                     val out = outputs[outputName] ?: return@withLock null
-                    val buffer = out.floatBuffer
+                    val buffer = (out as OnnxTensor).floatBuffer
                     val logits = FloatArray(buffer.remaining())
                     buffer.get(logits)
                     decodeTopLabels(logits)

@@ -13,11 +13,11 @@ import androidx.compose.ui.graphics.Color
  */
 object AppColors {
 
-    /** The scheme seed: a saturated indigo. */
-    val seed: Color = brandIndigo
-
     /** The primary brand indigo. */
     val brandIndigo = Color(0xFF2B5CE6)
+
+    /** The scheme seed: a saturated indigo. */
+    val seed: Color = brandIndigo
 
     /** Lighter sky-blue, used for the in-flight transfer accent. */
     val brandSky = Color(0xFF4FA8FF)

@@ -58,9 +58,9 @@ class PersonDetailViewModel @Inject constructor(
 
     val photos: StateFlow<List<MediaItemEntity>> = faces
         .map { faceList ->
-            val ids = faceList.map { it.mediaItemId }.distinct()
+            val ids: List<String> = faceList.map { it.mediaItemId }.distinct()
             if (ids.isEmpty()) {
-                emptyList()
+                emptyList<MediaItemEntity>()
             } else {
                 faceDao.mediaItemsForPerson(ids).sortedByDescending { it.createdAt }
             }

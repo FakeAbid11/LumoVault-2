@@ -102,7 +102,7 @@ fun AboutScreen(onBack: () -> Unit) {
 }
 
 private fun aboutVersion(context: Context): String = try {
-    context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unavailable"
 } catch (_: Exception) {
     "unavailable"
 }

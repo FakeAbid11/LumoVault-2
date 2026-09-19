@@ -168,7 +168,7 @@ class FaceDetectionService @Inject constructor(
             val shape = longArrayOf(1, 3, DETECTOR_INPUT_SIZE.toLong(), DETECTOR_INPUT_SIZE.toLong())
             val inputName = session.inputNames.first()
 
-            OnnxTensor.createTensor(modelHost.environment, input, shape).use { tensor ->
+            OnnxTensor.createTensor(modelHost.environment, java.nio.FloatBuffer.wrap(input), shape).use { tensor ->
                 val outputs = session.run(mapOf(inputName to tensor))
                 try {
                     decodeDetectorOutputs(outputs, bitmap.width, bitmap.height)
@@ -196,7 +196,8 @@ class FaceDetectionService @Inject constructor(
         val kpsByStride = HashMap<Int, FloatArray>()
         val anchorsByStride = HashMap<Int, Int>()
 
-        for ((_, tensor) in outputs) {
+        for ((_, value) in outputs) {
+            val tensor = value as? OnnxTensor ?: continue
             val shape = tensor.info.shape
             if (shape.isEmpty()) continue
             val total = shape.fold(1L) { acc, dim -> acc * dim }.toInt()
@@ -220,7 +221,7 @@ class FaceDetectionService @Inject constructor(
 
             val layout = resolveScrfdLayout(rows, DETECTOR_INPUT_SIZE) ?: continue
             val buffer = tensor.floatBuffer
-            val values = FloatArray(min(total, buffer.remaining()))
+            val values = FloatArray(minOf(total, buffer.remaining()))
             buffer.get(values)
             anchorsByStride[layout.stride] = layout.numAnchors
             when (channels) {
@@ -334,11 +335,11 @@ class FaceDetectionService @Inject constructor(
             val inputName = session.inputNames.first()
             val outputName = session.outputNames.first()
 
-            OnnxTensor.createTensor(modelHost.environment, input, shape).use { tensor ->
+            OnnxTensor.createTensor(modelHost.environment, java.nio.FloatBuffer.wrap(input), shape).use { tensor ->
                 val outputs = session.run(mapOf(inputName to tensor))
                 try {
                     val out = outputs[outputName] ?: return@withLock FloatArray(0)
-                    val buffer = out.floatBuffer
+                    val buffer = (out as OnnxTensor).floatBuffer
                     if (buffer.remaining() < EMBEDDING_DIM) return@withLock FloatArray(0)
                     val slice = FloatArray(EMBEDDING_DIM)
                     buffer.get(slice)
