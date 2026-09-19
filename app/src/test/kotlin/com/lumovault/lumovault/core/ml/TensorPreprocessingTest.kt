@@ -44,8 +44,12 @@ class TensorPreprocessingTest {
         val maxSide = 1600
         val sample = TensorPreprocessing.calculateSampleSize(w, h, maxSide)
         val longest = maxOf(w, h) / sample
-        assertTrue("decode too large: $longest", longest <= maxSide * 2)
-        assertTrue("decode smaller than necessary: $longest", longest > maxSide)
+        // inSampleSize semantics: the *largest power of two* that keeps the
+        // long side at or under the cap. It therefore under-shoots (5000 / 4 =
+        // 1250 against a 1600 cap) rather than over-shooting, so the bound is
+        // "at or under the cap" and "a smaller sample would not have fitted".
+        assertTrue("decode too large: $longest", longest <= maxSide)
+        assertTrue("a smaller sample would have sufficed: $longest", longest > maxSide / 2)
     }
 
     @Test

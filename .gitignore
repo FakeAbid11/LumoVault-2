@@ -28,3 +28,6 @@ ci_*.txt
 ci_*.log
 ci_result.json
 watch_ci.ps1
+show_labels.ps1
+push.log
+push.err.log

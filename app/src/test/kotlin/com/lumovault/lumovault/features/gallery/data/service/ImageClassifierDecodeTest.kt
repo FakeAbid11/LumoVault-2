@@ -47,7 +47,10 @@ class ImageClassifierDecodeTest {
     fun `labels are ordered by descending probability`() {
         val logits = FloatArray(1000)
         logits[281] = 15.0f // tabby
-        logits[0] = 10.0f   // tench
+        // 10.0f would put tench at a softmax probability of ~0.003, far below
+        // the 0.08 floor, so it would be dropped before ordering is tested.
+        // 14.0f keeps both classes above the floor (~0.73 / ~0.27).
+        logits[0] = 14.0f   // tench
 
         val labels = ImageClassifierService.decodeTopLabels(logits)
 
@@ -103,7 +106,9 @@ class ImageClassifierDecodeTest {
         assertEquals("tench", imageNetLabels[0])
         assertEquals("tabby", imageNetLabels[281])
         assertEquals("tiger cat", imageNetLabels[282])
-        assertEquals("persian cat", imageNetLabels[284])
+        // Canonical torchvision order: 283 is the Persian cat, 284 the Siamese.
+        assertEquals("Persian cat", imageNetLabels[283])
+        assertEquals("Siamese cat", imageNetLabels[284])
         assertEquals("toilet tissue", imageNetLabels[999])
     }
 

@@ -57,7 +57,7 @@ class AlbumsViewModel @Inject constructor(
             // Recompute counts whenever the album set changes. Item adds go
             // through [addToAlbum]/[removeFromAlbum] below, which refresh.
             val counts = albumDao.allAlbumCounts().associateBy({ it.albumId }, { it.count })
-            kotlinx.coroutines.flow.flowOf(
+            flowOf(
                 list.map { album ->
                     // cover_id references MediaItems.local_id; resolve it to the
                     // stored content URI so Coil can load it directly.

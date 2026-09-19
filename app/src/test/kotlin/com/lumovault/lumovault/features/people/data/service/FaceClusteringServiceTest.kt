@@ -78,7 +78,10 @@ class FaceClusteringServiceTest {
         }
         var norm = 0.0
         for (v in centroid) norm += v * v
-        assertEquals(1.0, norm, 1e-9)
+        // Each component is 0.70710678f, so the sum lands ~1e-7 from 1.0 in
+        // Float arithmetic; a 1e-9 tolerance would be testing Float rounding
+        // rather than the normalization.
+        assertEquals(1.0, norm, 1e-6)
     }
 
     @Test

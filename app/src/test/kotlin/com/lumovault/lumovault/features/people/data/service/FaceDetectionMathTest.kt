@@ -189,15 +189,23 @@ class FaceDetectionMathTest {
 
         assertEquals(1, detections.size)
         val d = detections.first()
-        // Anchor at cell (0,0) = (0,0) in detector space; box +-0.5*32 = 16.
-        assertEquals(16.0 * (1280.0 / 640.0), d.left, 1e-6)
-        assertEquals(16.0 * (960.0 / 640.0), d.top, 1e-6)
+        // Anchor at cell (0,0) = (0,0) in detector space, so a distance of
+        // 0.5 strides is half a cell from the anchor in each direction: the
+        // left/top edges land at -16, the right/bottom at +16, scaled by the
+        // source-to-detector ratio.
+        assertEquals(-16.0 * (1280.0 / 640.0), d.left, 1e-6)
+        assertEquals(-16.0 * (960.0 / 640.0), d.top, 1e-6)
+        assertEquals(16.0 * (1280.0 / 640.0), d.right, 1e-6)
+        assertEquals(16.0 * (960.0 / 640.0), d.bottom, 1e-6)
     }
 
     @Test
     fun `decodeScrfdOutputs drops sub-threshold detections`() {
         val scores = floatArrayOf(0.9f, 0.3f, 0.6f)
-        val boxes = FloatArray(12)
+        // Non-zero distances on every row: a zero-distance box is dropped as
+        // degenerate *before* the score is considered, so an all-zero fixture
+        // would assert nothing about the threshold at all.
+        val boxes = FloatArray(12) { 0.5f }
 
         val detections = decodeScrfdOutputs(
             scoresByStride = mapOf(8 to scores),
@@ -221,7 +229,11 @@ class FaceDetectionMathTest {
         val rows = grid * grid
 
         val scores = FloatArray(rows).also { it[0] = 0.9f }
-        val boxes = FloatArray(rows * 4)
+        // A real box for the only scored row: a zero-distance box is
+        // degenerate and never reaches the landmark branch.
+        val boxes = FloatArray(rows * 4).also {
+            it[0] = 0.5f; it[1] = 0.5f; it[2] = 0.5f; it[3] = 0.5f
+        }
         // Five landmark pairs, each (+1.0, +2.0) in stride units.
         val kps = FloatArray(rows * 10).also {
             for (n in 0 until 5) {
@@ -255,7 +267,9 @@ class FaceDetectionMathTest {
     @Test
     fun `decodeScrfdOutputs yields empty landmarks when the keypoint head is absent`() {
         val scores = floatArrayOf(0.9f)
-        val boxes = FloatArray(4)
+        // A valid box, so the detection survives as far as the landmark branch
+        // — which is the branch this test is about.
+        val boxes = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f)
 
         val detections = decodeScrfdOutputs(
             scoresByStride = mapOf(8 to scores),
@@ -322,7 +336,9 @@ class FaceDetectionMathTest {
         assertEquals(0.8f, normalized[1], 1e-6f)
         var sum = 0.0
         for (v in normalized) sum += v * v
-        assertEquals(1.0, sum, 1e-9)
+        // Float components: 0.6f and 0.8f squared sum to ~1.00000005, so a 1e-9
+        // tolerance here tests Float rounding rather than the normalization.
+        assertEquals(1.0, sum, 1e-6)
     }
 
     @Test
