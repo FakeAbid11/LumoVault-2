@@ -64,6 +64,13 @@ interface MediaDao {
     @Query("SELECT * FROM media_items WHERE is_trashed = 1 ORDER BY trashed_at DESC")
     fun trashedFlow(): Flow<List<MediaItemEntity>>
 
+    /** Hidden, not trashed — the two views stay disjoint. */
+    @Query("SELECT * FROM media_items WHERE is_hidden = 1 AND is_trashed = 0 ORDER BY created_at DESC")
+    fun hiddenFlow(): Flow<List<MediaItemEntity>>
+
+    @Query("SELECT * FROM media_items WHERE is_archived = 1 AND is_trashed = 0 ORDER BY created_at DESC")
+    fun archivedFlow(): Flow<List<MediaItemEntity>>
+
     /** Case-insensitive search over file name and description. */
     @Query(
         """
@@ -88,10 +95,17 @@ interface MediaDao {
     @Query("SELECT * FROM media_items WHERE file_hash = :fileHash LIMIT 1")
     suspend fun byHash(fileHash: String): MediaItemEntity?
 
+    /**
+     * Members of a duplicate group, newest first. Trashed and hidden items are
+     * excluded, as `getDuplicateGroups()` does in gallery_repository.dart: a
+     * photo the user hid or deleted should not reappear here asking to be
+     * resolved. The newest-first order is what makes "keep newest" a
+     * `skip(1)` and "keep oldest" a `reversed().skip(1)`.
+     */
     @Query(
         """
         SELECT * FROM media_items
-        WHERE file_hash = :fileHash AND is_trashed = 0
+        WHERE file_hash = :fileHash AND is_trashed = 0 AND is_hidden = 0
         ORDER BY created_at DESC
         """,
     )
@@ -100,7 +114,7 @@ interface MediaDao {
     @Query(
         """
         SELECT file_hash, COUNT(*) AS count FROM media_items
-        WHERE file_hash != '' AND is_trashed = 0
+        WHERE file_hash != '' AND is_trashed = 0 AND is_hidden = 0
         GROUP BY file_hash HAVING count >= 2
         """,
     )

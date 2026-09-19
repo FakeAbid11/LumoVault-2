@@ -1,4 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LumoVault</string>
+
+    <!-- Shared actions -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_delete_permanently">Delete permanently</string>
+    <string name="action_more">More options</string>
+
+    <!-- Selection mode, shared by trash and duplicates -->
+    <string name="collection_n_selected">%1$d selected</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_unhide_all">Unhide all</string>
+
+    <!-- Duplicates group actions -->
+    <string name="action_select_all">Select all</string>
+    <string name="action_deselect_all">Deselect all</string>
+    <string name="action_keep_newest">Keep newest</string>
+    <string name="action_keep_oldest">Keep oldest</string>
+
+    <!-- Irreversible delete confirmation, shared by trash and duplicates -->
+    <string name="confirm_delete_title">Delete permanently?</string>
+    <string name="confirm_delete_message">%1$d item(s) will be permanently deleted. This can\'t be undone.</string>
+
+    <!-- Favorites -->
+    <string name="favorites_title">Favorites</string>
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_explanation">Tap the heart icon on any photo to mark it as a favorite.</string>
+
+    <!-- Hidden -->
+    <string name="hidden_title">Hidden</string>
+    <string name="hidden_empty_title">Nothing hidden</string>
+    <string name="hidden_empty_explanation">Photos you hide are removed from the timeline but stay on your device.</string>
+
+    <!-- Archive -->
+    <string name="archive_title">Archive</string>
+    <string name="archive_empty_title">Archive is empty</string>
+    <string name="archive_empty_explanation">Archived photos are removed from the timeline but kept in LumoVault.</string>
+
+    <!-- Trash -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty_title">Trash is empty</string>
+    <string name="trash_empty_explanation">Items you delete appear here before being removed permanently.</string>
+    <string name="trash_retention_never">Items stay in Trash until you delete them. Long-press to select.</string>
+    <string name="trash_retention_days">Items are permanently deleted after %1$d days. Long-press to select.</string>
+
+    <!-- Duplicates -->
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_empty_title">No duplicates</string>
+    <string name="duplicates_empty_explanation">When two photos have identical content, they are grouped here.</string>
 </resources>

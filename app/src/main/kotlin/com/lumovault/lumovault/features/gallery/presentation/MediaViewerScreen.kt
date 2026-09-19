@@ -34,18 +34,26 @@ import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 fun MediaViewerScreen(
     initialIndex: Int,
     onBack: () -> Unit,
+    /**
+     * The collection to page through. Null means the main timeline; the flag
+     * views pass their own list because an index into their grid is not an
+     * index into the timeline — opening "photo 3 of Favorites" and landing on
+     * the third timeline photo would be a silent wrong-photo bug.
+     */
+    items: List<MediaItemEntity>? = null,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
-    val items by viewModel.timeline.collectAsStateWithLifecycle()
-    if (items.isEmpty()) {
-        // The viewer is only reachable from the grid, so an empty list here
+    val timeline by viewModel.timeline.collectAsStateWithLifecycle()
+    val source = items ?: timeline
+    if (source.isEmpty()) {
+        // The viewer is only reachable from a grid, so an empty list here
         // means the underlying data was cleared while the viewer was open.
         LaunchedEffect(Unit) { onBack() }
         return
     }
 
-    val index = initialIndex.coerceIn(0, items.lastIndex)
-    val pagerState = rememberPagerState(initialPage = index) { items.size }
+    val index = initialIndex.coerceIn(0, source.lastIndex)
+    val pagerState = rememberPagerState(initialPage = index) { source.size }
     var uiVisible by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -70,7 +78,7 @@ fun MediaViewerScreen(
         bottomBar = {
             if (uiVisible) {
                 ViewerBottomBar(
-                    item = items[pagerState.currentPage],
+                    item = source[pagerState.currentPage],
                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                     onTrash = { viewModel.moveToTrash(it) },
                     modifier = Modifier.background(Color.Black.copy(alpha = 0.6f)),

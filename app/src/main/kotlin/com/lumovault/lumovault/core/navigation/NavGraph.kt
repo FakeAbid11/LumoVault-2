@@ -19,6 +19,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,8 +33,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.lumovault.lumovault.features.gallery.presentation.ArchiveScreen
+import com.lumovault.lumovault.features.gallery.presentation.DuplicatesScreen
+import com.lumovault.lumovault.features.gallery.presentation.FavoritesScreen
+import com.lumovault.lumovault.features.gallery.presentation.HiddenScreen
 import com.lumovault.lumovault.features.gallery.presentation.MediaViewerScreen
 import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
+import com.lumovault.lumovault.features.gallery.presentation.TrashScreen
 
 /**
  * Every destination in the app.
@@ -133,6 +142,11 @@ fun LumoVaultNavGraph() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
+    // The collection the viewer pages through. A flag grid sets this before
+    // navigating so the viewer shows *its* photos; the timeline path leaves it
+    // null and the viewer falls back to its own timeline flow.
+    var viewerItems by remember { mutableStateOf<List<com.lumovault.lumovault.core.database.entity.MediaItemEntity>?>(null) }
+
     ScaffoldWithBottomBar(
         currentRoute = currentDestination?.route,
         onNavigate = { screen ->
@@ -156,6 +170,7 @@ fun LumoVaultNavGraph() {
                     onOpenItem = { index ->
                         // The viewer pages the same Flow the grid shows, so the
                         // grid position is the viewer's initial page.
+                        viewerItems = null
                         navController.navigate(Screen.MediaViewer.createRoute(index))
                     },
                     onOpenSettings = { navController.navigate(Screen.Settings.route) },
@@ -165,7 +180,57 @@ fun LumoVaultNavGraph() {
                 val index = entry.arguments?.getString("index")?.toIntOrNull() ?: 0
                 MediaViewerScreen(
                     initialIndex = index,
+                    items = viewerItems,
                     onBack = { navController.popBackStack() },
+                )
+            }
+
+            // -- Flag collections --
+            // Each passes its own list to the viewer: an index into one of
+            // these grids is not an index into the timeline.
+            composable(Screen.Favorites.route) {
+                FavoritesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+            composable(Screen.Hidden.route) {
+                HiddenScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+            composable(Screen.Archive.route) {
+                ArchiveScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+            composable(Screen.Trash.route) {
+                TrashScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+            composable(Screen.Duplicates.route) {
+                DuplicatesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
                 )
             }
 
@@ -182,11 +247,6 @@ fun LumoVaultNavGraph() {
             NotImplementedDestination(Screen.Map, navController)
             NotImplementedDestination(Screen.People, navController)
             NotImplementedDestination(Screen.Settings, navController)
-            NotImplementedDestination(Screen.Favorites, navController)
-            NotImplementedDestination(Screen.Hidden, navController)
-            NotImplementedDestination(Screen.Archive, navController)
-            NotImplementedDestination(Screen.Trash, navController)
-            NotImplementedDestination(Screen.Duplicates, navController)
             NotImplementedDestination(Screen.PersonDetail, navController)
             NotImplementedDestination(Screen.AlbumDetail, navController)
             NotImplementedDestination(Screen.DeviceFolder, navController)
