@@ -35,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.lumovault.features.albums.presentation.AlbumDetailScreen
 import com.lumovault.lumovault.features.albums.presentation.AlbumsScreen
+import com.lumovault.lumovault.features.albums.presentation.DeviceFolderScreen
 import com.lumovault.lumovault.features.backup.presentation.BackupDashboardScreen
 import com.lumovault.lumovault.features.backup.presentation.BackupSettingsScreen
 import com.lumovault.lumovault.features.backup.presentation.StorageStatsScreen
@@ -282,6 +283,17 @@ fun LumoVaultNavGraph() {
                     },
                 )
             }
+            composable(Screen.DeviceFolder.route) { entry ->
+                val folderId = entry.arguments?.getString("folderId") ?: return@composable
+                DeviceFolderScreen(
+                    folderId = folderId,
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
 
             // -- Onboarding (chained flow) --
             composable(Screen.OnboardingWelcome.route) {
@@ -422,7 +434,7 @@ fun LumoVaultNavGraph() {
             }
 
             // -- Declared, not yet implemented --
-            NotImplementedDestination(Screen.DeviceFolder, navController)
+            // (none — every route now resolves to a real screen)
         }
     }
 }
@@ -448,23 +460,6 @@ private fun ScaffoldWithBottomBar(
         },
         content = content,
     )
-}
-
-/**
- * A route that resolves to an honest "not built yet" screen.
- *
- * Distinct from a placeholder that renders mock data: this never implies the
- * feature works. It takes the nav controller only so it can offer a back
- * action, and it names the route so the gap is visible in the running app
- * rather than only in the source.
- */
-private fun androidx.navigation.NavGraphBuilder.NotImplementedDestination(
-    screen: Screen,
-    navController: NavHostController,
-) {
-    composable(screen.route) {
-        NotImplementedScreen(route = screen.route, onBack = { navController.popBackStack() })
-    }
 }
 
 @Composable

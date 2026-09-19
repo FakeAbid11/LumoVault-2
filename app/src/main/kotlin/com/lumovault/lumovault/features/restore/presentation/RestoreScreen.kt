@@ -21,10 +21,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.lumovault.R
 
 /**
@@ -42,7 +45,11 @@ import com.lumovault.lumovault.R
 fun RestoreScreen(
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
+    viewModel: RestoreViewModel = hiltViewModel(),
 ) {
+    val canRestore by viewModel.canRestore.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -96,17 +103,28 @@ fun RestoreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Engine pending: disabled with caption, not wired to nothing.
+            // Live when a Telegram session exists; otherwise disabled with
+            // the honest caption (an engine that can't run is not wired to a
+            // button that pretends otherwise).
             Button(
-                onClick = {},
-                enabled = false,
+                onClick = {
+                    viewModel.startRestore()
+                    onNavigate("restore/progress")
+                },
+                enabled = canRestore && !progress.running,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.restore_scan_channel))
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                stringResource(R.string.restore_engine_unavailable_caption),
+                stringResource(
+                    if (canRestore) {
+                        R.string.restore_engine_ready_caption
+                    } else {
+                        R.string.restore_engine_unavailable_caption
+                    },
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

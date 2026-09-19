@@ -52,6 +52,16 @@ interface MediaDao {
     )
     fun byAlbumFlow(albumName: String): Flow<List<MediaItemEntity>>
 
+    /** One-shot read for the device-folder detail screen. */
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE album_name = :albumName AND is_trashed = 0 AND is_hidden = 0
+        ORDER BY created_at DESC
+        """,
+    )
+    suspend fun byAlbum(albumName: String): List<MediaItemEntity>
+
     @Query(
         """
         SELECT * FROM media_items
@@ -156,6 +166,42 @@ interface MediaDao {
 
     @Query("DELETE FROM media_items WHERE local_id IN (:localIds)")
     suspend fun deleteByLocalIds(localIds: List<String>)
+
+    // --------------------------------------------------- backup engine reads
+
+    /**
+     * Items eligible for upload: pending, not excluded, not trashed, newest
+     * first. Status is persisted as the [MediaStatus] ordinal (see
+     * [Converters.toMediaStatus]); Room binds the enum parameter through the
+     * same converter.
+     */
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE status = :pending AND is_excluded = 0 AND is_trashed = 0
+        ORDER BY created_at DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun pendingForBackup(pending: MediaStatus, limit: Int): List<MediaItemEntity>
+
+    /** First uploaded row carrying [fileHash] — the upload-side dedup check. */
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE file_hash = :fileHash AND status = :uploaded AND telegram_message_id IS NOT NULL
+        LIMIT 1
+        """,
+    )
+    suspend fun firstUploadedByHash(fileHash: String, uploaded: MediaStatus): MediaItemEntity?
+
+    /** One item the engine has picked up, so the UI sees "uploading". */
+    @Query("UPDATE media_items SET status = :uploading, error_message = NULL WHERE local_id = :localId")
+    suspend fun markUploading(localId: String, uploading: MediaStatus)
+
+    /** Count of items still waiting to be backed up. */
+    @Query("SELECT COUNT(*) FROM media_items WHERE status = :pending AND is_excluded = 0 AND is_trashed = 0")
+    suspend fun pendingBackupCount(pending: MediaStatus): Int
 
     // --------------------------------------------------- partial updates
 

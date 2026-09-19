@@ -21,11 +21,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.lumovault.R
+import com.lumovault.lumovault.features.restore.data.service.RestorePhase as RestoreRunPhase
 
 /**
  * Coarse restore phases, mirroring the original's `RestorePhase` collapsed to
@@ -45,20 +49,35 @@ data class RestoreUiState(
 )
 
 /**
- * Restore progress — static layout for the three phases.
+ * Restore progress — live layout for the three phases.
  *
- * Ported from restore_progress_screen.dart (PRD 10.3). The original read a
- * live `restoreProgressProvider` with speed/ETA and pause/cancel; none of
- * that exists without the engine, so this renders the phase list and an
- * honestly labelled idle message. [state] is accepted (never fabricated) so
- * the screen is ready when the engine lands.
+ * Ported from restore_progress_screen.dart (PRD 10.3). State comes from the
+ * restore controller via [RestoreViewModel]: a null [state] still means idle
+ * (nothing ever started), while a running or finished run renders its phases
+ * and counters. The original's speed/ETA and pause/cancel remain unported.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RestoreProgressScreen(
     onBack: () -> Unit,
-    state: RestoreUiState? = null,
+    viewModel: RestoreViewModel = hiltViewModel(),
 ) {
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val state = if (progress.running || progress.itemsDone > 0) {
+        // Map the controller's phase onto this screen's presentation enum.
+        val phase = when (progress.phase) {
+            RestoreRunPhase.scan -> RestorePhase.scan
+            RestoreRunPhase.download -> RestorePhase.download
+            RestoreRunPhase.rebuild -> RestorePhase.rebuild
+        }
+        RestoreUiState(
+            phase = phase,
+            itemsDone = progress.itemsDone,
+            itemsTotal = progress.itemsTotal,
+        )
+    } else {
+        null
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -118,6 +137,23 @@ fun RestoreProgressScreen(
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (progress.failed > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    stringResource(R.string.restore_progress_failed, progress.failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            progress.error?.let { message ->
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }

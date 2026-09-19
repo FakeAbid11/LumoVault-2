@@ -10,7 +10,8 @@
     <string name="backup_last_backup">Last backup: %1$s</string>
     <string name="backup_last_backup_never">No backup has completed yet</string>
     <string name="backup_start">Start backup</string>
-    <string name="backup_engine_unavailable_caption">The upload engine is not part of this build yet, so backup can\'t be started.</string>
+    <string name="backup_running">Backup queued…</string>
+    <string name="backup_connect_telegram_hint">Connect Telegram in Settings to enable backup</string>
     <string name="backup_open_settings">Backup settings</string>
 
     <!-- Backup settings -->
@@ -50,7 +51,8 @@
     <string name="restore_headline">Restore your library</string>
     <string name="restore_explanation">LumoVault can recover photos and videos previously backed up to your Telegram storage channel.</string>
     <string name="restore_scan_channel">Scan channel for backups</string>
-    <string name="restore_engine_unavailable_caption">The restore engine is not part of this build yet, so scanning is disabled.</string>
+    <string name="restore_engine_unavailable_caption">Sign in to Telegram to scan your storage channel.</string>
+    <string name="restore_engine_ready_caption">Scans your storage channel and restores photos, videos, albums and metadata.</string>
     <string name="restore_what_it_does">What restore does</string>
     <string name="restore_step_scan">Scan your storage channel for an existing backup.</string>
     <string name="restore_step_download">Download backed-up photos and videos to this device.</string>
@@ -61,6 +63,7 @@
     <string name="restore_phase_scan">Scanning channel</string>
     <string name="restore_phase_download">Downloading media</string>
     <string name="restore_phase_rebuild">Rebuilding library</string>
-    <string name="restore_progress_idle">Nothing is running. The restore engine is not part of this build yet, so progress cannot start.</string>
+    <string name="restore_progress_idle">Nothing is running. Start a restore from the Restore screen.</string>
     <string name="restore_progress_items">%1$d of %2$d items</string>
+    <string name="restore_progress_failed">%1$d items could not be restored</string>
 </resources>

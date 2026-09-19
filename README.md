@@ -9,12 +9,12 @@ Navigation Compose.
 ## Status
 
 Active rewrite. Ported and wired: TDLib substrate (client, connection manager,
-auth), metadata sync engine, Room layer, upload queue, gallery pipeline,
-albums, settings (hub + 10 sub-screens), app lock (PIN + biometric), onboarding
-(5 screens), people (list + detail), backup/restore screens (engines land in
-Phase 4 — their controls are visibly disabled, not fake), search, osmdroid map,
-and local folders. All 33 declared routes resolve; only the device-folder
-detail is still a stub.
+auth, storage channel), metadata sync engine, Room layer, upload queue,
+**backup engine + WorkManager scheduling**, **restore engine (channel scan,
+download, catalog rebuild)**, gallery pipeline, albums (incl. device-folder
+detail), settings (hub + 10 sub-screens), app lock (PIN + biometric),
+onboarding (5 screens), people (list + detail), search, osmdroid map, and
+local folders. All 34 declared routes resolve. See docs/PORT-STATUS.md.
 
 ## Requirements
 

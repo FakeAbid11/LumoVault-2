@@ -224,6 +224,29 @@ class MediaScannerService @Inject constructor(
         longitude = item.longitude,
     )
 
+    /** Resolve a MediaStore bucket id to its display name, or null if gone. */
+    suspend fun bucketName(bucketId: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            contentResolver.query(
+                imageUri,
+                arrayOf(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME),
+                "${MediaStore.MediaColumns.BUCKET_ID} = ?",
+                arrayOf(bucketId),
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getStringOrNull(0) else null
+            } ?: contentResolver.query(
+                videoUri,
+                arrayOf(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME),
+                "${MediaStore.MediaColumns.BUCKET_ID} = ?",
+                arrayOf(bucketId),
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getStringOrNull(0) else null
+            }
+        }.getOrNull()
+    }
+
     private fun defaultMime(item: MediaStoreItem) = if (item.isVideo) "video/mp4" else "image/jpeg"
 
     /**
@@ -231,10 +254,17 @@ class MediaScannerService @Inject constructor(
      * skip it (matching the Flutter scanner, which treats an unreadable file
      * as "not eligible yet" rather than failing the whole scan).
      */
-    suspend fun hash(item: MediaStoreItem): String = withContext(Dispatchers.IO) {
+    suspend fun hash(item: MediaStoreItem): String = hashUri(item.contentUri)
+
+    /**
+     * Stream SHA-256 straight from a content URI. The backup engine uses this
+     * for freshly scanned rows, which store their content URI in
+     * [MediaItemEntity.filePath] rather than keeping a [MediaStoreItem] around.
+     */
+    suspend fun hashUri(uri: Uri): String = withContext(Dispatchers.IO) {
         runCatching {
             val digest = MessageDigest.getInstance("SHA-256")
-            contentResolver.openInputStream(item.contentUri)?.use { stream ->
+            contentResolver.openInputStream(uri)?.use { stream ->
                 val buffer = ByteArray(BUFFER_BYTES)
                 while (true) {
                     val read = stream.read(buffer)

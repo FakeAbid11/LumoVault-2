@@ -1,21 +1,43 @@
-# Phase 3 port status
+# Phase 3/4 port status
 
-Phase 3 ports the Flutter app's screens. Every screen below is wired into
+Phase 3 ports the Flutter app's screens. Phase 4 ports the engines: backup,
+restore, and the device-folder detail screen. Every screen below is wired into
 `NavGraph.kt` and resolves to real Compose, not the
 `NotImplementedScreen` stub.
 
-## Routes resolved (33 of 34)
+## Routes resolved (34 of 34)
 
 | Area | Routes | Notes |
 | --- | --- | --- |
 | Onboarding | welcome, permissions, background-permissions, folders, telegram | Chained flow; Telegram route doubles as `connect-telegram` |
 | Gallery | timeline, media_viewer, favorites, hidden, archive, trash, duplicates, search, map | Viewer pages the collection the grid passed |
-| Albums | albums, albums/{albumId} | Device folders from MediaStore buckets |
+| Albums | albums, albums/{albumId}, albums/folder/{bucketId} | Device folders from MediaStore buckets |
 | People | people, people/{personId} | Scans disabled until the engine phase |
-| Backup | backup, backup/settings, backup/stats | Engine controls visibly disabled |
-| Restore | restore, restore/progress | Engine pending; idle state only |
+| Backup | backup, backup/settings, backup/stats | **Live engine**: Start enqueues the worker |
+| Restore | restore, restore/progress | **Live engine**: scan → download → rebuild |
 | Settings | settings + 10 sub-screens | Hub, account, about, general, media, storage, storage-insights, appearance, privacy, notifications, developer |
-| **Stub** | albums/folder/{bucketId} | Device-folder detail — next port |
+
+## Phase 4: engines
+
+- **Backup engine** (`features/backup/data/service/BackupEngine.kt`): hashes
+  pending rows (SHA-256, streamed from MediaStore), dedups against rows
+  already uploaded, uploads original files as *documents* (never recompressed)
+  into the user's private "LumoVault Backup" channel, and carries the
+  [CaptionMetadata](WIRE-FORMAT.md) JSON as the message caption. Folder and
+  media-type settings are applied at pick-up; de-selected rows are excluded,
+  fixing the Flutter engine's "kept uploading de-selected tasks" defect.
+- **Backup worker** (`features/backup/data/work/BackupWorker.kt`): Hilt
+  `CoroutineWorker`; periodic every 6 h plus a manual one-shot from the
+  dashboard. Wi-Fi-only is a WorkManager network constraint; the schedule is
+  re-synced on every settings change.
+- **Restore engine** (`features/restore/data/service/RestoreEngine.kt` +
+  `RestoreController.kt`): scans the channel history, downloads each file via
+  TDLib, rebuilds catalog rows from the caption JSON (hash-matching existing
+  rows first), and best-effort exports into the user gallery. Reads the same
+  caption wire format as the Flutter app, so backups are portable across both.
+- **Storage channel** (`core/tdlib/StorageChannelService.kt`): verifies the
+  cached channel id, falls back to a local/server search, and creates the
+  channel on first run.
 
 ## Defects fixed rather than ported
 
@@ -39,8 +61,9 @@ reproduce them.
 
 ## Remaining work
 
-- Device-folder detail screen (the last stub).
-- Phase 4 engines: backup engine + `CoroutineWorker`s, face-scan controller,
-  restore engine, bootstrap ordering.
 - Phase 5 hardening: Room migrations (replace `fallbackToDestructiveMigration`),
   instrumented tests, R8, APK size pass.
+- Face-scan background controller (the ML services exist; the scan scheduling
+  does not run yet).
+- Metadata manifest/partition upload scheduling into the channel (the sync
+  engine is ported; wiring it into the periodic worker is pending).

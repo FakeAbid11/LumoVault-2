@@ -2,11 +2,19 @@ package com.lumovault.lumovault.features.backup.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.lumovault.lumovault.core.auth.AuthService
+import com.lumovault.lumovault.core.auth.AuthState
 import com.lumovault.lumovault.core.database.dao.MediaDao
 import com.lumovault.lumovault.core.database.entity.MediaStatus
+import com.lumovault.lumovault.features.backup.data.work.BackupScheduler
+import com.lumovault.lumovault.features.backup.data.work.BackupWorker
 import com.lumovault.lumovault.features.settings.data.SettingsRepository
 import com.lumovault.lumovault.features.settings.domain.model.AppSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -36,19 +44,47 @@ data class BackupCounts(
  * State for the backup + storage screens.
  *
  * Ported from backup_dashboard_screen.dart / storage_stats_screen.dart and
- * their `backupStatsProvider`. The upload *engine* is not part of this build,
- * so there is deliberately no start/pause/retry here — the screens render the
- * controls disabled with an explanatory caption instead of wiring dead
- * callbacks (a control that looks finished but does nothing is worse than a
- * disabled one).
+ * their `backupStatsProvider`, now wired to the live engine: Start enqueues a
+ * one-shot [BackupWorker] (gated on Telegram sign-in), and per-status counts
+ * update live from the Room media table the engine writes to.
  */
 @HiltViewModel
 class BackupViewModel @Inject constructor(
+    /** Application context, for observing WorkManager state. */
+    @ApplicationContext private val application: Context,
     /** Reactive settings, provided by SettingsModule. */
     val settings: StateFlow<AppSettings>,
     private val settingsRepository: SettingsRepository,
+    private val scheduler: BackupScheduler,
+    private val engine: BackupEngine,
+    authService: AuthService,
     mediaDao: MediaDao,
 ) : ViewModel() {
+
+    /** Backup needs a signed-in Telegram session; the gate mirrors restore's. */
+    val canBackup: StateFlow<Boolean> = authService.state
+        .map { it == AuthState.authenticated }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = authService.currentState == AuthState.authenticated,
+        )
+
+    /** True while a WorkManager-driven engine pass is pending or running. */
+    val engineBusy: StateFlow<Boolean> = WorkManager.getInstance(application)
+        .getWorkInfosForUniqueWorkFlow(BackupWorker.ONESHOT_WORK)
+        .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * Manual start: requests a manual pass (overriding the auto-backup toggle)
+     * and enqueues the one-shot worker. Progress surfaces through the media
+     * table, which the counts flow already observes.
+     */
+    fun startBackup() {
+        engine.requestManualRun()
+        scheduler.runNow()
+    }
 
     /** Per-status counts and byte totals over the visible (non-trashed) library. */
     val counts: StateFlow<BackupCounts> = mediaDao.timelineFlow()

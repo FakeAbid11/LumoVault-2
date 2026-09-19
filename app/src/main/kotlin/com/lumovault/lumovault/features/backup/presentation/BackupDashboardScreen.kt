@@ -40,12 +40,8 @@ import java.util.Locale
 /**
  * Backup dashboard — status card, per-status counts, last-backup time.
  *
- * Ported from backup_dashboard_screen.dart (PRD 8.3). The upload engine is
- * not part of this build, so pause/resume/retry and the live queue list are
- * omitted and Start is rendered *disabled* with an explanatory caption —
- * a control that looks finished but does nothing is worse than a disabled
- * one. Telegram sign-in state is likewise unknown, so instead of a badge
- * there is a hint row navigating to [onConnectTelegram].
+ * Ported from backup_dashboard_screen.dart (PRD 8.3), now wired to the live
+ * engine: Start enqueues the worker, gated on Telegram sign-in.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +53,8 @@ fun BackupDashboardScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val counts by viewModel.counts.collectAsStateWithLifecycle()
+    val canBackup by viewModel.canBackup.collectAsStateWithLifecycle()
+    val engineBusy by viewModel.engineBusy.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -161,21 +159,28 @@ fun BackupDashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // The engine isn't in this build: disabled button + caption, per
-            // the rewrite's honesty rule.
+            // Live Start: enqueues the backup worker. Disabled while no
+            // Telegram session exists (with the connect hint above) or while
+            // a run is already queued.
             Button(
-                onClick = {},
-                enabled = false,
+                onClick = viewModel::startBackup,
+                enabled = canBackup && !engineBusy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.backup_start))
+                Text(
+                    stringResource(
+                        if (engineBusy) R.string.backup_running else R.string.backup_start,
+                    ),
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.backup_engine_unavailable_caption),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (!canBackup) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.backup_connect_telegram_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
