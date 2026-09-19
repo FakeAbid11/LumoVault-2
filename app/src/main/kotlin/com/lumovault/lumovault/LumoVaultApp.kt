@@ -19,13 +19,12 @@ class LumoVaultApp : Application(), Configuration.Provider {
     @Inject
     lateinit var backupScheduler: com.lumovault.lumovault.features.backup.data.work.BackupScheduler
 
+    @Inject
+    lateinit var aiScheduleManager: com.lumovault.lumovault.features.backup.data.work.AiScheduleManager
+
     override fun onCreate() {
         super.onCreate()
 
-        // Keep the periodic backup schedule in step with the settings: synced
-        // once at startup and again on every settings change, so a user
-        // toggling background backup or Wi-Fi-only never relies on the next
-        // app restart to take effect.
         val scope = kotlinx.coroutines.CoroutineScope(
             kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default,
         )
@@ -35,6 +34,7 @@ class LumoVaultApp : Application(), Configuration.Provider {
                     backgroundEnabled = s.backgroundBackupEnabled && s.autoBackupEnabled,
                     wifiOnly = s.wifiOnly,
                 )
+                aiScheduleManager.syncSchedule()
             }
             apply(settingsRepository.load())
             settingsRepository.changes.collect(apply)
