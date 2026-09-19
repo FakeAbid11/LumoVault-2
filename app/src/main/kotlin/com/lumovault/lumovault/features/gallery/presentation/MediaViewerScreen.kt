@@ -2,6 +2,8 @@ package com.lumovault.lumovault.features.gallery.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -17,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -115,10 +118,24 @@ fun MediaViewerScreen(
 @Composable
 private fun ZoomableMedia(item: MediaItemEntity, onTap: () -> Unit) {
     val isVideo = item.mimeType.startsWith("video/")
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.5f, 5f)
+        offsetX += panChange.x
+        offsetY += panChange.y
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    if (scale <= 1f) onTap()
+                })
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (isVideo) {
@@ -128,7 +145,15 @@ private fun ZoomableMedia(item: MediaItemEntity, onTap: () -> Unit) {
                 model = item.filePath,
                 contentDescription = item.fileName,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY,
+                    )
+                    .transformable(state = transformableState),
             )
         }
     }
