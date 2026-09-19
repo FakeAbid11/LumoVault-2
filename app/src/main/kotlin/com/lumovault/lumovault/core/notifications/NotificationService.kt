@@ -28,35 +28,35 @@ enum class NotificationType(
         channelName = "Backup Progress",
         channelDescription = "Shows ongoing backup progress",
         priority = NotificationCompat.PRIORITY_LOW,
-        notificationId = NOTIFICATION_ID_PROGRESS,
+        notificationId = 1001,
     ),
     BackupCompleted(
         channelId = "backup_completed",
         channelName = "Backup Completed",
         channelDescription = "Notifies when backup finishes successfully",
         priority = NotificationCompat.PRIORITY_DEFAULT,
-        notificationId = NOTIFICATION_ID_COMPLETED,
+        notificationId = 1002,
     ),
     BackupFailed(
         channelId = "backup_failed",
         channelName = "Backup Failed",
         channelDescription = "Notifies when backup fails",
         priority = NotificationCompat.PRIORITY_HIGH,
-        notificationId = NOTIFICATION_ID_FAILED,
+        notificationId = 1003,
     ),
     RestoreCompleted(
         channelId = "restore_completed",
         channelName = "Restore Completed",
         channelDescription = "Notifies when restore finishes",
         priority = NotificationCompat.PRIORITY_DEFAULT,
-        notificationId = NOTIFICATION_ID_RESTORE,
+        notificationId = 1004,
     ),
     StorageWarning(
         channelId = "storage_warning",
         channelName = "Storage Warning",
         channelDescription = "Warns about low storage",
         priority = NotificationCompat.PRIORITY_HIGH,
-        notificationId = NOTIFICATION_ID_STORAGE,
+        notificationId = 1005,
     ),
 }
 
@@ -239,11 +239,4 @@ class NotificationService @Inject constructor(
         else -> "%.2f GB".format(bytes / (1024.0 * 1024 * 1024))
     }
 
-    companion object {
-        private const val NOTIFICATION_ID_PROGRESS = 1001
-        private const val NOTIFICATION_ID_COMPLETED = 1002
-        private const val NOTIFICATION_ID_FAILED = 1003
-        private const val NOTIFICATION_ID_RESTORE = 1004
-        private const val NOTIFICATION_ID_STORAGE = 1005
-    }
 }

@@ -234,7 +234,7 @@ class MediaScannerService @Inject constructor(
                 arrayOf(bucketId),
                 null,
             )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getStringOrNull(0) else null
+                if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)) else null
             } ?: contentResolver.query(
                 videoUri,
                 arrayOf(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME),
@@ -242,7 +242,7 @@ class MediaScannerService @Inject constructor(
                 arrayOf(bucketId),
                 null,
             )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getStringOrNull(0) else null
+                if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)) else null
             }
         }.getOrNull()
     }

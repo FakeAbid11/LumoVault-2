@@ -255,8 +255,8 @@ class BackupEngine @Inject constructor(
 
         val document = (finalMessage.content as? TdApi.MessageDocument)?.document
         return Pair(
-            messageId = finalMessage.id.toString(),
-            remoteFileId = document?.document?.remote?.uniqueId
+            finalMessage.id.toString(),
+            document?.document?.remote?.uniqueId
                 ?: document?.document?.remote?.id
                 ?: finalMessage.id.toString(),
         )

@@ -56,10 +56,11 @@ class TransferQueuePersistence @Inject constructor(
     /**
      * Persist the given [tasks] to disk, coalescing concurrent calls.
      */
-    suspend fun save(tasks: List<UploadTask>) = mutex.withLock {
-        pendingSave?.cancel()
-        pendingSave = coroutineScope {
-            async(Dispatchers.IO) {
+    suspend fun save(tasks: List<UploadTask>) {
+        mutex.withLock {
+            pendingSave?.cancel()
+            pendingSave = coroutineScope {
+                async(Dispatchers.IO) {
                 val payload = try {
                     json.encodeToString(
                         UploadTaskList.serializer(),
@@ -80,6 +81,7 @@ class TransferQueuePersistence @Inject constructor(
         }
         pendingSave?.await()
         pendingSave = null
+        }
     }
 
     // ----------------------------------------------------------------- load

@@ -100,8 +100,8 @@ class GallerySaveService @Inject constructor(
                 put(MediaStore.MediaColumns.DATE_MODIFIED, createdAt / 1000)
             }
             if (latitude != null && longitude != null) {
-                put(MediaStore.MediaColumns.LATITUDE, latitude)
-                put(MediaStore.MediaColumns.LONGITUDE, longitude)
+                put("latitude", latitude)
+                put("longitude", longitude)
             }
         }
 

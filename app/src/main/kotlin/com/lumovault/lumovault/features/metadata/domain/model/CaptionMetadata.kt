@@ -84,7 +84,7 @@ data class CaptionMetadata(
             albumName?.let { put("alb", it) }
             deviceFolder?.let { put("fol", it) }
             description?.let { put("desc", it) }
-            if (tags.isNotEmpty()) putJsonArray("tags") { tags.forEach { add(it) } }
+            if (tags.isNotEmpty()) putJsonArray("tags") { tags.forEach { add(JsonPrimitive(it)) } }
             if (isDateUserSet) put("dus", true)
             customFields?.takeIf { it.isNotEmpty() }?.let { put("x", it) }
         }

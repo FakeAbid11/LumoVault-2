@@ -64,8 +64,8 @@ class ThumbnailWarmup @Inject constructor(
                     cache.put(mediaStoreId.toString(), stream.toByteArray())
                     bitmap.recycle()
                 }
-            } catch (_: CancellationException) {
-                throw _
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Best-effort: a failed warmup only costs the on-demand regenerate.
             }
