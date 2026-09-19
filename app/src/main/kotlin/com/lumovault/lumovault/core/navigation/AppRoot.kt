@@ -41,8 +41,14 @@ fun AppRoot() {
         dynamicColor = settings.useDynamicColor,
         animationsEnabled = settings.animationsEnabled,
     ) {
-        MediaPermissionGate {
-            LumoVaultNavGraph()
+        // App lock wraps everything below it: when a PIN or biometric lock is
+        // enabled with requireAuthOnAppOpen, the nav graph is not reachable
+        // until the gate unlocks. The gate itself is a no-op when no lock is
+        // configured, so this costs nothing on an unlocked install.
+        com.lumovault.lumovault.features.applock.AppLockGate {
+            MediaPermissionGate {
+                LumoVaultNavGraph()
+            }
         }
     }
 }

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Onboarding: shared -->
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_skip">Skip</string>
+
+    <!-- Welcome -->
+    <string name="onboarding_tagline">Your photos, your cloud, your control</string>
+    <string name="onboarding_feature_backup_title">Automatic Backup</string>
+    <string name="onboarding_feature_backup_description">Back up photos and videos automatically in the background</string>
+    <string name="onboarding_feature_quality_title">Original Quality</string>
+    <string name="onboarding_feature_quality_description">Never compress your memories — full resolution, always</string>
+    <string name="onboarding_feature_privacy_title">Private &amp; Secure</string>
+    <string name="onboarding_feature_privacy_description">Your files stay in a private channel you own — nobody else can see them</string>
+    <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Permissions -->
+    <string name="onboarding_permissions_title">Permissions</string>
+    <string name="onboarding_permissions_heading">Grant permissions</string>
+    <string name="onboarding_permissions_subtitle">LumoVault needs access to your photos and videos to back them up.</string>
+    <string name="onboarding_media_title">Storage Access</string>
+    <string name="onboarding_media_description">Access your photos and videos for backup</string>
+    <string name="onboarding_media_required_badge">Required</string>
+    <string name="onboarding_media_granted">Granted</string>
+    <string name="onboarding_media_not_granted">Not granted</string>
+    <string name="onboarding_media_grant">Grant Access</string>
+    <string name="onboarding_media_rationale_title">Why we need this</string>
+    <string name="onboarding_media_rationale_body">LumoVault backs up photos and videos directly from your device, and the gallery view lists them. Both stop working without this access. Nothing is uploaded without your say — folders are chosen on a later screen.</string>
+    <string name="onboarding_media_skip_dialog_title">Continue without media access?</string>
+    <string name="onboarding_media_skip_dialog_message">Backup and the gallery will not work until you grant access to photos and videos. You can grant it later from your device Settings, but nothing will back up until then.</string>
+    <string name="onboarding_media_skip_dialog_confirm">Continue anyway</string>
+    <string name="onboarding_media_skip_dialog_cancel">Grant access</string>
+
+    <!-- Background permissions -->
+    <string name="onboarding_background_title">Background Backup</string>
+    <string name="onboarding_background_heading">Keep backup running</string>
+    <string name="onboarding_background_subtitle">These two settings decide whether backup survives the app being closed. Both are recommended, neither blocks you.</string>
+    <string name="onboarding_battery_title">Battery optimization</string>
+    <string name="onboarding_battery_description">Exempt LumoVault from battery optimization so backups are not killed in the background.</string>
+    <string name="onboarding_battery_open_settings">Open battery settings</string>
+    <string name="onboarding_battery_enabled">Exemption granted</string>
+    <string name="onboarding_battery_not_set">Not exempted yet</string>
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_description">Get notified about backup progress and completion.</string>
+    <string name="onboarding_notifications_grant">Enable notifications</string>
+    <string name="onboarding_notifications_granted">Granted</string>
+    <string name="onboarding_notifications_not_granted">Not granted</string>
+    <string name="onboarding_notifications_builtin">Built in on this Android version</string>
+    <string name="onboarding_background_brand_note">Some manufacturers (Xiaomi, Samsung, OnePlus, Oppo, Huawei) also restrict background apps in their own settings. If backups stop when the screen is off, check battery or app management settings for LumoVault.</string>
+
+    <!-- Folder selection -->
+    <string name="onboarding_folders_title">Select Folders</string>
+    <string name="onboarding_folders_load_error_title">Could not load folders</string>
+    <string name="onboarding_folders_load_error_body">Grant storage permission in Settings to continue.</string>
+    <string name="onboarding_folders_retry">Retry</string>
+    <string name="onboarding_folders_empty">No media folders found on this device.</string>
+    <string name="onboarding_folder_item_count">%1$d items</string>
+    <string name="onboarding_folders_none_title">No folders selected</string>
+    <string name="onboarding_folders_none_message">Auto-backup stays off until at least one folder is selected. You can choose folders later in Backup settings — until then only manual backups will upload anything.</string>
+    <string name="onboarding_folders_none_go_back">Go back</string>
+    <string name="onboarding_folders_none_continue">Continue anyway</string>
+
+    <!-- Telegram connect -->
+    <string name="onboarding_telegram_title">Connect Telegram</string>
+    <string name="onboarding_telegram_header_title">Secure Backup</string>
+    <string name="onboarding_telegram_header_body">Your photos are stored in a private channel in your own Telegram account — only you can access them.</string>
+    <string name="onboarding_telegram_phone_label">Phone number</string>
+    <string name="onboarding_telegram_country_code_label">Country code</string>
+    <string name="onboarding_telegram_country_code_picker_title">Choose country</string>
+    <string name="onboarding_telegram_country_search">Search countries</string>
+    <string name="onboarding_telegram_send_code">Send Code</string>
+    <string name="onboarding_telegram_phone_required">Please enter your phone number</string>
+    <string name="onboarding_telegram_connect_error">Could not connect to Telegram. Please try again.</string>
+    <string name="onboarding_telegram_code_sent_to">Code sent to %1$s</string>
+    <string name="onboarding_telegram_code_label">Verification code</string>
+    <string name="onboarding_telegram_code_required">Please enter the verification code</string>
+    <string name="onboarding_telegram_verify">Verify</string>
+    <string name="onboarding_telegram_verify_code_error">Could not verify code. Please try again.</string>
+    <string name="onboarding_telegram_password_title">Two-step verification</string>
+    <string name="onboarding_telegram_password_body">This account is protected by a two-step verification password. Enter it to finish connecting.</string>
+    <string name="onboarding_telegram_password_label">Password</string>
+    <string name="onboarding_telegram_password_required">Please enter your password</string>
+    <string name="onboarding_telegram_verify_password_error">Could not verify password. Please try again.</string>
+    <string name="onboarding_telegram_password_show">Show password</string>
+    <string name="onboarding_telegram_password_hide">Hide password</string>
+    <string name="onboarding_telegram_forgot_password">Forgot password?</string>
+    <string name="onboarding_telegram_forgot_password_title">Forgot your password?</string>
+    <string name="onboarding_telegram_forgot_password_body">This is the two-step verification password set on your Telegram account — not a LumoVault password.\n\nTo reset it, contact Telegram support through the official Telegram app (Settings → Privacy and Security → Two-Step Verification → Forgot password), or via the Telegram website. Resets can take a few days.</string>
+    <string name="onboarding_telegram_forgot_password_close">Close</string>
+    <string name="onboarding_telegram_forgot_password_open">Open Telegram Help</string>
+    <string name="onboarding_telegram_connected_title">Connected!</string>
+    <string name="onboarding_telegram_connected_body">Setting up your secure vault…</string>
+    <string name="onboarding_telegram_error_title">Connection Error</string>
+    <string name="onboarding_telegram_try_again">Try Again</string>
+    <string name="onboarding_telegram_skip_for_now">Skip for now</string>
+    <string name="onboarding_telegram_skip_note">You can connect Telegram later from Settings, but nothing will back up until you do.</string>
+    <string name="onboarding_telegram_unexpected_error">Unexpected error occurred</string>
+</resources>

@@ -32,6 +32,14 @@ class GalleryRepository @Inject constructor(
     suspend fun mediaItem(localId: String): MediaItemEntity? = mediaDao.byLocalId(localId)
 
     /**
+     * Case-insensitive search over file name and description (see
+     * [MediaDao.search]). AI-label search is deliberately not reimplemented
+     * here: it depends on the background labeling engine, which does not exist
+     * in the Kotlin app yet.
+     */
+    suspend fun search(query: String): List<MediaItemEntity> = mediaDao.search(query)
+
+    /**
      * Scan the device and sync Room to it.
      *
      * Rows absent from MediaStore are removed — a photo deleted from the

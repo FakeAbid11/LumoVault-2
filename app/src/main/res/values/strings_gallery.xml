@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Search -->
+    <string name="search_title">Search</string>
+    <string name="search_hint">Search by file name or description…</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_empty_title">No matches</string>
+    <string name="search_empty_explanation">No photos match this search.</string>
+    <string name="search_ai_hint">AI label search arrives with the background scan, which is currently off. Enable AI scan in Settings to search what\'s in your photos.</string>
+    <string name="search_idle_title">Search your library</string>
+    <string name="search_idle_explanation">Find photos by file name or description. AI labels appear on results once the background scan has labeled them.</string>
+
+    <!-- Map -->
+    <string name="map_title">Map</string>
+    <string name="map_empty_title">No located photos</string>
+    <string name="map_empty_explanation">Photos with GPS data appear here once your library has been scanned.</string>
+    <string name="map_osm_attribution">© OpenStreetMap contributors</string>
+
+    <!-- Local / device folders -->
+    <string name="local_title">On this device</string>
+    <string name="local_empty_title">No media folders</string>
+    <string name="local_empty_explanation">Folders containing photos or videos on this device appear here.</string>
+    <string name="local_folder_count">%1$d items</string>
+</resources>

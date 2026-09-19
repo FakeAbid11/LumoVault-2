@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- People (faces) -->
+    <string name="people_title">People</string>
+
+    <!-- Scan-disabled empty state. The face-scan engine is a later phase, so
+         this must explain rather than offer a button that does nothing. -->
+    <string name="people_scan_disabled_title">Face scan is off</string>
+    <string name="people_scan_disabled_explanation">Enable \"Face scan\" in Settings to group the people in your photos. Background scanning arrives with the face-scan engine.</string>
+
+    <!-- Never-scanned empty state (scan enabled, nothing found yet). -->
+    <string name="people_empty_title">No people found</string>
+    <string name="people_empty_explanation">Faces in your photos will be grouped here once the library has been scanned. Background scanning arrives with the face-scan engine.</string>
+
+    <!-- Person cards -->
+    <string name="people_default_person_name">Person</string>
+    <string name="people_photo_count">%1$d photos</string>
+    <string name="people_photo_count_one">%1$d photo</string>
+
+    <!-- Selection mode actions -->
+    <string name="people_merge_selected">Merge selected</string>
+    <string name="people_delete_selected">Delete selected</string>
+    <string name="people_merge_into_which">Merge into which person?</string>
+    <string name="people_merge_title">Merge people?</string>
+    <string name="people_merge_message">Merge %1$d people into \"%2$s\"? All photos will be combined. This cannot be undone.</string>
+    <string name="people_merge_action">Merge</string>
+    <string name="people_delete_title">Delete people?</string>
+    <string name="people_delete_message">Delete %1$d people? All face groupings will be removed. The photos themselves will not be deleted.</string>
+
+    <!-- Person detail -->
+    <string name="person_detail_fallback_title">Person</string>
+    <string name="person_detail_not_found_title">Person not found</string>
+    <string name="person_detail_not_found_explanation">This person may have been deleted.</string>
+    <string name="person_detail_empty_photos">No photos found</string>
+    <string name="person_detail_unnamed">Unnamed Person</string>
+    <string name="person_detail_add_name">Add name</string>
+    <string name="person_detail_rename_title">Name this person</string>
+    <string name="person_detail_name_label">Name</string>
+    <string name="person_detail_edit_name">Edit name</string>
+    <string name="person_detail_save_action">Save</string>
+    <string name="person_detail_merge_with">Merge with…</string>
+    <string name="person_detail_merge_confirm_title">Confirm merge</string>
+    <string name="person_detail_merge_confirm_message">Merge this person into \"%1$s\"?</string>
+    <string name="person_detail_delete">Delete person</string>
+    <string name="person_detail_delete_confirm_title">Delete person?</string>
+    <string name="person_detail_delete_confirm_message">Face groupings will be removed. Photos will not be deleted from your device.</string>
+    <string name="person_detail_remove_faces_title">This is not the person?</string>
+    <string name="person_detail_remove_faces_message">Remove %1$d photos from this group? They will not be grouped here again, and photos containing other people stay in those people\'s groups.</string>
+    <string name="person_detail_remove_faces_action">Remove</string>
+    <string name="person_detail_not_this_person">This is not the person</string>
+    <string name="person_detail_move_title">Move to…</string>
+    <string name="person_detail_move_new_person">New person</string>
+    <string name="person_detail_move_to_another">Move to another person</string>
+    <string name="person_detail_moved">Moved %1$d photos</string>
+    <string name="person_detail_removed">Removed %1$d photos from this person</string>
+</resources>

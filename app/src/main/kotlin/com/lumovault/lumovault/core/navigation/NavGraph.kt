@@ -35,13 +35,39 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.lumovault.features.albums.presentation.AlbumDetailScreen
 import com.lumovault.lumovault.features.albums.presentation.AlbumsScreen
+import com.lumovault.lumovault.features.backup.presentation.BackupDashboardScreen
+import com.lumovault.lumovault.features.backup.presentation.BackupSettingsScreen
+import com.lumovault.lumovault.features.backup.presentation.StorageStatsScreen
 import com.lumovault.lumovault.features.gallery.presentation.ArchiveScreen
 import com.lumovault.lumovault.features.gallery.presentation.DuplicatesScreen
 import com.lumovault.lumovault.features.gallery.presentation.FavoritesScreen
 import com.lumovault.lumovault.features.gallery.presentation.HiddenScreen
+import com.lumovault.lumovault.features.gallery.presentation.LocalScreen
+import com.lumovault.lumovault.features.gallery.presentation.MapScreen
 import com.lumovault.lumovault.features.gallery.presentation.MediaViewerScreen
+import com.lumovault.lumovault.features.gallery.presentation.SearchScreen
 import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
 import com.lumovault.lumovault.features.gallery.presentation.TrashScreen
+import com.lumovault.lumovault.features.onboarding.presentation.BackgroundPermissionsScreen
+import com.lumovault.lumovault.features.onboarding.presentation.FolderSelectionScreen
+import com.lumovault.lumovault.features.onboarding.presentation.PermissionsScreen
+import com.lumovault.lumovault.features.onboarding.presentation.TelegramConnectScreen
+import com.lumovault.lumovault.features.onboarding.presentation.WelcomeScreen
+import com.lumovault.lumovault.features.people.presentation.PeopleScreen
+import com.lumovault.lumovault.features.people.presentation.PersonDetailScreen
+import com.lumovault.lumovault.features.restore.presentation.RestoreProgressScreen
+import com.lumovault.lumovault.features.restore.presentation.RestoreScreen
+import com.lumovault.lumovault.features.settings.presentation.AboutScreen
+import com.lumovault.lumovault.features.settings.presentation.AccountScreen
+import com.lumovault.lumovault.features.settings.presentation.AppearanceSettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.DeveloperSettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.GeneralSettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.MediaSettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.NotificationSettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.PrivacySettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.SettingsScreen
+import com.lumovault.lumovault.features.settings.presentation.StorageInsightsScreen
+import com.lumovault.lumovault.features.settings.presentation.StorageSettingsScreen
 
 /**
  * Every destination in the app.
@@ -257,36 +283,146 @@ fun LumoVaultNavGraph() {
                 )
             }
 
+            // -- Onboarding (chained flow) --
+            composable(Screen.OnboardingWelcome.route) {
+                WelcomeScreen(onNext = { navController.navigate(Screen.OnboardingPermissions.route) })
+            }
+            composable(Screen.OnboardingPermissions.route) {
+                PermissionsScreen(
+                    onNext = { navController.navigate(Screen.OnboardingBackgroundPermissions.route) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(Screen.OnboardingBackgroundPermissions.route) {
+                BackgroundPermissionsScreen(
+                    onNext = { navController.navigate(Screen.OnboardingFolders.route) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(Screen.OnboardingFolders.route) {
+                FolderSelectionScreen(
+                    onNext = { navController.navigate(Screen.OnboardingTelegram.route) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(Screen.OnboardingTelegram.route) {
+                TelegramConnectScreen(
+                    onFinished = {
+                        navController.navigate(Screen.Timeline.route) {
+                            popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
+                        }
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // -- Gallery remainder --
+            composable(Screen.Search.route) {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+            composable(Screen.Map.route) {
+                MapScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+
+            // -- People --
+            composable(Screen.People.route) {
+                PeopleScreen(
+                    onOpenPerson = { navController.navigate(Screen.PersonDetail.createRoute(it)) },
+                )
+            }
+            composable(Screen.PersonDetail.route) { entry ->
+                val personId = entry.arguments?.getString("personId")?.toLongOrNull() ?: return@composable
+                PersonDetailScreen(
+                    personId = personId,
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+
+            // -- Backup + restore (screens; engines land in Phase 4) --
+            composable(Screen.BackupDashboard.route) {
+                BackupDashboardScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigate = { navController.navigate(it) },
+                    onConnectTelegram = { navController.navigate(Screen.ConnectTelegram.route) },
+                )
+            }
+            composable(Screen.BackupSettings.route) {
+                BackupSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.StorageStats.route) {
+                StorageStatsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Restore.route) {
+                RestoreScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigate = { navController.navigate(it) },
+                )
+            }
+            composable(Screen.RestoreProgress.route) {
+                RestoreProgressScreen(onBack = { navController.popBackStack() })
+            }
+
+            // -- Settings hub + sub-screens --
+            composable(Screen.Settings.route) {
+                SettingsScreen(onNavigate = { navController.navigate(it) })
+            }
+            composable(Screen.SettingsAccount.route) {
+                AccountScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsAbout.route) {
+                AboutScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsGeneral.route) {
+                GeneralSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsMedia.route) {
+                MediaSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsStorage.route) {
+                StorageSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsStorageInsights.route) {
+                StorageInsightsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsAppearance.route) {
+                AppearanceSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsPrivacy.route) {
+                PrivacySettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsNotifications.route) {
+                NotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsDeveloper.route) {
+                DeveloperSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.ConnectTelegram.route) {
+                // The same phone->code->2FA flow as onboarding's last step;
+                // finishing here returns to wherever the user came from.
+                TelegramConnectScreen(
+                    onFinished = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             // -- Declared, not yet implemented --
-            // Keep this list alphabetical by route and delete each entry as its
-            // screen lands; an empty list here is the Phase 3 exit criterion.
-            NotImplementedDestination(Screen.OnboardingWelcome, navController)
-            NotImplementedDestination(Screen.OnboardingPermissions, navController)
-            NotImplementedDestination(Screen.OnboardingBackgroundPermissions, navController)
-            NotImplementedDestination(Screen.OnboardingFolders, navController)
-            NotImplementedDestination(Screen.OnboardingTelegram, navController)
-            NotImplementedDestination(Screen.Search, navController)
-            NotImplementedDestination(Screen.Map, navController)
-            NotImplementedDestination(Screen.People, navController)
-            NotImplementedDestination(Screen.Settings, navController)
-            NotImplementedDestination(Screen.PersonDetail, navController)
             NotImplementedDestination(Screen.DeviceFolder, navController)
-            NotImplementedDestination(Screen.BackupDashboard, navController)
-            NotImplementedDestination(Screen.BackupSettings, navController)
-            NotImplementedDestination(Screen.StorageStats, navController)
-            NotImplementedDestination(Screen.Restore, navController)
-            NotImplementedDestination(Screen.RestoreProgress, navController)
-            NotImplementedDestination(Screen.SettingsAccount, navController)
-            NotImplementedDestination(Screen.SettingsAbout, navController)
-            NotImplementedDestination(Screen.SettingsGeneral, navController)
-            NotImplementedDestination(Screen.SettingsMedia, navController)
-            NotImplementedDestination(Screen.SettingsStorage, navController)
-            NotImplementedDestination(Screen.SettingsStorageInsights, navController)
-            NotImplementedDestination(Screen.SettingsAppearance, navController)
-            NotImplementedDestination(Screen.SettingsPrivacy, navController)
-            NotImplementedDestination(Screen.SettingsNotifications, navController)
-            NotImplementedDestination(Screen.SettingsDeveloper, navController)
-            NotImplementedDestination(Screen.ConnectTelegram, navController)
         }
     }
 }

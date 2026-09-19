@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App-lock feature strings. Ported from app_lock_screen.dart / app_lock_provider.dart copy. -->
+<resources>
+    <string name="app_lock_title">LumoVault is locked</string>
+    <string name="app_lock_enter_pin">Enter your PIN</string>
+    <string name="app_lock_unlock">Unlock</string>
+    <string name="app_lock_use_biometrics">Use biometrics</string>
+    <string name="app_lock_biometric_unavailable">Biometric unlock is unavailable</string>
+    <string name="app_lock_incorrect_pin">Incorrect PIN.</string>
+    <string name="app_lock_auth_cancelled">Authentication cancelled.</string>
+    <string name="app_lock_lockout_seconds">Too many attempts. Try again in %1$d s.</string>
+    <string name="app_lock_lockout_minutes">Too many attempts. Try again in %1$d min.</string>
+
+    <!-- Biometric prompt chrome -->
+    <string name="app_lock_biometric_prompt_title">Unlock LumoVault</string>
+    <string name="app_lock_biometric_prompt_subtitle">Verify it\'s you to open your vault</string>
+    <string name="app_lock_biometric_prompt_negative">Use PIN</string>
+</resources>

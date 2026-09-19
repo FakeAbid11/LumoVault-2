@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backup dashboard -->
+    <string name="backup_dashboard_title">Backup</string>
+    <string name="backup_status_card_title">Backup status</string>
+    <string name="backup_connect_telegram_hint">Connect Telegram in Settings to enable backup</string>
+    <string name="backup_count_pending">Pending</string>
+    <string name="backup_count_uploaded">Uploaded</string>
+    <string name="backup_count_failed">Failed</string>
+    <string name="backup_last_backup">Last backup: %1$s</string>
+    <string name="backup_last_backup_never">No backup has completed yet</string>
+    <string name="backup_start">Start backup</string>
+    <string name="backup_engine_unavailable_caption">The upload engine is not part of this build yet, so backup can\'t be started.</string>
+    <string name="backup_open_settings">Backup settings</string>
+
+    <!-- Backup settings -->
+    <string name="backup_settings_title">Backup Settings</string>
+    <string name="backup_section_schedule">Schedule</string>
+    <string name="backup_section_media">Media</string>
+    <string name="backup_section_performance">Performance</string>
+    <string name="backup_auto_backup">Auto Backup</string>
+    <string name="backup_auto_backup_subtitle">Automatically back up new photos and videos</string>
+    <string name="backup_wifi_only">Wi-Fi Only</string>
+    <string name="backup_wifi_only_subtitle">Only upload when connected to Wi-Fi</string>
+    <string name="backup_charging_only">Charging Only</string>
+    <string name="backup_charging_only_subtitle">Only upload while the device is charging</string>
+    <string name="backup_min_battery">Minimum battery level</string>
+    <string name="backup_min_battery_value">Pause backup below %1$d%%</string>
+    <string name="backup_photos">Back up photos</string>
+    <string name="backup_videos">Back up videos</string>
+    <string name="backup_max_parallel">Parallel uploads</string>
+    <string name="backup_max_parallel_value">%1$d at a time</string>
+    <string name="backup_batch_size">Upload batch size</string>
+    <string name="backup_batch_size_value">%1$d files</string>
+    <string name="backup_upload_delay">Delay between uploads</string>
+
+    <!-- Storage stats -->
+    <string name="storage_stats_title">Storage Usage</string>
+    <string name="storage_stats_backed_up_items">%1$d of %2$d items backed up</string>
+    <string name="storage_stats_none_backed_up">No items backed up yet</string>
+    <string name="storage_stats_total">Total</string>
+    <string name="storage_stats_backed_up">Backed Up</string>
+    <string name="storage_stats_pending">Pending</string>
+    <string name="storage_stats_failed">Failed</string>
+    <string name="storage_stats_uploading">Uploading</string>
+    <string name="storage_stats_total_bytes">Total size: %1$s</string>
+
+    <!-- Restore -->
+    <string name="restore_title">Restore</string>
+    <string name="restore_headline">Restore your library</string>
+    <string name="restore_explanation">LumoVault can recover photos and videos previously backed up to your Telegram storage channel.</string>
+    <string name="restore_scan_channel">Scan channel for backups</string>
+    <string name="restore_engine_unavailable_caption">The restore engine is not part of this build yet, so scanning is disabled.</string>
+    <string name="restore_what_it_does">What restore does</string>
+    <string name="restore_step_scan">Scan your storage channel for an existing backup.</string>
+    <string name="restore_step_download">Download backed-up photos and videos to this device.</string>
+    <string name="restore_step_rebuild">Rebuild your local library and timeline from the backup metadata.</string>
+
+    <!-- Restore progress -->
+    <string name="restore_progress_title">Restore progress</string>
+    <string name="restore_phase_scan">Scanning channel</string>
+    <string name="restore_phase_download">Downloading media</string>
+    <string name="restore_phase_rebuild">Rebuilding library</string>
+    <string name="restore_progress_idle">Nothing is running. The restore engine is not part of this build yet, so progress cannot start.</string>
+    <string name="restore_progress_items">%1$d of %2$d items</string>
+</resources>

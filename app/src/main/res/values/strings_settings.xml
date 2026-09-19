@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- User-visible strings for the settings feature. Ported from the hardcoded
+     literals in lib/features/settings/presentation/screens/*.dart. -->
+<resources>
+    <!-- Settings hub -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_account_row_title">Account</string>
+    <string name="settings_account_row_subtitle">Manage your Telegram account</string>
+    <string name="settings_section_backup_storage">Backup &amp; Storage</string>
+    <string name="settings_auto_backup">Auto Backup</string>
+    <string name="settings_auto_backup_subtitle">Automatically back up new photos</string>
+    <string name="settings_wifi_only">Wi-Fi Only</string>
+    <string name="settings_wifi_only_subtitle">Only upload on Wi-Fi</string>
+    <string name="settings_backup_settings">Backup Settings</string>
+    <string name="settings_backup_settings_subtitle">Advanced backup configuration</string>
+    <string name="settings_storage_usage">Storage Usage</string>
+    <string name="settings_storage_usage_subtitle">Device cache and storage cleanup</string>
+    <string name="settings_storage_insights">Storage Insights</string>
+    <string name="settings_storage_insights_subtitle">Backup coverage and media breakdown</string>
+    <string name="settings_section_vault_privacy">Vault &amp; Privacy</string>
+    <string name="settings_privacy_row_title">Privacy &amp; App Lock</string>
+    <string name="settings_privacy_biometric">Biometric lock enabled</string>
+    <string name="settings_privacy_pin">PIN lock enabled</string>
+    <string name="settings_privacy_none">No lock set</string>
+    <string name="settings_media_folders">Media Settings</string>
+    <string name="settings_media_folders_subtitle">Backup content, sort and filters</string>
+    <string name="settings_section_preferences">Preferences</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_section_about_system">About &amp; System</string>
+    <string name="settings_about">About LumoVault</string>
+    <string name="settings_developer">Developer Options</string>
+    <string name="settings_developer_subtitle">Debug info and diagnostics</string>
+
+    <!-- Theme mode names (shared) -->
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <!-- Appearance -->
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_section_theme">Theme</string>
+    <string name="appearance_section_colors">Colors</string>
+    <string name="appearance_dynamic_color">Dynamic Color</string>
+    <string name="appearance_dynamic_color_subtitle">Use system wallpaper colors</string>
+    <string name="appearance_section_gallery">Gallery</string>
+    <string name="appearance_grid_size">Grid Size</string>
+    <string name="appearance_grid_small">Small (5 per row)</string>
+    <string name="appearance_grid_medium">Medium (4 per row)</string>
+    <string name="appearance_grid_large">Large (3 per row)</string>
+    <string name="appearance_compact_mode">Compact Mode</string>
+    <string name="appearance_compact_mode_subtitle">Show more items on screen</string>
+    <string name="appearance_animations">Animations</string>
+    <string name="appearance_animations_subtitle">Enable transition animations</string>
+
+    <!-- General -->
+    <string name="general_title">General</string>
+    <string name="general_section_language">Language</string>
+    <string name="general_app_language">App Language</string>
+    <string name="general_language_coming_soon">%1$s — translations coming soon</string>
+    <string name="language_english">English</string>
+    <string name="language_spanish">Spanish</string>
+    <string name="language_french">French</string>
+
+    <!-- Media -->
+    <string name="media_title">Media Settings</string>
+    <string name="media_section_backup_content">Backup Content</string>
+    <string name="media_backup_photos">Backup Photos</string>
+    <string name="media_backup_photos_subtitle">Include photos in backups</string>
+    <string name="media_backup_videos">Backup Videos</string>
+    <string name="media_backup_videos_subtitle">Include videos in backups</string>
+    <string name="media_section_sort_filter">Sort &amp; Filter</string>
+    <string name="media_sort_order">Gallery Sort Order</string>
+    <string name="media_sort_newest_first">Newest first</string>
+    <string name="media_sort_oldest_first">Oldest first</string>
+    <string name="media_sort_name_asc">Name (A–Z)</string>
+    <string name="media_sort_size_desc">Largest first</string>
+    <string name="media_filter_type">Gallery Filter</string>
+    <string name="media_filter_all">All media</string>
+    <string name="media_filter_photos">Photos only</string>
+    <string name="media_filter_videos">Videos only</string>
+    <string name="media_filter_favorites">Favorites only</string>
+    <string name="media_section_upload">Upload</string>
+    <string name="media_upload_batch_size">Upload Batch Size</string>
+    <string name="media_upload_batch_size_value">%1$d items per batch</string>
+    <string name="media_batch_5">5 items per batch</string>
+    <string name="media_batch_10">10 items per batch</string>
+    <string name="media_batch_25">25 items per batch</string>
+    <string name="media_batch_50">50 items per batch</string>
+
+    <!-- Storage -->
+    <string name="storage_title">Storage</string>
+    <string name="storage_section_trash">Trash</string>
+    <string name="storage_trash_duration">Trash Retention</string>
+    <string name="storage_trash_days_7">7 days</string>
+    <string name="storage_trash_days_14">14 days</string>
+    <string name="storage_trash_days_30">30 days</string>
+    <string name="storage_trash_days_60">60 days</string>
+    <string name="storage_trash_forever">Until I delete them</string>
+
+    <!-- Storage insights -->
+    <string name="insights_title">Storage Insights</string>
+    <string name="insights_section_on_device">On This Device</string>
+    <string name="insights_total_items">Media Items</string>
+    <string name="insights_total_items_value">%1$d items</string>
+    <string name="insights_photos">Photos</string>
+    <string name="insights_videos">Videos</string>
+    <string name="insights_section_backup">Backup</string>
+    <string name="insights_backup_photos">Photos included in backup</string>
+    <string name="insights_backup_videos">Videos included in backup</string>
+    <string name="insights_last_backup">Last Backup</string>
+    <string name="insights_last_scan">Last Device Scan</string>
+    <string name="insights_never">Never</string>
+    <string name="insights_channel_ready">Telegram channel connected</string>
+    <string name="insights_channel_missing">No backup channel yet</string>
+    <string name="insights_storage_channel">Backup Destination</string>
+    <string name="insights_value_yes">Yes</string>
+    <string name="insights_value_no">No</string>
+
+    <!-- Notifications -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_section_backup">Backup</string>
+    <string name="notifications_backup_progress">Backup Progress</string>
+    <string name="notifications_backup_progress_subtitle">Show ongoing backup notifications</string>
+    <string name="notifications_backup_completed">Backup Completed</string>
+    <string name="notifications_backup_completed_subtitle">Notify when backup finishes</string>
+    <string name="notifications_backup_failed">Backup Failed</string>
+    <string name="notifications_backup_failed_subtitle">Notify when backup fails</string>
+    <string name="notifications_section_restore">Restore</string>
+    <string name="notifications_restore_completed">Restore Completed</string>
+    <string name="notifications_restore_completed_subtitle">Notify when restore finishes</string>
+    <string name="notifications_section_system">System</string>
+    <string name="notifications_storage_warning">Storage Warning</string>
+    <string name="notifications_storage_warning_subtitle">Warn when Telegram storage is low</string>
+
+    <!-- Privacy -->
+    <string name="privacy_title">Privacy</string>
+    <string name="privacy_section_app_lock">App Lock</string>
+    <string name="privacy_biometric_lock">Biometric Lock</string>
+    <string name="privacy_biometric_lock_subtitle">Require fingerprint or face to open app</string>
+    <string name="privacy_pin_lock">PIN Lock</string>
+    <string name="privacy_pin_lock_subtitle">Require PIN to open app</string>
+    <string name="privacy_require_on_open">Require on App Open</string>
+    <string name="privacy_require_on_open_subtitle">Lock every time app is opened</string>
+    <string name="privacy_section_encryption">Encryption</string>
+    <string name="privacy_e2e">End-to-End Encryption</string>
+    <string name="privacy_e2e_subtitle">Coming soon — encrypt all backups</string>
+
+    <!-- Developer -->
+    <string name="developer_title">Developer Options</string>
+    <string name="developer_section_debug">Debug Information</string>
+    <string name="developer_app_version">App Version</string>
+    <string name="developer_version_unavailable">unavailable</string>
+    <string name="developer_section_experimental">Experimental</string>
+    <string name="developer_debug_mode">Debug Mode</string>
+    <string name="developer_debug_mode_subtitle">Emit verbose diagnostic logs (logcat)</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_app_name">LumoVault</string>
+    <string name="about_version_format">Version %1$s</string>
+    <string name="about_tagline">Original quality photo backup powered by Telegram</string>
+    <string name="about_privacy_policy">Privacy Policy</string>
+    <string name="about_privacy_policy_url">https://lumovault.app/privacy</string>
+    <string name="about_source_code">Source Code</string>
+    <string name="about_source_code_url">github.com/FakeAbid11/LumoVault</string>
+
+    <!-- Account -->
+    <string name="account_title">Account</string>
+    <string name="account_signed_in">Connected to Telegram</string>
+    <string name="account_not_signed_in">Not signed in</string>
+    <string name="account_not_signed_in_subtitle">Sign in to start backing up your photos.</string>
+    <string name="account_checking">Checking account…</string>
+</resources>
