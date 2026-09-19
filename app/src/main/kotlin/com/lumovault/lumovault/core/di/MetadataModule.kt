@@ -83,7 +83,7 @@ object MetadataModule {
         manifestService = manifestService,
         store = store,
         deviceHashProvider = deviceHashProvider,
-        scope = scope,
+        coroutineScope = scope,
     )
 
     @Provides

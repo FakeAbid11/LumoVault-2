@@ -1,6 +1,5 @@
 package com.lumovault.lumovault.core.ml
 
-import ai.onnxruntime.OnnxRuntime
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
@@ -32,8 +31,7 @@ class OnnxModelHost @Inject constructor(
      * low-end device that never opens People should not pay the load.
      */
     val environment: OrtEnvironment by lazy {
-        OnnxRuntime.init()
-        OrtEnvironment.getDefaultInstance()
+        OrtEnvironment.getEnvironment()
     }
 
     /**

@@ -458,7 +458,6 @@ private fun ScaffoldWithBottomBar(
  * action, and it names the route so the gap is visible in the running app
  * rather than only in the source.
  */
-@Composable
 private fun androidx.navigation.NavGraphBuilder.NotImplementedDestination(
     screen: Screen,
     navController: NavHostController,
