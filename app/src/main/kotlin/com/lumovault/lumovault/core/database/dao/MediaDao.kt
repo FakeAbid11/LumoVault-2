@@ -275,4 +275,27 @@ interface MediaDao {
 
     @Query("UPDATE media_items SET ai_labels = :labels WHERE local_id = :localId")
     suspend fun setAiLabels(localId: String, labels: List<String>)
+
+    /** Items missing a CLIP embedding — candidates for background embedding. */
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE clip_embedding IS NULL AND is_trashed = 0 AND is_hidden = 0
+        ORDER BY created_at DESC
+        """,
+    )
+    suspend fun itemsNeedingEmbedding(): List<MediaItemEntity>
+
+    /** All non-trashed items — used for in-memory cosine similarity ranking. */
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE is_trashed = 0 AND is_hidden = 0 AND clip_embedding IS NOT NULL
+        """,
+    )
+    suspend fun allWithEmbeddings(): List<MediaItemEntity>
+
+    /** Set of localIds that have AI labels — used to skip already-labeled items. */
+    @Query("SELECT local_id FROM media_items WHERE ai_labels != '[]'")
+    suspend fun allLabeledIds(): List<String>
 }

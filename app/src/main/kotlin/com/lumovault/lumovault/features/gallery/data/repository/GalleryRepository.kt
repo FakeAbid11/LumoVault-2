@@ -7,11 +7,8 @@ import com.lumovault.lumovault.features.gallery.data.service.MediaScannerService
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.sqrt
 
-/**
- * Write-through gallery repository: MediaStore is the source of truth for what
- * exists, Room is the read model the UI observes.
- */
 @Singleton
 class GalleryRepository @Inject constructor(
     private val mediaDao: MediaDao,
@@ -21,55 +18,53 @@ class GalleryRepository @Inject constructor(
     val timeline: Flow<List<MediaItemEntity>> = mediaDao.timelineFlow()
     val favorites: Flow<List<MediaItemEntity>> = mediaDao.favoritesFlow()
     val trashed: Flow<List<MediaItemEntity>> = mediaDao.trashedFlow()
-
-    /** Hidden items: the flag is set, trashed items excluded so the two views
-     * stay disjoint. */
     val hidden: Flow<List<MediaItemEntity>> = mediaDao.hiddenFlow()
-
-    /** Archived items, same exclusion. */
     val archived: Flow<List<MediaItemEntity>> = mediaDao.archivedFlow()
 
     suspend fun mediaItem(localId: String): MediaItemEntity? = mediaDao.byLocalId(localId)
 
-    /**
-     * Case-insensitive search over file name and description (see
-     * [MediaDao.search]). AI-label search is deliberately not reimplemented
-     * here: it depends on the background labeling engine, which does not exist
-     * in the Kotlin app yet.
-     */
     suspend fun search(query: String): List<MediaItemEntity> = mediaDao.search(query)
 
-    /**
-     * Scan the device and sync Room to it.
-     *
-     * Rows absent from MediaStore are removed — a photo deleted from the
-     * device gallery should leave the timeline. This is only safe for a full
-     * unfiltered scan (the Flutter scanner deliberately suppresses deletion
-     * when a folder filter is active, since the scan never saw the excluded
-     * folders and would wrongly purge them).
-     */
+    suspend fun semanticSearch(
+        queryEmbedding: FloatArray,
+        limit: Int = 60,
+        minScore: Double = 0.2,
+    ): List<MediaItemEntity> {
+        val items = mediaDao.allWithEmbeddings()
+        val scored = items.mapNotNull { item ->
+            val emb = item.clipEmbedding ?: return@mapNotNull null
+            if (emb.size != EMBEDDING_DIM) return@mapNotNull null
+            val score = cosineSimilarity(queryEmbedding, emb.toFloatArray())
+            if (score >= minScore) item to score else null
+        }
+        return scored.sortedByDescending { it.second }
+            .take(limit)
+            .map { it.first }
+    }
+
+    suspend fun itemsNeedingEmbedding(): List<MediaItemEntity> =
+        mediaDao.itemsNeedingEmbedding()
+
+    suspend fun updateClipEmbedding(localId: String, embedding: FloatArray) =
+        mediaDao.setClipEmbedding(localId, embedding.toList())
+
+    suspend fun labelMediaItem(localId: String, labels: List<String>) =
+        mediaDao.setAiLabels(localId, labels)
+
+    suspend fun labeledLocalIds(): Set<String> =
+        mediaDao.allLabeledIds().toSet()
+
     suspend fun refreshFromDevice(onProgress: ((Int) -> Unit)? = null): Int {
         val now = System.currentTimeMillis()
-
-        // listAll paginates internally and reports progress as it goes.
         val scanned = scanner.listAll { loaded -> onProgress?.invoke(loaded) }
-
         val entities = scanned.map { scanner.toEntity(it, now) }
-
-        // Preserve existing PKs so the upsert targets the right row instead of
-        // colliding on the localId unique index.
         val existing = mediaDao.byLocalIds(scanned.map { it.id.toString() })
             .associateBy { it.localId }
         val withIds = entities.map { e -> existing[e.localId]?.let { e.copy(id = it.id) } ?: e }
-
         mediaDao.upsertAll(withIds)
-
-        // Remove rows whose media no longer exists on the device, chunked so
-        // the IN clause stays bounded for very large libraries.
         val seen = withIds.map { it.localId }.toHashSet()
         val stale = existing.keys - seen
         stale.chunked(BATCH).forEach { mediaDao.deleteByLocalIds(it) }
-
         return withIds.size
     }
 
@@ -81,18 +76,8 @@ class GalleryRepository @Inject constructor(
 
     suspend fun restoreFromTrash(localId: String) = mediaDao.restoreFromTrash(localId)
 
-    /**
-     * Removes the row outright. Unlike [moveToTrash] this is not reversible, so
-     * callers confirm first — and the device file itself is left alone, since
-     * deleting from MediaStore is a separate, user-visible system action.
-     */
     suspend fun deletePermanently(localId: String) = deletePermanently(listOf(localId))
 
-    /**
-     * The batched form of [deletePermanently]: one statement for N items rather
-     * than N statements, which is what a "delete everything selected" action
-     * needs to stay instantaneous on a large selection.
-     */
     suspend fun deletePermanently(localIds: List<String>) {
         if (localIds.isEmpty()) return
         mediaDao.deleteByLocalIds(localIds)
@@ -104,14 +89,6 @@ class GalleryRepository @Inject constructor(
     suspend fun setArchived(localId: String, archived: Boolean) =
         mediaDao.setArchived(localId, archived)
 
-    /**
-     * Groups items sharing a SHA-256 [MediaItemEntity.fileHash].
-     *
-     * Ported from `gallery_repository.dart`'s `getDuplicateGroups`. Excludes
-     * empty hashes, trashed and hidden items. Groups come back largest-first
-     * with the hash breaking ties, as the original's stable comparator did;
-     * within a group [MediaDao.byFileHash] already orders newest-first.
-     */
     suspend fun duplicateGroups(): List<List<MediaItemEntity>> {
         val hashes = mediaDao.duplicateHashes().sortedWith(
             compareByDescending<DuplicateHash> { it.count }.thenBy { it.fileHash },
@@ -124,5 +101,20 @@ class GalleryRepository @Inject constructor(
 
     companion object {
         private const val BATCH = 500
+        private const val EMBEDDING_DIM = 512
+
+        fun cosineSimilarity(a: FloatArray, b: FloatArray): Double {
+            if (a.size != b.size) return 0.0
+            var dot = 0.0
+            var normA = 0.0
+            var normB = 0.0
+            for (i in a.indices) {
+                dot += a[i] * b[i].toDouble()
+                normA += a[i] * a[i].toDouble()
+                normB += b[i] * b[i].toDouble()
+            }
+            val denom = sqrt(normA) * sqrt(normB)
+            return if (denom == 0.0) 0.0 else dot / denom
+        }
     }
 }

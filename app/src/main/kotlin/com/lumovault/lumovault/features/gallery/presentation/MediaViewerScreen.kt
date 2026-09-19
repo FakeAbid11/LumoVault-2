@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 fun MediaViewerScreen(
     initialIndex: Int,
     onBack: () -> Unit,
+    onFindSimilar: ((localId: String) -> Unit)? = null,
     /**
      * The collection to page through. Null means the main timeline; the flag
      * views pass their own list because an index into their grid is not an
@@ -72,6 +74,13 @@ fun MediaViewerScreen(
                         navigationIconContentColor = Color.White,
                         actionIconContentColor = Color.White,
                     ),
+                    actions = {
+                        if (onFindSimilar != null) {
+                            IconButton(onClick = { onFindSimilar(source[pagerState.currentPage].localId) }) {
+                                Icon(Icons.Filled.ImageSearch, "Find similar")
+                            }
+                        }
+                    },
                 )
             }
         },

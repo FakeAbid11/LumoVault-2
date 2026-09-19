@@ -1,22 +1,34 @@
 package com.lumovault.lumovault.features.gallery.presentation
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
@@ -26,8 +38,10 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -36,67 +50,129 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.lumovault.R
 import com.lumovault.lumovault.core.database.entity.MediaItemEntity
 
-/**
- * Keyword search over the scanned library.
- *
- * Ported from lib/features/gallery/presentation/screens/search_screen.dart.
- * The original also had CLIP semantic search, "find similar", and an in-app AI
- * labeling scan; all three are engine work that does not exist in the Kotlin
- * app yet, so this port covers the text search plus display of whatever AI
- * labels the scan has already stored — and says so plainly instead of offering
- * a search mode that silently cannot work.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onBack: () -> Unit,
     onOpenItem: (index: Int, items: List<MediaItemEntity>) -> Unit,
+    initialSimilarTo: String? = null,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val similarResults by viewModel.similarResults.collectAsStateWithLifecycle()
+    val similarTo by viewModel.similarTo.collectAsStateWithLifecycle()
+    val semanticMode by viewModel.semanticMode.collectAsStateWithLifecycle()
+    val aiScanState by viewModel.aiScanState.collectAsStateWithLifecycle()
 
-    // AI labels present on the current results, deduplicated: labels a
-    // background scan already wrote to Room. Showing them makes the existing
-    // data visible without implying a working label search.
-    val resultLabels = remember(results) {
-        results.flatMap { it.aiLabels }.distinct().sorted()
+    LaunchedEffect(initialSimilarTo) {
+        if (initialSimilarTo != null) {
+            viewModel.setSimilarTo(initialSimilarTo)
+        }
+    }
+
+    val isFindSimilar = similarTo != null
+    val displayResults = if (isFindSimilar) similarResults else results
+
+    val resultLabels = remember(displayResults) {
+        displayResults.flatMap { it.aiLabels }.distinct().sorted()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.search_title)) },
+                title = {
+                    Text(
+                        if (isFindSimilar) stringResource(R.string.search_find_similar)
+                        else stringResource(R.string.search_title)
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (isFindSimilar) {
+                            viewModel.setSimilarTo(null)
+                            viewModel.clear()
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 },
+                actions = {
+                    if (!isFindSimilar) {
+                        IconButton(onClick = { viewModel.toggleSemanticMode() }) {
+                            Icon(
+                                if (semanticMode) Icons.Filled.Psychology else Icons.Filled.Search,
+                                contentDescription = if (semanticMode) "Semantic search" else "Keyword search",
+                            )
+                        }
+                    }
+                },
             )
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            SearchField(query = query, onQueryChange = viewModel::onQueryChange, onClear = viewModel::clear)
+            if (!isFindSimilar) {
+                SearchField(
+                    query = query,
+                    onQueryChange = viewModel::onQueryChange,
+                    onClear = viewModel::clear,
+                )
+            }
 
             when {
-                query.isBlank() -> EmptyCollection(
-                    title = stringResource(R.string.search_idle_title),
-                    explanation = stringResource(R.string.search_idle_explanation),
-                )
-                results.isEmpty() && !settings.aiScanEnabled -> EmptyCollection(
+                isFindSimilar && similarResults.isEmpty() && query.isBlank() -> {
+                    if (aiScanState.running) {
+                        AiScanProgress(aiScanState, onStop = { viewModel.stopAiScan() })
+                    } else {
+                        EmptyCollection(
+                            title = stringResource(R.string.search_find_similar),
+                            explanation = stringResource(R.string.search_find_similar_explanation),
+                        )
+                    }
+                }
+                query.isBlank() && !isFindSimilar -> {
+                    if (aiScanState.running) {
+                        AiScanProgress(aiScanState, onStop = { viewModel.stopAiScan() })
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                stringResource(R.string.search_idle_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Spacer(Modifier.size(8.dp))
+                            Text(
+                                stringResource(R.string.search_idle_explanation),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.size(24.dp))
+                            Button(onClick = { viewModel.startAiScan() }) {
+                                Icon(Icons.Filled.Psychology, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.search_start_scan))
+                            }
+                        }
+                    }
+                }
+                displayResults.isEmpty() && !settings.aiScanEnabled && !isFindSimilar -> EmptyCollection(
                     title = stringResource(R.string.search_empty_title),
                     explanation = stringResource(R.string.search_ai_hint),
                 )
-                results.isEmpty() -> EmptyCollection(
+                displayResults.isEmpty() -> EmptyCollection(
                     title = stringResource(R.string.search_empty_title),
                     explanation = stringResource(R.string.search_empty_explanation),
                 )
                 else -> {
-                    if (resultLabels.isNotEmpty()) {
+                    if (resultLabels.isNotEmpty() && !isFindSimilar) {
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -107,12 +183,47 @@ fun SearchScreen(
                         }
                     }
                     MediaGrid(
-                        items = results,
-                        onItemClick = { index -> onOpenItem(index, results) },
+                        items = displayResults,
+                        onItemClick = { index -> onOpenItem(index, displayResults) },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AiScanProgress(state: AiScanState, onStop: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (state.total > 0) {
+            Text(
+                "Scanning ${state.completed} / ${state.total}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(Modifier.size(16.dp))
+            LinearProgressIndicator(
+                progress = { state.progress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                "${((state.progress) * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            CircularProgressIndicator()
+            Spacer(Modifier.size(16.dp))
+            Text("Preparing scan...")
+        }
+        Spacer(Modifier.size(24.dp))
+        Button(onClick = onStop, colors = ButtonDefaults.buttonColors()) {
+            Text("Stop")
         }
     }
 }
@@ -132,8 +243,6 @@ private fun SearchField(
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotEmpty()) {
-                // Tooltip is an addition: the original clear button had no
-                // tooltip and was invisible to screen readers.
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                     tooltip = { PlainTooltip { Text(stringResource(R.string.search_clear)) } },

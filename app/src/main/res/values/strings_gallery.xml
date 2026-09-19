@@ -9,6 +9,9 @@
     <string name="search_ai_hint">AI label search arrives with the background scan, which is currently off. Enable AI scan in Settings to search what\'s in your photos.</string>
     <string name="search_idle_title">Search your library</string>
     <string name="search_idle_explanation">Find photos by file name or description. AI labels appear on results once the background scan has labeled them.</string>
+    <string name="search_start_scan">Start AI Scan</string>
+    <string name="search_find_similar">Find Similar</string>
+    <string name="search_find_similar_explanation">Find photos visually similar to this one using AI embeddings.</string>
 
     <!-- Map -->
     <string name="map_title">Map</string>

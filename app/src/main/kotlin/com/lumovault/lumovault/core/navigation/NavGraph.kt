@@ -103,6 +103,9 @@ sealed class Screen(val route: String) {
     data object MediaViewer : Screen("media_viewer/{index}") {
         fun createRoute(index: Int) = "media_viewer/$index"
     }
+    data object SearchSimilar : Screen("search?similar={similarTo}") {
+        fun createRoute(similarTo: String) = "search?similar=$similarTo"
+    }
     data object Favorites : Screen("favorites")
     data object Hidden : Screen("hidden")
     data object Archive : Screen("archive")
@@ -211,6 +214,9 @@ fun LumoVaultNavGraph() {
                     initialIndex = index,
                     items = viewerItems,
                     onBack = { navController.popBackStack() },
+                    onFindSimilar = { localId ->
+                        navController.navigate(Screen.SearchSimilar.createRoute(localId))
+                    },
                 )
             }
 
@@ -336,6 +342,17 @@ fun LumoVaultNavGraph() {
                         viewerItems = items
                         navController.navigate(Screen.MediaViewer.createRoute(index))
                     },
+                )
+            }
+            composable(Screen.SearchSimilar.route) { entry ->
+                val similarTo = entry.arguments?.getString("similarTo")
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                    initialSimilarTo = similarTo,
                 )
             }
             composable(Screen.Map.route) {
