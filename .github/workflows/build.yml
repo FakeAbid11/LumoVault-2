@@ -59,8 +59,8 @@ jobs:
             echo "## Log tail"
             tail -60 gradle-assemble.log
           } >> "$GITHUB_STEP_SUMMARY"
-          # Also save as artifact for easy download
-          grep -E "^e: |error: |FAILURE: Build|What went failed|Caused by" gradle-assemble.log | head -300 > ci-errors.txt
+          # Save full log as artifact for debugging
+          cp gradle-assemble.log ci-errors.txt
           echo '--- TAIL ---' >> ci-errors.txt
           tail -120 gradle-assemble.log >> ci-errors.txt
 
