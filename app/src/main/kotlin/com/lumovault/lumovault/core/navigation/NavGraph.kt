@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -47,6 +48,7 @@ import com.lumovault.lumovault.features.gallery.presentation.LocalScreen
 import com.lumovault.lumovault.features.gallery.presentation.MapScreen
 import com.lumovault.lumovault.features.gallery.presentation.MediaViewerScreen
 import com.lumovault.lumovault.features.gallery.presentation.SearchScreen
+import com.lumovault.lumovault.features.gallery.presentation.TelegramMediaViewerScreen
 import com.lumovault.lumovault.features.gallery.presentation.TimelineScreen
 import com.lumovault.lumovault.features.gallery.presentation.TrashScreen
 import com.lumovault.lumovault.features.onboarding.presentation.BackgroundPermissionsScreen
@@ -105,6 +107,9 @@ sealed class Screen(val route: String) {
     }
     data object SearchSimilar : Screen("search?similar={similarTo}") {
         fun createRoute(similarTo: String) = "search?similar=$similarTo"
+    }
+    data object TelegramMediaViewer : Screen("telegram_viewer/{index}") {
+        fun createRoute(index: Int) = "telegram_viewer/$index"
     }
     data object Favorites : Screen("favorites")
     data object Hidden : Screen("hidden")
@@ -218,6 +223,21 @@ fun LumoVaultNavGraph() {
                         navController.navigate(Screen.SearchSimilar.createRoute(localId))
                     },
                 )
+            }
+            composable(Screen.TelegramMediaViewer.route) { entry ->
+                val index = entry.arguments?.getString("index")?.toIntOrNull() ?: 0
+                val telegramItems = viewerItems?.filter { it.telegramMessageId != null } ?: emptyList()
+                if (telegramItems.isNotEmpty()) {
+                    val vm: com.lumovault.lumovault.features.gallery.presentation.TelegramMediaViewModel = hiltViewModel()
+                    TelegramMediaViewerScreen(
+                        items = telegramItems,
+                        initialIndex = index.coerceIn(telegramItems.indices),
+                        onBack = { navController.popBackStack() },
+                        downloader = vm.downloader,
+                        gallerySaveService = vm.gallerySaveService,
+                        storageChannelId = vm.storageChannelId,
+                    )
+                }
             }
 
             // -- Flag collections --
