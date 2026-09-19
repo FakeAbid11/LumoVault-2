@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lumovault.lumovault.core.database.converter.Converters
 import com.lumovault.lumovault.core.database.dao.AlbumDao
 import com.lumovault.lumovault.core.database.dao.FaceDao
@@ -27,7 +29,7 @@ import com.lumovault.lumovault.core.database.entity.PersonEntity
         AlbumEntity::class,
         AlbumItemEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -40,11 +42,22 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val DB_NAME = "lumovault.db"
 
+        /**
+         * Migration from v1 to v2: no schema change needed (v1 was the
+         * initial Kotlin schema). This migration exists so Room has an
+         * explicit path and doesn't trigger destructive fallback on upgrade
+         * from a v1 Kotlin install.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // v1 and v2 share the same schema; bump only so the
+                // destructive-fallback guard is no longer the upgrade path.
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-                // Fresh app (clean break from the Flutter format); while there
-                // are no users, a schema bump may simply rebuild the table.
-                // Replace with explicit migrations before any release.
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
     }

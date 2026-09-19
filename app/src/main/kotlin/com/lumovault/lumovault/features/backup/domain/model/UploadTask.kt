@@ -1,5 +1,7 @@
 package com.lumovault.lumovault.features.backup.domain.model
 
+import kotlinx.serialization.Serializable
+
 enum class UploadStatus { queued, uploading, paused, completed, failed }
 
 /**
@@ -13,6 +15,7 @@ enum class UploadStatus { queued, uploading, paused, completed, failed }
  *   the queue-lifecycle timestamp) and is what gets written into the backup
  *   metadata so a restore reproduces the original timeline.
  */
+@Serializable
 data class UploadTask(
     val id: String,
     val mediaItemId: String,
