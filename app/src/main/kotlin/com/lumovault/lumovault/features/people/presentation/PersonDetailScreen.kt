@@ -101,7 +101,7 @@ private fun PersonHeader(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W600),
             )
             Text(
-                stringResource(R.string.person_detail_photo_count, photoCount),
+                stringResource(R.string.people_photo_count, photoCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
