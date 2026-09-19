@@ -8,6 +8,7 @@ import com.lumovault.lumovault.core.auth.AuthService
 import com.lumovault.lumovault.core.auth.AuthState
 import com.lumovault.lumovault.core.database.dao.MediaDao
 import com.lumovault.lumovault.core.database.entity.MediaStatus
+import com.lumovault.lumovault.features.backup.data.service.BackupEngine
 import com.lumovault.lumovault.features.backup.data.work.BackupScheduler
 import com.lumovault.lumovault.features.backup.data.work.BackupWorker
 import com.lumovault.lumovault.features.settings.data.SettingsRepository
