@@ -50,4 +50,22 @@
     <string name="duplicates_title">Duplicates</string>
     <string name="duplicates_empty_title">No duplicates</string>
     <string name="duplicates_empty_explanation">When two photos have identical content, they are grouped here.</string>
+
+    <!-- Albums -->
+    <string name="albums_title">Albums</string>
+    <string name="albums_create">Create album</string>
+    <string name="albums_create_action">Create</string>
+    <string name="albums_name_label">Album name</string>
+    <string name="albums_empty_title">No albums yet</string>
+    <string name="albums_empty_explanation">Create an album to group photos across folders.</string>
+    <string name="albums_item_count">%1$d items</string>
+    <string name="albums_rename">Rename</string>
+    <string name="albums_delete">Delete album</string>
+    <string name="albums_delete_confirm_title">Delete album?</string>
+    <string name="albums_delete_confirm_message">The photos themselves stay in your library; only the album is removed.</string>
+    <string name="albums_remove_title">Remove from album?</string>
+    <string name="albums_remove_message">This will not delete the photo from your device.</string>
+    <string name="albums_remove_action">Remove</string>
+    <string name="album_detail_empty_title">Album is empty</string>
+    <string name="album_detail_empty_explanation">Add photos from the viewer by tapping \"Add to Album\".</string>
 </resources>

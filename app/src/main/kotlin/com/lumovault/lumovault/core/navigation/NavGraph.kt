@@ -33,6 +33,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.lumovault.lumovault.features.albums.presentation.AlbumDetailScreen
+import com.lumovault.lumovault.features.albums.presentation.AlbumsScreen
 import com.lumovault.lumovault.features.gallery.presentation.ArchiveScreen
 import com.lumovault.lumovault.features.gallery.presentation.DuplicatesScreen
 import com.lumovault.lumovault.features.gallery.presentation.FavoritesScreen
@@ -234,6 +236,27 @@ fun LumoVaultNavGraph() {
                 )
             }
 
+            // -- Albums --
+            composable(Screen.Albums.route) {
+                AlbumsScreen(
+                    onOpenAlbum = { navController.navigate(Screen.AlbumDetail.createRoute(it)) },
+                    onOpenFolder = { bucketId, _ ->
+                        navController.navigate(Screen.DeviceFolder.createRoute(bucketId))
+                    },
+                )
+            }
+            composable(Screen.AlbumDetail.route) { entry ->
+                val albumId = entry.arguments?.getString("albumId")?.toLongOrNull() ?: return@composable
+                AlbumDetailScreen(
+                    albumId = albumId,
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { index, items ->
+                        viewerItems = items
+                        navController.navigate(Screen.MediaViewer.createRoute(index))
+                    },
+                )
+            }
+
             // -- Declared, not yet implemented --
             // Keep this list alphabetical by route and delete each entry as its
             // screen lands; an empty list here is the Phase 3 exit criterion.
@@ -242,13 +265,11 @@ fun LumoVaultNavGraph() {
             NotImplementedDestination(Screen.OnboardingBackgroundPermissions, navController)
             NotImplementedDestination(Screen.OnboardingFolders, navController)
             NotImplementedDestination(Screen.OnboardingTelegram, navController)
-            NotImplementedDestination(Screen.Albums, navController)
             NotImplementedDestination(Screen.Search, navController)
             NotImplementedDestination(Screen.Map, navController)
             NotImplementedDestination(Screen.People, navController)
             NotImplementedDestination(Screen.Settings, navController)
             NotImplementedDestination(Screen.PersonDetail, navController)
-            NotImplementedDestination(Screen.AlbumDetail, navController)
             NotImplementedDestination(Screen.DeviceFolder, navController)
             NotImplementedDestination(Screen.BackupDashboard, navController)
             NotImplementedDestination(Screen.BackupSettings, navController)
