@@ -44,7 +44,19 @@ jobs:
           fi
 
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-assemble.log
+
+      # Publishes Kotlin compile errors into the job summary, which is publicly
+      # readable without an auth token — the raw log API is not.
+      - name: Summarize compile errors
+        if: failure()
+        run: |
+          {
+            echo "## Compile errors"
+            grep -E "^e: |error: " gradle-assemble.log | head -100 || echo "(no error lines matched)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
