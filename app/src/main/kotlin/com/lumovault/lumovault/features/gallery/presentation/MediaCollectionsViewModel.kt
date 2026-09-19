@@ -53,6 +53,11 @@ class MediaCollectionsViewModel @Inject constructor(
         repository.deletePermanently(localId)
     }
 
+    /** Batch variant for a multi-select: one repository call, one transaction. */
+    fun deletePermanently(localIds: Collection<String>) = viewModelScope.launch {
+        repository.deletePermanently(localIds.toList())
+    }
+
     fun setHidden(localId: String, hidden: Boolean) = viewModelScope.launch {
         repository.setHidden(localId, hidden)
     }
