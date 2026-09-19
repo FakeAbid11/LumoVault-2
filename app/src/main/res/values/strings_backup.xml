@@ -11,7 +11,6 @@
     <string name="backup_last_backup_never">No backup has completed yet</string>
     <string name="backup_start">Start backup</string>
     <string name="backup_running">Backup queued…</string>
-    <string name="backup_connect_telegram_hint">Connect Telegram in Settings to enable backup</string>
     <string name="backup_open_settings">Backup settings</string>
 
     <!-- Backup settings -->
