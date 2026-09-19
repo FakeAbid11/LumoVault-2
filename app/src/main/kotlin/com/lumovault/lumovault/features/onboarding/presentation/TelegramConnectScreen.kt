@@ -75,7 +75,6 @@ import kotlinx.coroutines.launch
  * completes onboarding exactly once. The country picker and the password
  * visibility toggle both carry semantic labels, which the original lacked.
  */
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelegramConnectScreen(
@@ -175,6 +174,14 @@ fun TelegramConnectScreen(
                                 when (val r = viewModel.sendCode(full)) {
                                     is AuthResult.CodeSent -> step = AuthStep.CODE
                                     is AuthResult.Error -> error = r.message
+                                    else -> Unit
+                                }
+                                busy = false
+                            }
+                        },
+                    ) { Text(stringResource(R.string.onboarding_telegram_send_code)) }
+                }
+
                 AuthStep.CODE -> {
                     Text(stringResource(R.string.onboarding_telegram_code_sent_to, "$dialCode$phone"),
                         style = MaterialTheme.typography.bodySmall)
@@ -267,11 +274,4 @@ fun TelegramConnectScreen(
 }
 
 private enum class AuthStep { PHONE, CODE, PASSWORD }
-                                    else -> Unit
-                                }
-                                busy = false
-                            }
-                        },
-                    ) { Text(stringResource(R.string.onboarding_telegram_send_code)) }
-                }
 

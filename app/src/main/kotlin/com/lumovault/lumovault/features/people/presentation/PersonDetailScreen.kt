@@ -359,4 +359,4 @@ fun PersonDetailScreen(
             },
         )
     }
-
+}
