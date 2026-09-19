@@ -77,6 +77,7 @@ class TransferQueuePersistence @Inject constructor(
                 } catch (_: Exception) {
                     temp.delete()
                 }
+                Unit
             }
         }
         pendingSave?.await()
