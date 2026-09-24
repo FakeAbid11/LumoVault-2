@@ -29,26 +29,26 @@ abstract class LumoVaultDatabase : RoomDatabase() {
          * against is the schema the migration produces.
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `onboarding_completed` INTEGER NOT NULL DEFAULT 0",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `telegram_linked` INTEGER NOT NULL DEFAULT 0",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `backup_enabled` INTEGER NOT NULL DEFAULT 0",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `notification_preference` TEXT NOT NULL DEFAULT 'not_asked'",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `background_backup_preference` TEXT NOT NULL DEFAULT 'not_asked'",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `source_selection` TEXT",
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE `app_settings` ADD COLUMN `selected_folders` TEXT NOT NULL DEFAULT ''",
                 )
             }
@@ -60,8 +60,8 @@ abstract class LumoVaultDatabase : RoomDatabase() {
          * opened on an existing install, not at build time.
          */
         val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `media` (
                         `media_store_id` INTEGER NOT NULL,
@@ -81,10 +81,10 @@ abstract class LumoVaultDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
-                database.execSQL(
+                db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_media_date_added_seconds` ON `media` (`date_added_seconds`)",
                 )
-                database.execSQL(
+                db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_media_media_type` ON `media` (`media_type`)",
                 )
             }

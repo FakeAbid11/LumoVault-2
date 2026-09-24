@@ -3,6 +3,7 @@ package com.lumovault.app.util
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 class MediaFormattingTest {
     @Test
@@ -48,9 +49,17 @@ class MediaFormattingTest {
 
     @Test
     fun `epoch seconds convert to a local date in the caller zone`() {
-        assertEquals(
-            LocalDate.of(2026, 9, 25),
-            localDateOf(1_758_768_000, java.time.ZoneOffset.UTC),
-        )
+        // 2026-09-25T00:00Z. Pinned as a pair with its date rather than derived from the code
+        // under test, so a wrong floor would be caught instead of agreed with.
+        assertEquals(LocalDate.of(2026, 9, 25), localDateOf(1_790_294_400, ZoneOffset.UTC))
+        // Mid-day stays on the same day…
+        assertEquals(LocalDate.of(2026, 9, 25), localDateOf(1_790_294_400 + 43_200, ZoneOffset.UTC))
+        // …and one second before midnight belongs to the day before.
+        assertEquals(LocalDate.of(2026, 9, 24), localDateOf(1_790_294_400 - 1, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `pre-epoch timestamps floor backwards instead of truncating toward day zero`() {
+        assertEquals(LocalDate.of(1969, 12, 31), localDateOf(-1, ZoneOffset.UTC))
     }
 }
