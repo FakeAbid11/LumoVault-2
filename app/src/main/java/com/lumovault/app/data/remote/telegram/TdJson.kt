@@ -17,8 +17,13 @@ import kotlinx.serialization.json.longOrNull
  * across releases. Every reader below therefore accepts either spelling and yields the fallback
  * otherwise: an unreadable id must degrade to "skip this item", never to a crash mid-scan.
  */
-internal fun JsonObject.type(): String? = this["@type"]?.jsonPrimitive?.contentOrNull
-
+/**
+ * Readers shared by the cloud mappers.
+ *
+ * `@type` is deliberately not re-declared here: [TdAuthorizationMapper] already owns `type()` in this
+ * package, and a second top-level overload makes every existing call site ambiguous — which is what
+ * the first CI run for this file caught.
+ */
 internal fun JsonObject.stringOf(key: String): String = this[key]?.jsonPrimitive?.contentOrNull.orEmpty()
 
 internal fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull

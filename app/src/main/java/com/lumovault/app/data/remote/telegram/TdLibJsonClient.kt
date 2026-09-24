@@ -98,7 +98,9 @@ class TdLibJsonClient(
         val target = clientId
         if (target != 0) {
             clientId = 0
-            withContext(Dispatchers.IO) { native.destroy(target) }
+            // The integer client API has no destroy call: TDLib closes an instance once `close` or
+            // `logOut` has been sent, and destroys it automatically afterwards. Dropping the handle
+            // here is the whole teardown; the receive loop above is what actually stops.
         }
 
         val closed = TelegramRequestException(code = 0, method = "stop", reason = "client stopped")

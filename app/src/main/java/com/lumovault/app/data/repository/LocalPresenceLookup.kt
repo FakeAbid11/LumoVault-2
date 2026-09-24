@@ -26,10 +26,10 @@ class LocalPresenceLookup(
         val names = candidates.map { it.fileName }.filter { it.isNotBlank() }.distinct()
         if (names.isEmpty()) return emptySet()
 
-        val onDevice = names.chunked(NAME_CHUNK) { chunk -> media.findByName(chunk) }
-            .flatten()
-            .map { it.displayName to it.sizeBytes }
-            .toSet()
+        val onDevice = mutableSetOf<Pair<String, Long>>()
+        names.chunked(NAME_CHUNK).forEach { chunk ->
+            media.findByName(chunk).forEach { match -> onDevice += match.displayName to match.sizeBytes }
+        }
 
         return candidates.filter { it.fileName to it.sizeBytes in onDevice }.map { it.messageId }.toSet()
     }
