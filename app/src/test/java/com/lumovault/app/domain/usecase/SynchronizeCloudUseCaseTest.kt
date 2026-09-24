@@ -48,7 +48,7 @@ class SynchronizeCloudUseCaseTest {
     )
 
     /** Pages newest-first; [pages] is consumed in order, and the last one ends the walk. */
-    private class FakeTelegram(
+    inner class FakeTelegram(
         private val pages: List<List<Long>>,
         var userId: Long = 11L,
         var existingChannel: Long? = CHAT_ID,
@@ -80,7 +80,7 @@ class SynchronizeCloudUseCaseTest {
         }
     }
 
-    private class FakeIndex(initial: CloudAssociation? = null) : CloudIndexRepository {
+    inner class FakeIndex(initial: CloudAssociation? = null) : CloudIndexRepository {
         var saved = initial
         var cleared = 0
         val pagesWritten = mutableListOf<List<Long>>()
