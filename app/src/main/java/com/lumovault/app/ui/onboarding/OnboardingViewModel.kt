@@ -72,6 +72,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
 
+        viewModelScope.launch {
+            container.mediaRepository.observeFolders()
+                .collect { folders -> _uiState.update { it.copy(availableFolders = folders) } }
+        }
+
         refreshSystemStatuses()
     }
 

@@ -40,15 +40,39 @@ environment variables and exposed through `BuildConfig`; absent values must prod
 "not configured" state, never a crash and never a placeholder that looks real. Never commit or log a
 credential, api hash, session value, phone number, verification code or password. `TelegramCredentials`
 overrides `toString` for this reason — keep it that way, and keep raw TDLib error text out of
-user-visible strings (`TdErrorMapper` is the boundary).
+user-visible strings (`TdErrorMapper` is the boundary). Local media metadata is personal too: the one
+logging call in the app records an exception's class name, never a MediaStore message or file path.
 
-## Version pinning
+## Toolchain
 
-Versions live in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Kotlin is held on the 2.3
-line because KSP has no 2.4.x release; advancing Kotlin past KSP breaks Room's annotation processor.
-Since nothing can be compiled locally, change versions by reading real metadata (Google Maven
-`group-index.xml`, Maven Central, Gradle's release feed, a library's `.module` `kotlin-stdlib`
-requires) rather than from memory.
+| Component | Version | Notes |
+| --- | --- | --- |
+| Kotlin / KSP | 2.3.21 / 2.3.12 | KSP has no 2.4.x release; do not advance Kotlin past it |
+| Compose BOM | 2026.09.00 | Material 3 1.4.0, ui 1.12.1 |
+| Room | 2.8.5 | KSP processor; schema export on |
+| Coil | 3.6.3 | `coil-compose` + `coil-video`, no network artifact |
+| libphonenumber | 9.0.40 | country codes + E.164 |
+| compileSdk / targetSdk / **minSdk** | 37 / 37 / **29** | see below |
+
+**minSdk is 29 on purpose.** `MediaStore.Files`, `RELATIVE_PATH` and `IS_PENDING` all begin at API
+29, so the scanner is one query with no version branches. Supporting API 26-28 would require
+guessing which columns the platform returns on those versions — which nothing here can verify.
+Do not lower it without re-checking that reasoning.
+
+## Verify third-party APIs before using them
+
+Nothing in this project can be compiled locally, so an API remembered wrongly becomes a red CI run
+(or, worse, a runtime crash that tests cannot catch because the contract was never exercised).
+Before writing code against TDLib, Coil, Material 3, MediaStore or androidx, check the real thing:
+
+- Artifact lists and versions: Google Maven `group-index.xml`, Maven Central directory listings.
+- **Class and method names: download the artifact's published `-sources.jar` for the exact version
+  and read the declarations.** Coil's and Material 3's sources settled questions memory got wrong;
+  guessing about TDLib instead cost three failed builds.
+- TDLib method and field names come from
+  `td/generate/scheme/td_api.tl` — check it, and re-check against the tag the binary is pinned to.
+- An empty grep output is not confirmation. If a lookup returns nothing, say so; do not report the
+  value as verified.
 
 ## Git
 

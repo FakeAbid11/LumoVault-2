@@ -170,8 +170,8 @@ fun OnboardingFlow(
 
         composable(OnboardingStep.Folders.route) {
             FolderSelectionScreen(
-                // No scanner yet (Phase 3), so there is nothing real to list.
-                folders = emptyList(),
+                // Folders come from the media index, so an unscanned device legitimately has none.
+                folders = state.availableFolders,
                 selectedFolders = state.progress.selectedFolders,
                 onToggle = viewModel::toggleFolder,
                 onBack = { navController.popBackStack() },

@@ -7,10 +7,28 @@
     <string name="nav_cloud">Cloud</string>
     <string name="nav_map">Map</string>
 
-    <string name="photos_placeholder">Local photo library will appear here.</string>
     <string name="albums_placeholder">Albums will appear here.</string>
     <string name="cloud_placeholder">Cloud library will appear here.</string>
     <string name="map_placeholder">Photo map will appear here.</string>
+
+    <!-- Photos library (Phase 3) -->
+    <string name="photos_empty_title">No photos yet</string>
+    <string name="photos_empty_body">Photos, videos and GIFs on this device will appear here.</string>
+    <string name="photos_permission_title">Allow photo access</string>
+    <string name="photos_permission_body">LumoVault needs access to your photos and videos to show your library.</string>
+    <string name="photos_permission_action">Allow access</string>
+    <string name="photos_scanning_title">Scanning your library</string>
+    <string name="photos_scanning_progress">%1$d items found</string>
+    <string name="photos_error_title">Couldn\'t load your library</string>
+    <string name="photos_error_body">Something went wrong while reading your device media.</string>
+    <string name="photos_limited_access_notice">Only the photos you selected are shown.</string>
+    <string name="photos_limited_access_action">Choose more</string>
+    <string name="day_today">Today</string>
+    <string name="day_yesterday">Yesterday</string>
+    <string name="media_kind_photo">Photo</string>
+    <string name="media_kind_video">Video</string>
+    <string name="media_kind_gif">GIF</string>
+    <string name="media_badge_gif">GIF</string>
 
     <string name="theme_toggle">Switch theme</string>
     <string name="back">Back</string>
@@ -120,7 +138,7 @@
 
     <string name="folders_title">Select folders</string>
     <string name="folders_empty_title">No folders to list yet</string>
-    <string name="folders_empty_description">LumoVault reads folders from your media library, which is built in the next step of setup. Your selection is saved and applied as soon as that library exists.</string>
+    <string name="folders_empty_description">Folders come from the media already indexed on this device. Your selection is saved and applied to backup as soon as the library has been scanned.</string>
     <string name="folders_action">Continue</string>
 
     <!-- Screen 6: Ready -->

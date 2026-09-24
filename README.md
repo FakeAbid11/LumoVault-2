@@ -8,29 +8,33 @@ This README records build and architecture status only.
 
 ## Status
 
-**Phase 1 — foundation:** complete, and verified by a green cloud build
-(run [36024569535](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36024569535), debug APK
-published as an artifact).
+**Phase 1 — foundation:** complete, verified green (run
+[36024569535](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36024569535)).
 
-**Phase 2 — onboarding + Telegram authentication:** implemented; see "Build status" below for
-whether CI has confirmed it.
+**Phase 2 — onboarding + Telegram authentication:** complete, verified green (run
+[36038113299](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36038113299)). The six
+onboarding screens, the searchable country selector, E.164 phone normalization, the authentication
+state machine, its nine human-readable failures, persisted setup choices, and launch gating are
+built and compiling; live Telegram sign-in is not (see *Telegram status*).
 
-Built in Phase 2:
+**Phase 3 — local photo library:** implemented; see *Build in the cloud* below for whether CI has
+confirmed it.
 
-- The six onboarding screens, in PRD section 32's order, with Permissions/Notifications/Background
-  combined onto one screen as the PRD requires
-- A searchable country selector over the full ISO region list, with flags drawn from the ISO code
-- Phone entry that normalizes to E.164 through libphonenumber rather than string concatenation
-- A Telegram authentication state machine: phone → code → (2FA password) → authenticated, driven by
-  what TDLib reports and never by which button was pressed
-- Nine distinct human-readable authentication failures, including Telegram's rate-limit windows
-- Onboarding completion, backup-source choice and folder selection persisted in Room
-- Live media/notification/battery status, re-read on resume rather than remembered
-- Launch logic that opens onboarding or the Photos shell, with the theme applied to both
+- A MediaStore scanner that indexes photos, videos and GIFs from metadata only — it never opens file
+  bytes, and it identifies GIFs by MIME type rather than treating every image as static
+- A Room `media` table carrying the columns PRD section 61 names, indexes chosen for the two queries
+  the timeline actually runs, and a v2→v3 migration
+- Incremental sync: rows are tagged with a scan id, upserted in chunks, and rows the scan did not see
+  are removed — no rebuild, and no `NOT IN (…)` list a large library would overflow
+- The Photos screen: day-grouped lazy grid, windowed loading instead of one in-memory list, Coil
+  thumbnails decoded to the cell's size, video play/duration and GIF badges
+- One sealed `PhotosUiState`, so "this device has no media" and "the index is not built yet" cannot
+  be confused; permission, scanning, empty, error and pull-to-refresh states
+- The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Not built yet, by design:** the TDLib native binary and its JNI binding (see *Telegram status*),
-channel discovery and the Cloud library (Phase 4), the media scanner (Phase 3), the backup engine
-and hashing (Phases 5-6), map, albums, favorites, archive, trash, and Settings.
+**Still not built, by design:** Telegram upload, the backup queue, hashing, the remote manifest,
+channel discovery and the Cloud library, restore, free-up-space, map, albums, trash and Settings.
+Phase 3 is entirely local — nothing leaves the device.
 
 ## Build in the cloud — never locally
 

@@ -27,7 +27,10 @@ android {
 
     defaultConfig {
         applicationId = "com.lumovault.app"
-        minSdk = 26
+        // MediaStore's unified Files collection, RELATIVE_PATH and IS_PENDING all date from API 29.
+        // Supporting 26-28 would mean per-version column guesses that no build here could verify,
+        // so the floor is the version whose column set is documented and stable.
+        minSdk = 29
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
@@ -87,6 +90,13 @@ dependencies {
     // TDLib's client interface is JSON. Parsed via the JsonElement API, so no compiler plugin is
     // needed and the mapping is testable off-device.
     implementation(libs.kotlinx.serialization.json)
+
+    // Thumbnail loading for content:// URIs: memory and disk caching, decode-to-target-size, and
+    // cancellation with the composable that asked. coil-video adds MediaMetadataRetriever frame
+    // decoding; both register themselves through ServiceLoader, so no ImageLoader setup is needed.
+    // No network artifact is added: Phase 3 is entirely local.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.video)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

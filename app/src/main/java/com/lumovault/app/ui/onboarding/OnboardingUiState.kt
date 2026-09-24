@@ -39,8 +39,10 @@ data class OnboardingUiState(
     val selectedCountry: Country? = null,
     val phoneInput: String = "",
     val countries: List<Country> = emptyList(),
-    /** Which part of the sign-in form is on screen; kept so a failure doesn't lose the user's place. */
+    /** Which part of the sign-in flow the user is looking at. */
     val telegramPanel: TelegramPanel = TelegramPanel.Phone,
+    /** Folders present in the media index; empty until the library has been scanned. */
+    val availableFolders: List<String> = emptyList(),
 ) {
     /** The sub-step Telegram's latest state implies, or the previous one while an error is showing. */
     val panel: TelegramPanel

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.data.local.LumoVaultDatabase
+import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.remote.telegram.MissingTdLibNative
 import com.lumovault.app.data.remote.telegram.TdLibJsonClient
 import com.lumovault.app.data.remote.telegram.TelegramAuthRepositoryImpl
@@ -12,10 +13,12 @@ import com.lumovault.app.data.remote.telegram.TelegramCredentials
 import com.lumovault.app.data.remote.telegram.TelegramStorage
 import com.lumovault.app.data.remote.telegram.DeviceInfo
 import com.lumovault.app.data.repository.CountryRepositoryImpl
+import com.lumovault.app.data.repository.MediaRepositoryImpl
 import com.lumovault.app.data.repository.OnboardingRepositoryImpl
 import com.lumovault.app.data.repository.SettingsRepositoryImpl
 import com.lumovault.app.data.repository.SystemPermissionsRepositoryImpl
 import com.lumovault.app.domain.repository.CountryRepository
+import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
 import com.lumovault.app.domain.repository.SettingsRepository
@@ -32,7 +35,7 @@ import kotlinx.coroutines.SupervisorJob
  * it — cancelling it with a screen would drop the session mid-handshake.
  *
  * Still hand-written rather than a DI framework: Hilt earns its place when Phase 5's WorkManager
- * workers need constructor injection across processes, not before.
+ * workers need constructor injection across processes.
  */
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -41,7 +44,7 @@ class AppContainer(context: Context) {
 
     val database: LumoVaultDatabase by lazy {
         Room.databaseBuilder(appContext, LumoVaultDatabase::class.java, "lumovault.db")
-            .addMigrations(LumoVaultDatabase.MIGRATION_1_2)
+            .addMigrations(*LumoVaultDatabase.ALL_MIGRATIONS)
             .build()
     }
 
@@ -54,6 +57,14 @@ class AppContainer(context: Context) {
     val permissionRepository: PermissionRepository by lazy { SystemPermissionsRepositoryImpl(appContext) }
 
     val countryRepository: CountryRepository by lazy { CountryRepositoryImpl() }
+
+    val mediaRepository: MediaRepository by lazy {
+        MediaRepositoryImpl(
+            database = database,
+            dao = database.mediaDao(),
+            source = MediaStoreDataSource(appContext.contentResolver),
+        )
+    }
 
     private val telegramCredentials: TelegramCredentials by lazy { TelegramCredentials.fromBuildConfig() }
 
