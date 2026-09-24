@@ -17,8 +17,9 @@ onboarding screens, the searchable country selector, E.164 phone normalization, 
 state machine, its nine human-readable failures, persisted setup choices, and launch gating are
 built and compiling; live Telegram sign-in is not (see *Telegram status*).
 
-**Phase 3 — local photo library:** implemented; see *Build in the cloud* below for whether CI has
-confirmed it.
+**Phase 3 — local photo library:** complete, verified green (run
+[36046308629](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36046308629), 69 unit tests,
+17.1 MB debug APK published as an artifact).
 
 - A MediaStore scanner that indexes photos, videos and GIFs from metadata only — it never opens file
   bytes, and it identifies GIFs by MIME type rather than treating every image as static
@@ -49,7 +50,7 @@ commit + push  →  GitHub Actions  →  assembleDebug + testDebugUnitTest  → 
 unit tests, then uploads `app-debug.apk` as an artifact (30 days). Download it from the run's
 **Artifacts** section. A workflow run that has not gone green is not a build.
 
-Phase 2 did not change the workflow: nothing new needs a CI-side tool.
+Phases 2 and 3 did not change the workflow: nothing new needs a CI-side tool.
 
 ### Telegram credentials
 
