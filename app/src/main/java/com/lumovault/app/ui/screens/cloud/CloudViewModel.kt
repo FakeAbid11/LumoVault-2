@@ -1,0 +1,127 @@
+package com.lumovault.app.ui.screens.cloud
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.domain.model.CloudMedia
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * Screen state for the cloud library.
+ *
+ * The nine-step start-up machine is not here: [com.lumovault.app.domain.usecase.SynchronizeCloudUseCase]
+ * owns it, because it spans Telegram and Room and has to be testable without a ViewModel. This class
+ * reads the index, forwards intent, and picks the [CloudUiState] case — no TDLib request and no SQL
+ * below this point.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class CloudViewModel(application: Application) : AndroidViewModel(application) {
+    private val container = (application as LumoVaultApplication).container
+
+    /** Grows as the user reaches the end of the timeline; see [WINDOW_START]. */
+    private val loadedLimit = MutableStateFlow(WINDOW_START)
+
+    private val localMatches = MutableStateFlow(emptySet<Long>())
+    private val refreshing = MutableStateFlow(false)
+
+    private val items: StateFlow<List<CloudMedia>> = loadedLimit
+        .flatMapLatest { limit -> container.cloudIndexRepository.observeWindow(limit) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    private val totalCount = container.cloudIndexRepository.observeCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
+
+    private val counts = container.cloudIndexRepository.observeTypeCounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val uiState: StateFlow<CloudUiState> = combine(
+        container.cloudSync.state,
+        items,
+        totalCount,
+        counts,
+        localMatches,
+        refreshing,
+    ) { init, media, total, typeCounts, backedUp, isRefreshing ->
+        deriveCloudState(
+            init = init,
+            items = media,
+            totalCount = total,
+            counts = typeCounts,
+            localMatches = backedUp,
+            refreshingOverride = isRefreshing,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
+
+    init {
+        // Which of these remote items also live on the device: one batched query over the loaded
+        // window, never a MediaStore or database round-trip per cell.
+        items
+            .onEach { media -> localMatches.value = container.localPresenceLookup.backedUp(media) }
+            .launchIn(viewModelScope)
+
+        synchronize()
+    }
+
+    fun resume() {
+        synchronize()
+    }
+
+    /** Pull-to-refresh, running the same use case the start-up path uses. */
+    fun refresh() {
+        synchronize()
+    }
+
+    fun loadMore() {
+        loadedLimit.value = loadedLimit.value + WINDOW_STEP
+    }
+
+    /**
+     * Local path for one cell's *thumbnail*, or null when no preview can be shown.
+     *
+     * Only `previewRemoteFileId` is ever passed down. Nothing in this call chain can request the
+     * original file, which is what keeps the grid's rendering inside PRD section 25.
+     */
+    suspend fun previewPath(item: CloudMedia): String? =
+        container.telegramPreviewRepository.localPathFor(item.previewRemoteFileId)
+
+    private fun synchronize() {
+        if (refreshing.value) return
+        refreshing.value = true
+
+        viewModelScope.launch {
+            try {
+                // Repeated calls are safe, and needed: the Cloud tab can be opened without onboarding
+                // having touched TDLib, and a chat request before a session is meaningless.
+                container.telegramAuthRepository.connect()
+                container.cloudSync.synchronize()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // Class name only — a TDLib error string can carry a chat title.
+                android.util.Log.w(TAG, "cloud sync failed: ${error.javaClass.simpleName}")
+            } finally {
+                refreshing.value = false
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "LumoVaultCloud"
+
+        /** Same widening-window approach as the local timeline, for the same reason. */
+        const val WINDOW_START = 300
+        const val WINDOW_STEP = 300
+        const val STOP_TIMEOUT_MILLIS = 5_000L
+    }
+}

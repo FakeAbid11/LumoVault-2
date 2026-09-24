@@ -10,6 +10,7 @@ import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.remote.telegram.JniTdLibNative
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
 import com.lumovault.app.data.remote.telegram.TdLibJsonClient
+import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
 import com.lumovault.app.data.remote.telegram.TelegramAuthRepositoryImpl
 import com.lumovault.app.data.remote.telegram.TelegramClient
 import com.lumovault.app.data.remote.telegram.TelegramClientInfo
@@ -30,6 +31,7 @@ import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
 import com.lumovault.app.domain.repository.SettingsRepository
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
+import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
@@ -121,6 +123,14 @@ class AppContainer(context: Context) {
 
     private val telegramCloudRepository: TelegramCloudRepository by lazy {
         TdLibCloudRepository(client = telegramClient)
+    }
+
+    /**
+     * Thumbnails only. Deliberately built on the same [telegramClient] as the rest of Telegram, since
+     * TDLib allows one receive loop per process.
+     */
+    val telegramPreviewRepository: TelegramPreviewRepository by lazy {
+        TdLibPreviewRepository(client = telegramClient)
     }
 
     /** The cloud start-up state machine; the Cloud screen renders its [CloudInitState] directly. */
