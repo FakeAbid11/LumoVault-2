@@ -159,7 +159,7 @@
     <string name="country_result_count">%1$d countries</string>
     <!-- Cloud library (PRD sections 24-26). The copy never claims a sync happened, and never says
          "no photos" for a library that is merely not indexed yet. -->
-    <string name="cloud_not_available_title">Telegram isn't available in this build</string>
+    <string name="cloud_not_available_title">Telegram isn\'t available in this build</string>
     <string name="cloud_not_available_body">Your synced cloud library will appear here once Telegram backup is enabled in this app.</string>
     <string name="cloud_needs_signin_title">Connect Telegram to see your cloud</string>
     <string name="cloud_needs_signin_body">Sign in to your Telegram account from onboarding to load your LumoVault Backup library.</string>
@@ -170,16 +170,16 @@
     <string name="cloud_scanning_title">Reading your cloud library</string>
     <string name="cloud_empty_title">Your cloud is empty</string>
     <string name="cloud_empty_body">Photos and videos you back up to LumoVault will appear here.</string>
-    <string name="cloud_error_title">Couldn't load your cloud</string>
+    <string name="cloud_error_title">Couldn\'t load your cloud</string>
     <string name="cloud_error_body">Something went wrong while reaching Telegram. Your device photos are unaffected.</string>
-    <string name="cloud_offline_notice">You're offline. Showing your last synced cloud library.</string>
+    <string name="cloud_offline_notice">You\'re offline. Showing your last synced cloud library.</string>
     <string name="cloud_refreshing_notice">Checking for new items…</string>
     <string name="cloud_badge_on_device">On this device</string>
     <string name="cloud_badge_cloud_only">In cloud</string>
     <string name="cloud_viewer_unnamed">Untitled item</string>
     <string name="cloud_viewer_size">%1$s</string>
     <string name="cloud_viewer_dates_from_message">dated from Telegram</string>
-    <string name="cloud_viewer_preview_shown">Showing Telegram's preview. The original is still in your channel.</string>
+    <string name="cloud_viewer_preview_shown">Showing Telegram\'s preview. The original is still in your channel.</string>
     <string name="cloud_viewer_no_preview">No preview available for this item.</string>
     <string name="cloud_download_action">Download to device</string>
     <string name="cloud_download_unavailable">Downloads open with the backup release and are not available in this build.</string>
