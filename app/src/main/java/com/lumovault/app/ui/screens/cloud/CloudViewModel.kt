@@ -33,7 +33,16 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
     private val loadedLimit = MutableStateFlow(WINDOW_START)
 
     private val localMatches = MutableStateFlow(emptySet<Long>())
-    private val refreshing = MutableStateFlow(false)
+
+    /**
+     * Re-entrancy guard only, deliberately not observable state.
+     *
+     * A sync in flight is already expressed by [com.lumovault.app.domain.telegram.CloudInitState.Scanning],
+     * so publishing a second flow that says the same thing would create a pair of values that can
+     * disagree — and Kotlin's typed `combine` only covers five flows anyway, which is what made the
+     * six-way version resolve through the vararg overload and lose its types.
+     */
+    private var syncing = false
 
     private val items: StateFlow<List<CloudMedia>> = loadedLimit
         .flatMapLatest { limit -> container.cloudIndexRepository.observeWindow(limit) }
@@ -51,15 +60,13 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         totalCount,
         counts,
         localMatches,
-        refreshing,
-    ) { init, media, total, typeCounts, backedUp, isRefreshing ->
+    ) { init, media, total, typeCounts, backedUp ->
         deriveCloudState(
             init = init,
             items = media,
             totalCount = total,
             counts = typeCounts,
             localMatches = backedUp,
-            refreshingOverride = isRefreshing,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
 
@@ -96,8 +103,8 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         container.telegramPreviewRepository.localPathFor(item.previewRemoteFileId)
 
     private fun synchronize() {
-        if (refreshing.value) return
-        refreshing.value = true
+        if (syncing) return
+        syncing = true
 
         viewModelScope.launch {
             try {
@@ -111,7 +118,7 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
                 // Class name only — a TDLib error string can carry a chat title.
                 android.util.Log.w(TAG, "cloud sync failed: ${error.javaClass.simpleName}")
             } finally {
-                refreshing.value = false
+                syncing = false
             }
         }
     }

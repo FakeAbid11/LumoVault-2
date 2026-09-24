@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -203,14 +204,20 @@ private fun CloudTimeline(
 /** Header line, built only from counts the index actually holds. */
 @Composable
 private fun CloudHeader(state: CloudUiState.Library) {
+    // Plurals are resolved through Resources rather than pluralStringResource inside the lambda: a
+    // @Composable call is only allowed in composable scope, and joinToString's transform is an ordinary
+    // function type. The wording and the resource names are unchanged.
+    val resources = LocalContext.current.resources
+    val countsText = state.counts
+        .joinToString(separator = " · ") { (type, count) -> resources.getQuantityString(type.cloudCountRes(), count, count) }
+        .ifBlank { resources.getQuantityString(R.plurals.cloud_items_found, state.totalCount, state.totalCount) }
+
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = CellSpacing, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = state.counts
-                .joinToString(separator = " · ") { (type, count) -> stringResource(type.cloudCountRes(), count) }
-                .ifBlank { pluralStringResource(R.plurals.cloud_items_found, state.totalCount, state.totalCount) },
+            text = countsText,
             style = MaterialTheme.typography.titleMedium,
         )
 
