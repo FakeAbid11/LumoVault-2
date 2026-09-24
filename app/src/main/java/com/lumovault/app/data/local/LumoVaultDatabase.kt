@@ -4,6 +4,10 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.lumovault.app.data.local.cloud.CloudChannelDao
+import com.lumovault.app.data.local.cloud.CloudChannelEntity
+import com.lumovault.app.data.local.cloud.CloudMediaDao
+import com.lumovault.app.data.local.cloud.CloudMediaEntity
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 
@@ -14,13 +18,20 @@ import com.lumovault.app.data.local.media.MediaEntity
  * its recorded setup choices, and no destructive fallback is used anywhere.
  */
 @Database(
-    entities = [AppSettingsEntity::class, MediaEntity::class],
-    version = 3,
+    entities = [
+        AppSettingsEntity::class,
+        MediaEntity::class,
+        CloudMediaEntity::class,
+        CloudChannelEntity::class,
+    ],
+    version = 4,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun appSettingsDao(): AppSettingsDao
     abstract fun mediaDao(): MediaDao
+    abstract fun cloudMediaDao(): CloudMediaDao
+    abstract fun cloudChannelDao(): CloudChannelDao
 
     companion object {
         /**
@@ -59,8 +70,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
          * order: a schema that differs from the compiled one fails validation when the database is
          * opened on an existing install, not at build time.
          */
-        val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
+        val MIGRATION_2_3 = object : Migration(2, 3) {            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `media` (
@@ -90,6 +100,65 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        /**
+         * Mirrors Room's generated DDL for [CloudMediaEntity] and [CloudChannelEntity]
+         * column-for-column and in declaration order: a schema that differs from the compiled one
+         * fails validation when the database is opened on an existing install, not at build time.
+         *
+         * Nothing here touches `media` or `app_settings`. A user upgrading from Phase 3 keeps their
+         * entire local index, which is the point of migrations over destructive fallbacks: the cloud
+         * index is additive, and losing local media metadata to gain it would be a worse outcome than
+         * an empty Cloud screen.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `cloud_media` (
+                        `message_id` INTEGER NOT NULL,
+                        `chat_id` INTEGER NOT NULL,
+                        `media_type` TEXT NOT NULL,
+                        `mime_type` TEXT NOT NULL DEFAULT '',
+                        `file_name` TEXT NOT NULL DEFAULT '',
+                        `size_bytes` INTEGER NOT NULL DEFAULT 0,
+                        `date_seconds` INTEGER NOT NULL,
+                        `date_source` TEXT NOT NULL DEFAULT 'telegram_message',
+                        `width` INTEGER NOT NULL DEFAULT 0,
+                        `height` INTEGER NOT NULL DEFAULT 0,
+                        `duration_seconds` INTEGER,
+                        `remote_file_id` TEXT NOT NULL DEFAULT '',
+                        `preview_remote_file_id` TEXT NOT NULL DEFAULT '',
+                        `caption` TEXT NOT NULL DEFAULT '',
+                        `last_seen_scan_id` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`message_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_cloud_media_date_seconds` ON `cloud_media` (`date_seconds`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_cloud_media_media_type` ON `cloud_media` (`media_type`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_cloud_media_last_seen_scan_id` ON `cloud_media` (`last_seen_scan_id`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `cloud_channel` (
+                        `id` INTEGER NOT NULL,
+                        `chat_id` INTEGER NOT NULL,
+                        `owner_user_id` INTEGER NOT NULL,
+                        `protocol_version` INTEGER NOT NULL DEFAULT 1,
+                        `last_scanned_message_id` INTEGER NOT NULL DEFAULT 0,
+                        `last_sync_seconds` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }
 }

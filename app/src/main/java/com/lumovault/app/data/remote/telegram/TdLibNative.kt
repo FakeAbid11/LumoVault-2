@@ -1,15 +1,13 @@
 package com.lumovault.app.data.remote.telegram
 
 /**
- * The native surface LumoVault needs from TDLib's JSON interface
- * (`td_json_client_create`, `td_json_client_send`, `td_json_client_receive`,
- * `td_json_client_destroy`).
+ * The native surface LumoVault needs from TDLib's JSON interface — `td_create_client_id`,
+ * `td_send` and `td_receive` at the commit pinned in `.github/workflows/build-tdlib.yml`.
  *
- * This is the one seam Phase 2 does not implement: a stock `libtdjson.so` exports those as C
- * symbols, so reaching them from Kotlin needs a small forwarding JNI library, built by TDLib's own
- * `example/android/build-tdlib.sh` flow. Keeping it behind an interface means the JSON protocol, the
- * request correlation and the whole authentication state machine below are real, unit-tested code —
- * so the fast follow is a binary plus a handful of bindings rather than a rewrite.
+ * There is no destroy call on purpose: TDLib's integer client API has none, and a session ends when
+ * Kotlin sends `close` or `logOut`. [receive] takes no client id because TDLib's `td_receive` does
+ * not — one process-wide loop reads responses for every client, which is also why a second
+ * [TdLibNative] instance must never be started.
  */
 interface TdLibNative {
     /** False when this build carries no TDLib binary; callers must then report "not configured". */
@@ -20,9 +18,7 @@ interface TdLibNative {
     fun send(clientId: Int, request: String)
 
     /** Blocks up to [timeoutSeconds]; returns null when nothing arrived in time. */
-    fun receive(clientId: Int, timeoutSeconds: Double): String?
-
-    fun destroy(clientId: Int)
+    fun receive(timeoutSeconds: Double): String?
 }
 
 /** Stand-in until the native library is packaged; never throws, so nothing crashes on launch. */
@@ -31,9 +27,48 @@ object MissingTdLibNative : TdLibNative {
 
     override fun createClientId(): Int = throw IllegalStateException("TDLib is not packaged in this build")
 
-    override fun send(clientId: Int, request: String): Unit = throw IllegalStateException("TDLib is not packaged in this build")
+    override fun send(clientId: Int, request: String): Unit =
+        throw IllegalStateException("TDLib is not packaged in this build")
 
-    override fun receive(clientId: Int, timeoutSeconds: Double): String? = null
+    override fun receive(timeoutSeconds: Double): String? = null
+}
 
-    override fun destroy(clientId: Int) = Unit
+/**
+ * The real seam: `libtdjson.so` (TDLib itself) plus `liblumo_tdlib.so` (the four-line JNI forwarder
+ * in `tdlib/lumo_tdlib_jni.c`). Both are produced by the manual `Build TDLib` workflow from pinned
+ * upstream source, and dropped into `app/src/main/jniLibs/<abi>/` before a build.
+ *
+ * Loading is attempted once and the outcome remembered, because availability is a property of the
+ * APK rather than of the moment: an APK without the binaries reports "not configured" everywhere or
+ * nowhere, never per screen.
+ */
+class JniTdLibNative : TdLibNative {
+    override val isAvailable: Boolean
+        get() = LOADED
+
+    private external fun nativeCreateClientId(): Int
+
+    private external fun nativeSend(clientId: Int, request: String)
+
+    private external fun nativeReceive(timeoutSeconds: Double): String?
+
+    override fun createClientId(): Int = nativeCreateClientId()
+
+    override fun send(clientId: Int, request: String): Unit = nativeSend(clientId, request)
+
+    override fun receive(timeoutSeconds: Double): String? = nativeReceive(timeoutSeconds)
+
+    companion object {
+        /**
+         * Loaded once per process, on the first instance created: `System.loadLibrary` is idempotent
+         * but repeating it per seam object would put file I/O on whatever thread builds a repository.
+         */
+        private val LOADED: Boolean by lazy {
+            runCatching {
+                // TDLib first: the forwarder has an unresolved dependency on it, so link order matters.
+                System.loadLibrary("tdjson")
+                System.loadLibrary("lumo_tdlib")
+            }.isSuccess
+        }
+    }
 }

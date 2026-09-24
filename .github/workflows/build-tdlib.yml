@@ -1,0 +1,110 @@
+name: Build TDLib native libraries
+
+# Deliberately manual, and deliberately not part of build.yml.
+#
+# TDLib ships no Android binaries, so this workflow produces them from upstream source the same way
+# TDLib's own documented flow does, and publishes them as an artifact. Keeping it out of the per-push
+# build means the app's CI stays fast and stays green with no native code present — the APK then
+# reports "Telegram not available" honestly rather than pretending.
+#
+# Reproducibility: the source revision is a pinned commit, the checksum of every produced .so is
+# printed and stored, and nothing is committed to the repository. Run it, download the artifact, and
+# unzip it into app/src/main/jniLibs before a build that needs a live Telegram session.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tdlib_commit:
+        description: TDLib commit to build
+        required: true
+        # Verified as of 2026-09-24; the scheme and the C header in this commit are what
+        # TdLibCloudRepository and tdlib/lumo_tdlib_jni.c are written against.
+        default: ea97bcdd
+      abis:
+        description: Comma-separated ABIs
+        required: false
+        default: arm64-v8a,armeabi-v7a,x86_64
+
+env:
+  # TDLib's own example builds one .so per ABI with this NDK; the version is what its
+  # example/android/build-tdlib.sh expects by default.
+  ANDROID_NDK_VERSION: 23.2.8568313
+
+permissions:
+  contents: read
+
+jobs:
+  tdjson:
+    name: Build libtdjson for ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: tdlib/td
+          ref: ${{ github.event.inputs.tdlib_commit }}
+          path: td
+
+      # The forwarder lives here, not upstream: it is LumoVault's four-function seam, compiled against
+      # TDLib's exported symbols.
+      - uses: actions/checkout@v5
+        with:
+          path: lumovault
+
+      - name: Build TDLib with the JSON interface
+        # example/android/Dockerfile installs the toolchain (NDK, OpenSSL, gperf, cmake) and builds
+        # every ABI; --output extracts the resulting archives rather than leaving them in an image.
+        run: |
+          cd td
+          docker build \
+            --build-arg COMMIT_HASH="$(git rev-parse HEAD)" \
+            --build-arg TDLIB_INTERFACE=JSON \
+            --output tdlib .
+          ls -laR tdlib | head -60
+
+      - name: Unpack the produced libraries
+        run: |
+          cd td
+          mkdir -p unpacked && unzip -o tdlib/tdlib.zip -d unpacked >/dev/null
+          find unpacked -name 'libtdjson.so' -printf '%p %s\n'
+
+      - name: Build the LumoVault JNI forwarder
+        # Four entry points that turn td_create_client_id / td_send / td_receive into Java calls.
+        # Built here rather than by the app build so no CMake configuration exists in build.gradle.kts
+        # and a missing artifact can never break an ordinary CI run.
+        run: |
+          set -euo pipefail
+          ABI="${{ matrix.abi }}"
+          TDJSON_DIR="$(dirname "$(find td/unpacked -name 'libtdjson.so' -path "*$ABI*" | head -n1)")"
+          test -n "$TDJSON_DIR"
+          NDK_DIR="$(ls -d "$ANDROID_HOME/ndk/"* 2>/dev/null | tail -n1)"
+          if [ -z "$NDK_DIR" ]; then
+            echo "No NDK on the runner; installing"
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ANDROID_NDK_VERSION" >/dev/null
+            NDK_DIR="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+          fi
+          HOST_BIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CLANG="$HOST_BIN/$( [ "$ABI" = "arm64-v8a" ] && echo aarch64-linux-android21-clang || ([ "$ABI" = "armeabi-v7a" ] && echo armv7a-linux-androideabi21-clang || echo x86_64-linux-android21-clang) )"
+          mkdir -p out/"$ABI"
+          "$CLANG" -shared -fPIC -O2 -Wall \
+            -I "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
+            -o out/"$ABI"/liblumo_tdlib.so \
+            lumovault/tdlib/lumo_tdlib_jni.c \
+            -L "$TDJSON_DIR" -ltdjson
+          cp "$TDJSON_DIR"/libtdjson.so out/"$ABI"/
+          "$HOST_BIN"/llvm-readelf -d out/"$ABI"/liblumo_tdlib.so | grep -i needed || true
+
+      - name: Record checksums
+        run: |
+          find out -name '*.so' -type f -exec sha256sum {} \; | tee out/SHA256SUMS
+          echo "Pin these values when comparing a locally built artifact."
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: tdlib-jniLibs-${{ matrix.abi }}
+          path: out/
+          retention-days: 90
+          if-no-files-found: error

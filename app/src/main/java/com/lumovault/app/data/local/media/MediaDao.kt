@@ -35,7 +35,28 @@ interface MediaDao {
 
     @Query("DELETE FROM media")
     suspend fun clear()
+
+    /**
+     * Which of [names] exist on this device at exactly [sizes]' byte count, as pairs.
+     *
+     * Used to label a cloud item *local + cloud* rather than *cloud-only*. Name alone is not enough —
+     * `IMG_0001.jpg` is ordinary in three folders — and a hash would mean reading originals, which
+     * Phase 4 must not do, so name and size together are the strongest identity available without
+     * touching file bytes.
+     */
+    @Query(
+        """
+        SELECT display_name AS displayName, size_bytes AS sizeBytes FROM media
+        WHERE display_name IN (:names)
+        """,
+    )
+    suspend fun findByName(names: List<String>): List<LocalNameMatch>
 }
+
+data class LocalNameMatch(
+    val displayName: String,
+    val sizeBytes: Long,
+)
 
 data class MediaTypeCount(
     val mediaType: String,

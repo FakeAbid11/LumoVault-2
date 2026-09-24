@@ -66,7 +66,9 @@ class TdLibJsonClient(
         clientId = created
         receiveJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                val raw = native.receive(created, RECEIVE_TIMEOUT_SECONDS) ?: continue
+                // td_receive takes no client id: this loop is the process-wide reader, which is why
+                // exactly one TdLibJsonClient may be alive at a time (AppContainer holds it lazily).
+                val raw = native.receive(RECEIVE_TIMEOUT_SECONDS) ?: continue
                 dispatch(raw)
             }
         }
@@ -120,7 +122,30 @@ class TdLibJsonClient(
             put(TYPE_KEY, method)
             put(EXTRA_KEY, requestId)
             params.forEach { (key, value) -> put(key, value) }
-        }.toString()
+        }.toString().asAsciiJson()
+
+    /**
+     * Escapes every non-ASCII character as a unicode escape, so the string reaching JNI is pure
+     * ASCII.
+     *
+     * `GetStringUTFChars` hands out *modified* UTF-8, which encodes supplementary characters as two
+     * three-byte sequences; TDLib's parser expects ordinary UTF-8 and would reject or mangle an emoji
+     * in a caption or a device model. JSON has no such distinction — a surrogate pair written as two
+     * escapes denotes the same character — so escaping removes the whole class of bug at no cost.
+     */
+    private fun String.asAsciiJson(): String {
+        if (all { it.code in ASCII_PRINTABLE }) return this
+
+        return buildString(length + 16) {
+            this@asAsciiJson.forEach { char ->
+                if (char.code in ASCII_PRINTABLE) {
+                    append(char)
+                } else {
+                    append("\\u").append(char.code.toString(16).padStart(4, '0'))
+                }
+            }
+        }
+    }
 
     /** An `error` response is still a matched response, so it becomes a typed failure here. */
     private fun JsonObject.toResult(method: String): JsonObject {
@@ -144,5 +169,8 @@ class TdLibJsonClient(
         const val REQUEST_TIMEOUT_MILLIS = 120_000L
 
         const val RECEIVE_TIMEOUT_SECONDS = 2.0
+
+        /** Printable ASCII, the only range JNI can carry without a modified-UTF-8 caveat. */
+        val ASCII_PRINTABLE = 0x20..0x7E
     }
 }

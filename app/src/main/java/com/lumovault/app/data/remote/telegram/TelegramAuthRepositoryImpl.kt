@@ -189,10 +189,11 @@ class TelegramAuthRepositoryImpl(
         put("files_directory", storage.filesDirectory.absolutePath)
         // bytes travel base64 over the JSON interface; an empty key means "no passphrase".
         put("database_encryption_key", "")
+        // Authentication needed neither history nor secret chats; the cloud scanner does need the
+        // message database, because paging a channel's history means reading it back out of TDLib.
         put("use_file_database", true)
         put("use_chat_info_database", true)
-        // Authentication needs neither message history nor secret chats.
-        put("use_message_database", false)
+        put("use_message_database", true)
         put("use_secret_chats", false)
         put("api_id", credentials.apiId)
         put("api_hash", credentials.apiHash)
