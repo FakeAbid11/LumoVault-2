@@ -45,7 +45,6 @@
     <string name="code_description">We sent a verification code to your Telegram account.</string>
     <string name="code_description_destination">We sent a verification code to …%1$s.</string>
     <string name="code_description_call">Telegram is calling you with a verification code.</string>
-    <string name="code_description_email">We sent a verification code to your email address.</string>
     <string name="code_label">Code</string>
     <string name="code_action">Confirm</string>
     <string name="code_resend">Resend code</string>

@@ -67,8 +67,23 @@ class TelegramAuthRepositoryImpl(
 
     override suspend fun requestCode(internationalNumber: String) = guard(TelegramAuthState.SendingCode) {
         client.request(
-            method = "checkAuthenticationPhoneNumber",
-            params = buildJsonObject { put(PHONE_NUMBER, internationalNumber) },
+            method = "setAuthenticationPhoneNumber",
+            params = buildJsonObject {
+                put(PHONE_NUMBER, internationalNumber)
+                put(
+                    SETTINGS,
+                    buildJsonObject {
+                        put("@type", "phoneNumberAuthenticationSettings")
+                        // No flash call, no missed call: the code has to be typed by hand, which is
+                        // the only path LumoVault's UI actually implements.
+                        put("allow_flash_call", false)
+                        put("allow_missed_call", false)
+                        put("is_current_phone_number", false)
+                        put("has_unknown_phone_number", false)
+                        put("allow_sms_retriever_api", false)
+                    },
+                )
+            },
         )
     }
 
@@ -77,7 +92,14 @@ class TelegramAuthRepositoryImpl(
     }
 
     override suspend fun resendCode() = guard(TelegramAuthState.SendingCode) {
-        client.request("resendAuthenticationCode")
+        client.request(
+            method = "resendAuthenticationCode",
+            // TDLib requires a reason; this is the user-asked-for-one rather than a retry after a
+            // rejected code.
+            params = buildJsonObject {
+                put(REASON, buildJsonObject { put("@type", "resendCodeReasonUserRequest") })
+            },
+        )
     }
 
     override suspend fun submitPassword(password: String) = guard(TelegramAuthState.Authenticating) {
@@ -134,13 +156,6 @@ class TelegramAuthRepositoryImpl(
                         method = "setTdlibParameters",
                         params = tdlibParameters(),
                     )
-
-                    Classification.NeedsEncryptionKey -> client.request(
-                        // No passphrase is configured, so TDLib only needs the empty-key
-                        // acknowledgement to finish opening its database.
-                        method = "checkDatabaseEncryptionKey",
-                        params = buildJsonObject { put(ENCRYPTION_KEY, "") },
-                    )
                 }
             }
         } finally {
@@ -163,27 +178,28 @@ class TelegramAuthRepositoryImpl(
         }
     }
 
+    /**
+     * TDLib takes its parameters flat, not as a nested object. Field names come from the current
+     * `td_api.tl` scheme; `tdlib_parameters` and a separate encryption-key step were older shapes
+     * and are gone.
+     */
     private fun tdlibParameters(): JsonObject = buildJsonObject {
-        put(
-            PARAMETERS,
-            buildJsonObject {
-                put("@type", "tdlib_parameters")
-                put("use_test_dc", false)
-                put("database_directory", storage.databaseDirectory.absolutePath)
-                put("files_directory", storage.filesDirectory.absolutePath)
-                put("use_file_database", true)
-                put("use_chat_info_database", true)
-                // Authentication needs neither message history nor secret chats.
-                put("use_message_database", false)
-                put("use_secret_chats", false)
-                put("api_id", credentials.apiId)
-                put("api_hash", credentials.apiHash)
-                put("system_language_code", info.systemLanguageCode)
-                put("device_model", info.deviceModel)
-                put("system_version", info.systemVersion)
-                put("application_version", info.applicationVersion)
-            },
-        )
+        put("use_test_dc", false)
+        put("database_directory", storage.databaseDirectory.absolutePath)
+        put("files_directory", storage.filesDirectory.absolutePath)
+        // bytes travel base64 over the JSON interface; an empty key means "no passphrase".
+        put("database_encryption_key", "")
+        put("use_file_database", true)
+        put("use_chat_info_database", true)
+        // Authentication needs neither message history nor secret chats.
+        put("use_message_database", false)
+        put("use_secret_chats", false)
+        put("api_id", credentials.apiId)
+        put("api_hash", credentials.apiHash)
+        put("system_language_code", info.systemLanguageCode)
+        put("device_model", info.deviceModel)
+        put("system_version", info.systemVersion)
+        put("application_version", info.applicationVersion)
     }
 
     private fun fail(error: Exception) {
@@ -202,13 +218,13 @@ class TelegramAuthRepositoryImpl(
 
     private companion object {
         const val TAG = "LumoVaultTelegram"
-        const val PARAMETERS = "parameters"
         const val PHONE_NUMBER = "phone_number"
+        const val SETTINGS = "settings"
+        const val REASON = "reason"
         const val CODE = "code"
         const val PASSWORD = "password"
-        const val ENCRYPTION_KEY = "encryption_key"
 
-        /** Parameters, then encryption key, then a real state: anything longer means TDLib is stuck. */
-        const val MAX_HANDSHAKE_STEPS = 4
+        /** Parameters, then a real state: anything longer means TDLib is not advancing. */
+        const val MAX_HANDSHAKE_STEPS = 3
     }
 }

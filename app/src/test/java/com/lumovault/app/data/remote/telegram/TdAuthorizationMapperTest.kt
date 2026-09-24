@@ -10,9 +10,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Guards the step order. The UI shows exactly what TDLib reported, so a wrong mapping here would
- * make a user appear to be asked for a password before any code had been sent — or, worse, appear
- * authenticated when they are not.
+ * Guards the step order against TDLib's real `td_api` shapes: the UI shows exactly what Telegram
+ * reported, so a wrong mapping here would let a user appear to be asked for a password before any
+ * code had been sent — or appear signed in when they are not.
  */
 class TdAuthorizationMapperTest {
     private fun state(json: String): Classification =
@@ -30,19 +30,20 @@ class TdAuthorizationMapperTest {
     }
 
     @Test
-    fun `the two one-time setup steps are steps, not renderable states`() {
+    fun `supplying parameters is a step to perform, not a state to render`() {
         assertEquals(Classification.NeedsParameters, state("""{"@type":"authorizationStateWaitTdlibParameters"}"""))
-        assertEquals(Classification.NeedsEncryptionKey, state("""{"@type":"authorizationStateWaitEncryptionKey"}"""))
     }
 
     @Test
-    fun `code length and channel are read from the response, not hardcoded`() {
+    fun `channel and code length are read from code_info dot type`() {
+        // td_api: authorizationStateWaitCode code_info:authenticationCodeInfo, whose `type` is an
+        // authenticationCodeType carrying `length`.
         val waiting = value(
             """
             {"@type":"authorizationStateWaitCode","code_info":{
-              "@type":"authCodeInfo",
-              "code_length":{"@type":"authCodeLength","first_part_length":3,"length":6},
-              "type":{"@type":"authCodeTypeCall"},
+              "@type":"authenticationCodeInfo",
+              "phone_number":"+8801712345678",
+              "type":{"@type":"authenticationCodeTypeCall","length":6},
               "timeout":0
             }}
             """.trimIndent(),
@@ -52,11 +53,12 @@ class TdAuthorizationMapperTest {
     }
 
     @Test
-    fun `a response without code length leaves the field unconstrained`() {
+    fun `a code type without a length leaves the field unconstrained`() {
         val waiting = value(
             """
             {"@type":"authorizationStateWaitCode","code_info":{
-              "@type":"authCodeInfo","type":{"@type":"authCodeTypeSms"},"timeout":0
+              "@type":"authenticationCodeInfo",
+              "type":{"@type":"authenticationCodeTypeSms"}
             }}
             """.trimIndent(),
         )
@@ -65,13 +67,12 @@ class TdAuthorizationMapperTest {
     }
 
     @Test
-    fun `an unrecognised code channel degrades to unknown instead of throwing`() {
+    fun `an unnamed delivery type degrades to unknown instead of throwing`() {
         val waiting = value(
             """
             {"@type":"authorizationStateWaitCode","code_info":{
-              "@type":"authCodeInfo",
-              "code_length":{"@type":"authCodeLength","first_part_length":0,"length":5},
-              "type":{"@type":"authCodeTypeSomeNewThing"}
+              "@type":"authenticationCodeInfo",
+              "type":{"@type":"authenticationCodeTypeFirebaseAndroid","length":5}
             }}
             """.trimIndent(),
         )
@@ -98,20 +99,16 @@ class TdAuthorizationMapperTest {
     fun `only authorizationStateReady may be read as authenticated`() {
         assertEquals(TelegramAuthState.Authenticated, value("""{"@type":"authorizationStateReady"}"""))
         // A state newer than this mapping must never be mistaken for a signed-in session.
+        assertEquals(TelegramAuthState.Unknown, value("""{"@type":"authorizationStateWaitEmailCode"}"""))
         assertEquals(TelegramAuthState.Unknown, value("""{"@type":"authorizationStateSomethingNew"}"""))
     }
 
     @Test
-    fun `wrappers are unwrapped and unrelated responses yield nothing`() {
+    fun `the update wrapper is unwrapped and unrelated responses yield nothing`() {
         val update = """{"@type":"updateAuthorizationState","authorization_state":{"@type":"authorizationStateReady"}}"""
-        val updateResult = TdAuthorizationMapper.classifyResponse(update.toJsonObject())
-        assertEquals(TelegramAuthState.Authenticated, (updateResult as Classification.State).value)
+        val classified = TdAuthorizationMapper.classifyResponse(update.toJsonObject())
 
-        val result = """{"@type":"getCurrentStateResult","authorization_state":{"@type":"authorizationStateWaitPhoneNumber"}}"""
-        val resultState = TdAuthorizationMapper.classifyResponse(result.toJsonObject())
-        assertEquals(TelegramAuthState.ReadyForPhoneNumber, (resultState as Classification.State).value)
-
-        // A plain `ok` carries no authorization state; the caller has to ask again.
+        assertEquals(TelegramAuthState.Authenticated, (classified as Classification.State).value)
         assertNull(TdAuthorizationMapper.authorizationStateOf("""{"@type":"ok"}""".toJsonObject()))
     }
 

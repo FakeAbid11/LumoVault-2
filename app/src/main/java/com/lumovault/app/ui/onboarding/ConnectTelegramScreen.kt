@@ -329,14 +329,13 @@ private fun BusyRow() {
 }
 
 /**
- * Telegram says which channel it used, so the prompt can say "calling" or "email" rather than
- * implying a text that may not be coming.
+ * Telegram names the delivery channel, so the prompt says "calling" when a call is coming instead
+ * of implying a text that isn't.
  */
 @Composable
 private fun codeDescription(destinationHint: String, channel: AuthCodeChannel?): String = when (channel) {
-    AuthCodeChannel.Call -> stringResource(R.string.code_description_call)
-    AuthCodeChannel.Email -> stringResource(R.string.code_description_email)
-    AuthCodeChannel.FlashCall, AuthCodeChannel.MissedCall -> stringResource(R.string.code_description)
+    AuthCodeChannel.Call, AuthCodeChannel.MissedCall -> stringResource(R.string.code_description_call)
+    AuthCodeChannel.FlashCall -> stringResource(R.string.code_description)
     else -> if (destinationHint.isBlank()) {
         stringResource(R.string.code_description)
     } else {

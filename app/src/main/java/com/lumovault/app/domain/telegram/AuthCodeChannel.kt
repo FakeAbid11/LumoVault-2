@@ -1,25 +1,26 @@
 package com.lumovault.app.domain.telegram
 
-/** How Telegram is delivering the code, so the prompt can say "texted" instead of guessing. */
+/**
+ * How Telegram is delivering the code, so the prompt can say "texted" or "calling" instead of
+ * guessing. Names follow TDLib's `authenticationCodeType*` constructors; anything the app does not
+ * name specifically arrives as [Unknown] rather than being forced into the nearest label.
+ */
 enum class AuthCodeChannel {
     Sms,
     Call,
-    Email,
     FlashCall,
     MissedCall,
 
-    /** TDLib reported a channel this build does not name. */
+    /** A delivery type newer or different than the ones LumoVault names. */
     Unknown,
     ;
 
     companion object {
-        /** Maps an `authCodeType*` `@type` string; unknown values stay [Unknown] rather than throwing. */
         fun fromTdType(type: String?): AuthCodeChannel = when (type) {
-            "authCodeTypeSms" -> Sms
-            "authCodeTypeCall" -> Call
-            "authCodeTypeEmailCode", "authCodeTypeEmail" -> Email
-            "authCodeTypeFlashCall" -> FlashCall
-            "authCodeTypeMissedCall" -> MissedCall
+            "authenticationCodeTypeSms" -> Sms
+            "authenticationCodeTypeCall" -> Call
+            "authenticationCodeTypeFlashCall" -> FlashCall
+            "authenticationCodeTypeMissedCall" -> MissedCall
             else -> Unknown
         }
     }

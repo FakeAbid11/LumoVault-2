@@ -87,9 +87,13 @@ false, authentication is honestly reported as unavailable, and **Phase 2's accep
 "Telegram authentication works" is not met by this commit**. The Ready screen shows Telegram as
 *Unavailable* rather than ticking it, and no screen pretends otherwise.
 
-Because TDLib's JSON schema evolves between releases, the exact parameter field names in
-`TelegramAuthRepositoryImpl.tdlibParameters()` must be checked against the pinned TDLib version's
-`td_api.json` when the binary is built. They are kept in one function so that correction is local.
+Because TDLib's JSON schema evolves between releases, the method names and request shapes here were
+taken from TDLib's own scheme (`td/generate/scheme/td_api.tl`) rather than from memory, which already
+corrected three guesses: the phone-code request is `setAuthenticationPhoneNumber` (with a
+`phoneNumberAuthenticationSettings` object), `setTdlibParameters` takes its fields flat rather than as
+a nested `tdlib_parameters` object, and the code length arrives as `code_info.type.length` rather than
+a separate `code_length`. When the binary is pinned to a specific TDLib tag, re-check them against
+that tag.
 
 ## Toolchain
 

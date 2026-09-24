@@ -20,17 +20,16 @@ internal object TdAuthorizationMapper {
     fun classifyResponse(response: JsonObject): Classification? =
         authorizationStateOf(response)?.let { classify(it) }
 
-    /** Pulls `authorization_state` out of the wrappers that carry it, or accepts a bare state object. */
+    /** Pulls `authorization_state` out of the wrapper update, or accepts a bare state object. */
     fun authorizationStateOf(response: JsonObject): JsonObject? =
         when (response.type()) {
-            "updateAuthorizationState", "getCurrentStateResult" -> response.child(AUTH_STATE)
+            "updateAuthorizationState" -> response.child(AUTH_STATE)
             null -> null
             else -> response.takeIf { it.type()?.startsWith(AUTHORIZATION_STATE_PREFIX) == true }
         }
 
     fun classify(state: JsonObject): Classification = when (state.type()) {
         "authorizationStateWaitTdlibParameters" -> Classification.NeedsParameters
-        "authorizationStateWaitEncryptionKey" -> Classification.NeedsEncryptionKey
 
         "authorizationStateReady" -> Classification.State(TelegramAuthState.Authenticated)
 
@@ -43,12 +42,13 @@ internal object TdAuthorizationMapper {
             TelegramAuthState.Failed(TelegramAuthFailure(TelegramAuthFailure.Kind.AccountNotFound)),
         )
 
+        // TDLib carries both the channel and the code length inside code_info.type.
         "authorizationStateWaitCode" -> {
-            val info = state.child(CODE_INFO)
+            val codeType = state.child(CODE_INFO)?.child(AUTH_CODE_TYPE)
             Classification.State(
                 TelegramAuthState.WaitingForCode(
-                    channel = AuthCodeChannel.fromTdType(info?.child(TYPE)?.type()),
-                    codeLength = info?.child(CODE_LENGTH)?.int(LENGTH),
+                    channel = AuthCodeChannel.fromTdType(codeType?.type()),
+                    codeLength = codeType?.int(LENGTH),
                 ),
             )
         }
@@ -68,13 +68,12 @@ internal object TdAuthorizationMapper {
 internal sealed interface Classification {
     data class State(val value: TelegramAuthState) : Classification
     data object NeedsParameters : Classification
-    data object NeedsEncryptionKey : Classification
 }
 
 private const val AUTH_STATE = "authorization_state"
 private const val AUTHORIZATION_STATE_PREFIX = "authorizationState"
 private const val CODE_INFO = "code_info"
-private const val CODE_LENGTH = "code_length"
+private const val AUTH_CODE_TYPE = "type"
 private const val TYPE = "@type"
 private const val LENGTH = "length"
 private const val PASSWORD_HINT = "password_hint"
