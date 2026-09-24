@@ -70,6 +70,7 @@ fun WelcomeScreen(
 @Composable
 fun HowItWorksScreen(
     onContinue: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     OnboardingScaffold(
@@ -78,6 +79,7 @@ fun HowItWorksScreen(
         title = stringResource(R.string.how_title),
         primaryLabel = stringResource(R.string.how_action),
         onPrimary = onContinue,
+        onBack = onBack,
         modifier = modifier,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 8.dp)) {

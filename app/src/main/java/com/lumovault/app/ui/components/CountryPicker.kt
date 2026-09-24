@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -134,7 +135,9 @@ private fun CountryRow(country: Country, isSelected: Boolean, onClick: () -> Uni
                     }
                 }
         },
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        // ListItem has no onClick of its own; the row is made clickable through the modifier.
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
     )
 }
