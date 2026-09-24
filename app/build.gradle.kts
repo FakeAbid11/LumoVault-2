@@ -58,10 +58,14 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+}
+
+// Versioned schema so the Phase 3/6 tables land as real migrations instead of destructive upsets.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

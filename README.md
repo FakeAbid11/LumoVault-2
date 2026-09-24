@@ -17,7 +17,7 @@ Built here:
 - Navigation shell: **Photos | Albums | Cloud | Map**, state preserved across tab switches
 - Dark/light theme foundation with a persisted theme preference (System / Light / Dark)
 - Layered architecture: UI → ViewModel → domain repository interface → data source
-- Room + coroutine foundations, wired but intentionally without entities
+- Room foundation holding the PRD section 61 `UserSettings` row, with coroutine-backed access to it
 - GitHub Actions cloud build producing a debug APK artifact
 
 Deliberately **not** built here (later phases per PRD section 80): onboarding, Telegram
@@ -66,8 +66,8 @@ app/src/main/java/com/lumovault/app/
 ├── AppContainer.kt           lazy, hand-written dependency graph
 ├── MainActivity.kt           edge-to-edge host, theme + navigation only
 ├── data/
-│   ├── local/                Room database holder (no entities in Phase 1)
-│   └── repository/           DataStore-backed implementations
+│   ├── local/                Room database, settings entity + DAO
+│   └── repository/           Room-backed implementations of the domain interfaces
 ├── domain/
 │   ├── model/                ThemeMode
 │   └── repository/           SettingsRepository (interface)
@@ -89,12 +89,17 @@ Two decisions worth knowing about:
 - **Dependency injection is a three-node hand-written container.** Hilt (or similar) is justified
   when Phase 4's Telegram session and Phase 5's WorkManager workers need graph-wide scoping, not
   now.
-- **Room ships entity-free.** The media and backup schemas belong to Phases 3 and 6 (PRD section
-  61); guessing columns now would create a migration whose only job is to delete the guesses.
-  Schema export turns on together with the first entity.
+- **Room starts with one row, not zero.** The first cloud build rejected an entity-free
+  `@Database(entities = [])` with `@Database annotation must specify list of entities`, so the
+  database now carries the `UserSettings` record named by PRD section 61 and holds only its
+  `themeMode` column. Media and backup tables still belong to Phases 3 and 6; they arrive as
+  migrations against the schema exported to `app/schemas`.
 
 ## Validation performed
 
-Static only: package declarations against file paths, imports against declared dependencies,
-resource references, navigation routes, workflow YAML. The Gradle build itself has only one
-executor — GitHub Actions.
+Static checks locally (package declarations against paths, imports against declared dependencies,
+catalog accessors against build scripts, resource references, workflow YAML) — and one real build:
+GitHub Actions run 36021695995 compiled through resource merging, manifest processing and R
+generation, then failed at `:app:kspDebugKotlin` on the entity-free database described above.
+The workflow itself, the pinned Gradle wrapper, the SDK 37 install and the AGP/Kotlin/KSP/Room
+version matrix all cleared; that failure is the one that shaped this section.

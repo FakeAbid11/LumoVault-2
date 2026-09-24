@@ -17,9 +17,11 @@ import com.lumovault.app.domain.repository.SettingsRepository
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
 
-    val settingsRepository: SettingsRepository by lazy { SettingsRepositoryImpl(appContext) }
-
     val database: LumoVaultDatabase by lazy {
         Room.databaseBuilder(appContext, LumoVaultDatabase::class.java, "lumovault.db").build()
+    }
+
+    val settingsRepository: SettingsRepository by lazy {
+        SettingsRepositoryImpl(database.appSettingsDao())
     }
 }

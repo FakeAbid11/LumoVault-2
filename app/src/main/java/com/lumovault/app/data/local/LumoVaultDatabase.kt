@@ -4,12 +4,15 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 /**
- * Deliberately entity-free in Phase 1. The media and backup schemas are specified in PRD
- * sections 61 and 80 (Phases 3 and 6); guessing columns now would only create a migration
- * whose job is to delete the guesses.
- *
- * Schema export stays off until the first entity exists, at which point `app/schemas` becomes
- * the versioned contract for migrations.
+ * Phase 1 holds only the `UserSettings` row from PRD section 61, because that is the only data the
+ * foundation actually reads (the persisted theme). Media and backup tables are specified by
+ * Phases 3 and 6 and arrive as migrations from here, against the exported schema.
  */
-@Database(entities = [], version = 1, exportSchema = false)
-abstract class LumoVaultDatabase : RoomDatabase()
+@Database(
+    entities = [AppSettingsEntity::class],
+    version = 1,
+    exportSchema = true,
+)
+abstract class LumoVaultDatabase : RoomDatabase() {
+    abstract fun appSettingsDao(): AppSettingsDao
+}
