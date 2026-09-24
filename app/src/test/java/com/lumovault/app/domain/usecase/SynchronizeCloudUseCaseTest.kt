@@ -26,12 +26,13 @@ import org.junit.Test
  *
  * Each one is a data-loss bug if it breaks silently, and none of them is observable from the UI.
  */
-class SynchronizeCloudUseCaseTest {
-    private val chatId = 55_000_000_000L
+/** File level, because the nested fakes below are not `inner` and cannot reach an outer property. */
+private const val CHAT_ID = 55_000_000_000L
 
+class SynchronizeCloudUseCaseTest {
     private fun media(id: Long) = CloudMedia(
         messageId = id,
-        chatId = chatId,
+        chatId = CHAT_ID,
         type = MediaType.Photo,
         mimeType = "",
         fileName = "",
@@ -50,7 +51,7 @@ class SynchronizeCloudUseCaseTest {
     private class FakeTelegram(
         private val pages: List<List<Long>>,
         var userId: Long = 11L,
-        var existingChannel: Long? = chatId,
+        var existingChannel: Long? = CHAT_ID,
         var verdict: CloudChannelVerdict = CloudChannelVerdict.Valid,
         var usable: Boolean = true,
     ) : TelegramCloudRepository {
@@ -64,7 +65,7 @@ class SynchronizeCloudUseCaseTest {
 
         override suspend fun createStorageChannel(): Long {
             created += 1
-            return chatId
+            return CHAT_ID
         }
 
         override suspend fun loadHistoryPage(chatId: Long, fromMessageId: Long, limit: Int): CloudHistoryPage {
@@ -131,7 +132,7 @@ class SynchronizeCloudUseCaseTest {
 
         val adopted = useCase(telegram, index).synchronize()
 
-        assertEquals(chatId, adopted?.chatId)
+        assertEquals(CHAT_ID, adopted?.chatId)
         // One request per page, starting at the newest, then each page's oldest id.
         assertEquals(listOf(0L, 7L, 4L), telegram.requestedFrom)
         assertEquals(listOf(listOf(9L, 8L, 7L), listOf(6L, 5L, 4L), listOf(3L, 2L, 1L)), index.pagesWritten)
@@ -156,7 +157,7 @@ class SynchronizeCloudUseCaseTest {
         val telegram = FakeTelegram(pages = listOf(listOf(4, 3, 2), listOf(1)))
         val index = FakeIndex(
             initial = CloudAssociation(
-                chatId = chatId,
+                chatId = CHAT_ID,
                 ownerUserId = 11L,
                 protocolVersion = LumoVaultStorageProtocol.VERSION,
                 lastScannedMessageId = 7L,
@@ -176,7 +177,7 @@ class SynchronizeCloudUseCaseTest {
         val telegram = FakeTelegram(pages = listOf(listOf(1)), userId = 22L)
         val index = FakeIndex(
             initial = CloudAssociation(
-                chatId = chatId,
+                chatId = CHAT_ID,
                 ownerUserId = 11L,
                 protocolVersion = LumoVaultStorageProtocol.VERSION,
             ),
@@ -197,7 +198,7 @@ class SynchronizeCloudUseCaseTest {
             verdict = CloudChannelVerdict.NotFound,
         )
         val index = FakeIndex(
-            initial = CloudAssociation(chatId = chatId, ownerUserId = 11L, protocolVersion = 1),
+            initial = CloudAssociation(chatId = CHAT_ID, ownerUserId = 11L, protocolVersion = 1),
         )
 
         val adopted = useCase(telegram, index).synchronize()
