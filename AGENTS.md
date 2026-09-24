@@ -26,7 +26,11 @@ Rules that have already caused a mistake here:
   alongside it.
 - **No placeholder schema.** Phase 1 shipped `@Database(entities = [])` and the first CI run rejected
   it (`@Database annotation must specify list of entities`). Add only the PRD-named columns a phase
-  actually reads, as a real migration, with the schema exported to `app/schemas`.
+  actually reads, as a real migration. `room.schemaLocation` is configured, but the JSON it exports
+  exists only in the runner's workspace — nothing is generated here, so a hand-written `CREATE TABLE`
+  is **not** machine-checked against Room's own DDL. A mismatch surfaces as a schema-validation crash
+  when an existing install opens the database, not as a red build: mirror Room's column order,
+  nullability and defaults exactly and say so in the migration's comment.
 - **No pass-through layers.** `domain/usecase/` stays absent until logic spans two repositories.
   DI is a small hand-written container (`AppContainer.kt`) until WorkManager needs injection.
 - **Report live state, not remembered state.** Permissions can be revoked outside the app; read them

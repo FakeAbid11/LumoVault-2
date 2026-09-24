@@ -158,7 +158,7 @@ Decisions worth knowing about:
   row cannot overwrite each other.
 - **Room v2.** Phase 1 shipped a v1 the first cloud build rejected (an entity-free `@Database` is
   illegal), so PRD section 61's `UserSettings` row became the first entity, and Phase 2's fields are
-  an explicit `MIGRATION_1_2` against the schema exported to `app/schemas`.
+  an explicit `MIGRATION_1_2`.
 - **Permission state is read live, decisions are stored.** A remembered "granted" would be wrong the
   moment the user revokes access in system settings.
 - **The country list is derived, not bundled.** `Locale.getISOCountries()` for names,
