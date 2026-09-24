@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 11 and below. TDLib's session and downloaded files stay on the device that created them;
+    the settings database is excluded too, because restoring a session reference on another install
+    would claim an account that this install cannot actually use.
+-->
+<full-backup-content>
+    <exclude
+        domain="file"
+        path="tdlib_database" />
+    <exclude
+        domain="file"
+        path="tdlib_files" />
+    <exclude
+        domain="database"
+        path="lumovault.db" />
+</full-backup-content>

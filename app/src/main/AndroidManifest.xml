@@ -1,19 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-        Media, notification and battery-optimisation permissions arrive with the phases that
-        need them (PRD sections 18, 38) so each one can be requested at the right moment.
-    -->
+    <!-- Telegram is reached over the network; no media or notification permission is declared
+         here that the runtime does not also request. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
-        Backup rules are deferred on purpose: there is nothing sensitive to protect until Phase 2
-        stores a Telegram session, and that is when exclusions become meaningful.
+        Phase 2 asks for media access per Android's current model (PRD section 38.1): typed media
+        permissions from API 33, the user-selected subset from API 34, and the broad read permission
+        only for the API 26-32 devices that still need it. ACCESS_MEDIA_LOCATION is deliberately
+        absent — EXIF/GPS reading is Phase 3+, and asking early would spend trust we have not earned.
+        Battery optimisation is NOT a runtime permission: the setup card opens the system page.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Optional on purpose: skipping it must not block onboarding (PRD section 38.2). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        Needed to ask, under Android 11+ package visibility, whether this device offers the battery
+        optimisation page at all — so the setup card can say "unavailable" instead of showing a
+        button that leads nowhere.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
+        </intent>
+    </queries>
+
+    <!--
+        Backup rules are meaningful now that TDLib writes a session to app-private storage: the
+        session must never leave the device, while the harmless settings row may.
     -->
     <application
         android:name=".LumoVaultApplication"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

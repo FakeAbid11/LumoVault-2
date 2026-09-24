@@ -4,6 +4,23 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Telegram API credentials are build inputs, never source code. Absent values stay absent:
+// TELEGRAM_API_ID 0 / empty hash means "not configured in this build", which the app reports as a
+// clear setup state instead of crashing or pretending to authenticate.
+// Locally: -PTELEGRAM_API_ID=... -PTELEGRAM_API_HASH=...  In CI: repository secrets passed as properties.
+val telegramApiId: Int = providers.gradleProperty("TELEGRAM_API_ID")
+    .orElse(providers.environmentVariable("TELEGRAM_API_ID"))
+    .getOrElse("0")
+    .filter { it.isDigit() }
+    .toIntOrNull()
+    ?: 0
+
+val telegramApiHash: String = providers.gradleProperty("TELEGRAM_API_HASH")
+    .orElse(providers.environmentVariable("TELEGRAM_API_HASH"))
+    .getOrElse("")
+    // An api hash is hex; filtering keeps a stray quote from generating uncompilable BuildConfig.
+    .filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+
 android {
     namespace = "com.lumovault.app"
     compileSdk = 37
@@ -14,6 +31,9 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField("int", "TELEGRAM_API_ID", telegramApiId.toString())
+        buildConfigField("String", "TELEGRAM_API_HASH", "\"$telegramApiHash\"")
     }
 
     buildTypes {
@@ -33,6 +53,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -59,6 +80,13 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.kotlinx.coroutines.android)
+
+    // Offline country metadata: calling codes, example numbers, and E.164 normalisation. Hand-rolling
+    // a ~240-row table that must agree with the parser is the worse trade; see CountryRepositoryImpl.
+    implementation(libs.libphonenumber)
+    // TDLib's client interface is JSON. Parsed via the JsonElement API, so no compiler plugin is
+    // needed and the mapping is testable off-device.
+    implementation(libs.kotlinx.serialization.json)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

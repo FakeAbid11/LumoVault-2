@@ -13,4 +13,131 @@
     <string name="map_placeholder">Photo map will appear here.</string>
 
     <string name="theme_toggle">Switch theme</string>
+    <string name="back">Back</string>
+
+    <!-- Screen 1: Welcome -->
+    <string name="welcome_tagline">Your photos.\nYour storage.</string>
+    <string name="welcome_description">Private photo, video and GIF backup using your Telegram account.</string>
+    <string name="welcome_action">Get started</string>
+
+    <!-- Screen 2: How it works -->
+    <string name="how_title">How LumoVault works</string>
+    <string name="how_your_phone">Your phone</string>
+    <string name="how_your_cloud">LumoVault Backup on Telegram</string>
+    <string name="how_point_local">Your media stays on this device.</string>
+    <string name="how_point_backup">LumoVault copies what you choose into your own Telegram storage.</string>
+    <string name="how_point_cloud">Cloud lets you browse that library from anywhere.</string>
+    <string name="how_point_originals">Originals download only when you ask for them.</string>
+    <string name="how_action">Continue</string>
+
+    <!-- Screen 3: Connect Telegram -->
+    <string name="connect_title">Connect Telegram</string>
+    <string name="connect_description">Connect your Telegram account to use it as your private cloud storage.</string>
+    <string name="connect_phone_label">Phone number</string>
+    <string name="connect_action">Continue</string>
+    <string name="connect_country_description">Choose your country</string>
+    <string name="connect_not_configured">This build cannot reach Telegram yet.</string>
+    <string name="connect_not_configured_detail">LumoVault was compiled without the Telegram library or API credentials, so signing in is unavailable. Setup can continue now and the account can be connected later.</string>
+    <string name="connect_restoring">Checking your Telegram session…</string>
+
+    <!-- Verification code -->
+    <string name="code_title">Enter verification code</string>
+    <string name="code_description">We sent a verification code to your Telegram account.</string>
+    <string name="code_description_destination">We sent a verification code to …%1$s.</string>
+    <string name="code_description_call">Telegram is calling you with a verification code.</string>
+    <string name="code_description_email">We sent a verification code to your email address.</string>
+    <string name="code_label">Code</string>
+    <string name="code_action">Confirm</string>
+    <string name="code_resend">Resend code</string>
+    <string name="code_change_number">Change number</string>
+
+    <!-- Two-step verification -->
+    <string name="password_title">Two-step verification</string>
+    <string name="password_description">Enter your Telegram password to continue.</string>
+    <string name="password_hint_label">Password</string>
+    <string name="password_action">Continue</string>
+
+    <!-- Authentication failures -->
+    <string name="error_phone_invalid">That phone number doesn\'t look right.</string>
+    <string name="error_phone_invalid_detail">Check the country code and number, then try again.</string>
+    <string name="error_code_invalid">That code is incorrect.</string>
+    <string name="error_code_invalid_detail">Please check the code and try again.</string>
+    <string name="error_code_expired">The code expired.</string>
+    <string name="error_code_expired_detail">Request a new code and try again.</string>
+    <string name="error_password_incorrect">That password is incorrect.</string>
+    <string name="error_password_incorrect_detail">Take a moment and try again, or reset it in Telegram.</string>
+    <string name="error_rate_limited">Too many attempts right now.</string>
+    <string name="error_rate_limited_detail">Telegram is asking you to wait about %1$s before trying again.</string>
+    <string name="error_network">Couldn\'t connect to Telegram.</string>
+    <string name="error_network_detail">Check your internet connection and try again.</string>
+    <string name="error_no_account">That number has no Telegram account.</string>
+    <string name="error_no_account_detail">LumoVault backs up to an existing Telegram account.</string>
+    <string name="error_session_invalid">Your Telegram session is no longer valid.</string>
+    <string name="error_session_invalid_detail">Sign in again to reconnect your cloud library.</string>
+    <string name="error_unexpected">Something went wrong.</string>
+    <string name="error_unexpected_detail">Telegram didn\'t finish the request. Please try again.</string>
+    <string name="error_retry">Try again</string>
+    <string name="code_length_hint">Enter the %1$d-digit code Telegram sent.</string>
+    <string name="duration_short">a moment</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_seconds">%1$d s</string>
+
+    <!-- Screen 4: Permissions and backup setup -->
+    <string name="setup_title">Set up LumoVault</string>
+    <string name="setup_description">Three quick things, and you can skip the optional ones.</string>
+    <string name="setup_media_title">Photos and videos</string>
+    <string name="setup_media_description">Allow LumoVault to access your photos, videos and GIFs so it can find and back them up.</string>
+    <string name="setup_media_action">Allow access</string>
+    <string name="setup_media_open_settings">Open settings</string>
+    <string name="setup_notifications_title">Notifications</string>
+    <string name="setup_notifications_description">Get notified when backup starts, finishes, or needs attention.</string>
+    <string name="setup_notifications_action">Allow notifications</string>
+    <string name="setup_notifications_not_now">Not now</string>
+    <string name="setup_notifications_not_required">This Android version doesn\'t ask for notification permission.</string>
+    <string name="setup_background_title">Background backup</string>
+    <string name="setup_background_description">For reliable automatic backup, LumoVault may need to run without battery restrictions.</string>
+    <string name="setup_background_action">Check settings</string>
+    <string name="setup_background_later">I\'ll do this later</string>
+    <string name="setup_background_unavailable">This device doesn\'t offer a battery setting LumoVault can open.</string>
+    <string name="setup_action">Continue</string>
+
+    <string name="status_done">Done</string>
+    <string name="status_allowed">Allowed</string>
+    <string name="status_partly_allowed">Partly allowed</string>
+    <string name="status_skipped">Skipped</string>
+    <string name="status_not_set">Not set</string>
+    <string name="status_unavailable">Unavailable</string>
+    <string name="status_restricted">Restricted</string>
+    <string name="status_unrestricted">Unrestricted</string>
+
+    <!-- Screen 5: Backup source -->
+    <string name="source_title">What should LumoVault back up?</string>
+    <string name="source_all">All photos, videos and GIFs</string>
+    <string name="source_folders">Select folders</string>
+    <string name="source_none">Not now</string>
+    <string name="source_none_detail">You can choose later in Settings.</string>
+    <string name="source_action">Continue</string>
+    <string name="source_selected_count">%1$d folders selected</string>
+
+    <string name="folders_title">Select folders</string>
+    <string name="folders_empty_title">No folders to list yet</string>
+    <string name="folders_empty_description">LumoVault reads folders from your media library, which is built in the next step of setup. Your selection is saved and applied as soon as that library exists.</string>
+    <string name="folders_action">Continue</string>
+
+    <!-- Screen 6: Ready -->
+    <string name="ready_title">You\'re ready</string>
+    <string name="ready_telegram">Telegram connected</string>
+    <string name="ready_media">Media access</string>
+    <string name="ready_notifications">Notifications</string>
+    <string name="ready_source">Backup source selected</string>
+    <string name="ready_description">LumoVault is ready to protect your memories.</string>
+    <string name="ready_action">Start backup</string>
+    <string name="ready_note">Backup itself begins once your library has been scanned.</string>
+
+    <!-- Country selector -->
+    <string name="country_picker_title">Select country</string>
+    <string name="country_search_label">Search country</string>
+    <string name="country_search_clear">Clear search</string>
+    <string name="country_no_results">No country matches that search.</string>
+    <string name="country_result_count">%1$d countries</string>
 </resources>
