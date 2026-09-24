@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LumoVault</string>
+
+    <string name="nav_photos">Photos</string>
+    <string name="nav_albums">Albums</string>
+    <string name="nav_cloud">Cloud</string>
+    <string name="nav_map">Map</string>
+
+    <string name="photos_placeholder">Local photo library will appear here.</string>
+    <string name="albums_placeholder">Albums will appear here.</string>
+    <string name="cloud_placeholder">Cloud library will appear here.</string>
+    <string name="map_placeholder">Photo map will appear here.</string>
+
+    <string name="theme_toggle">Switch theme</string>
+</resources>

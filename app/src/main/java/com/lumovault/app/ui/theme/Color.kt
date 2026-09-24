@@ -1,0 +1,30 @@
+package com.lumovault.app.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// Dark scheme: black + dark blue surfaces, blue accents (PRD section 44).
+internal val DarkBackground = Color(0xFF05070D)
+internal val DarkSurface = Color(0xFF0C1220)
+internal val DarkSurfaceVariant = Color(0xFF16203A)
+internal val DarkOnSurface = Color(0xFFE6EDF8)
+internal val DarkOnSurfaceVariant = Color(0xFFA9B7CE)
+internal val DarkPrimary = Color(0xFF4C8DFF)
+internal val DarkOnPrimary = Color(0xFF001429)
+internal val DarkPrimaryContainer = Color(0xFF1B3A67)
+internal val DarkOnPrimaryContainer = Color(0xFFCFE0FF)
+internal val DarkOutline = Color(0xFF43526B)
+
+// Light scheme: white + light blue surfaces, the same blue accent family.
+internal val LightBackground = Color(0xFFFFFFFF)
+internal val LightSurface = Color(0xFFF4F8FF)
+internal val LightSurfaceVariant = Color(0xFFDCE9FA)
+internal val LightOnSurface = Color(0xFF0C1420)
+internal val LightOnSurfaceVariant = Color(0xFF43526B)
+internal val LightPrimary = Color(0xFF0F5FD8)
+internal val LightOnPrimary = Color(0xFFFFFFFF)
+internal val LightPrimaryContainer = Color(0xFFD3E3FF)
+internal val LightOnPrimaryContainer = Color(0xFF00296B)
+internal val LightOutline = Color(0xFF7E8CA3)
+
+internal val ErrorRed = Color(0xFFB3261E)
+internal val OnErrorRed = Color(0xFFFFFFFF)

@@ -1,0 +1,21 @@
+# Gradle / build outputs
+.gradle/
+build/
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+
+# Local machine configuration (never committed)
+local.properties
+
+# Signing material stays out of the repository
+*.jks
+*.keystore
+*.pk8
+
+# Captured artifacts
+captures/
+*.apk
+*.aab
