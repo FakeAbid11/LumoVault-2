@@ -15,11 +15,15 @@ on:
   workflow_dispatch:
     inputs:
       tdlib_commit:
-        description: TDLib commit to build
+        description: TDLib commit to build (full 40-character SHA)
         required: true
-        # Verified as of 2026-09-24; the scheme and the C header in this commit are what
+        # Verified as of 2026-09-24; the scheme and the C header at this revision are what
         # TdLibCloudRepository and tdlib/lumo_tdlib_jni.c are written against.
-        default: ea97bcdd
+        #
+        # It has to be the complete SHA: actions/checkout only treats `ref` as a commit when it is 40
+        # hex characters, so the short form `ea97bcdd` was fetched as if it were a branch name
+        # (`+refs/heads/ea97bcdd*:...`) and every ABI job failed before the build started.
+        default: ea97bcdd3a15523c58ddfe772b4547187cf5bbeb
       abis:
         description: Comma-separated ABIs
         required: false
