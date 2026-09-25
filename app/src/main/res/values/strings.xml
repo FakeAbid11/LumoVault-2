@@ -8,7 +8,6 @@
     <string name="nav_map">Map</string>
 
     <string name="cloud_placeholder">Cloud library will appear here.</string>
-    <string name="map_placeholder">Photo map will appear here.</string>
 
     <!-- Photos library (Phase 3) -->
     <string name="photos_empty_title">No photos yet</string>
@@ -279,6 +278,28 @@
     <plurals name="viewer_position">
         <item quantity="one">%1$d of %2$d</item>
         <item quantity="other">%1$d of %2$d</item>
+    </plurals>
+
+    <!--
+        Phase 8: the map. The two notices are the two silences a map can have, and they are named apart on
+        purpose — "no photo has a location in it" and "the locations have not been read yet" want opposite
+        actions, and a single empty state would push someone to grant a permission that changes nothing.
+    -->
+    <string name="map_tiles_unconfigured">No map tiles are configured in this build, so the background is blank. Photo positions, clusters and previews all work.</string>
+    <string name="map_locations_title">Show where your photos were taken</string>
+    <string name="map_locations_body">LumoVault reads the location a photo carries inside it. It never asks where your phone is, and photos without a saved location are left off the map.</string>
+    <string name="map_locations_action">Allow photo locations</string>
+    <string name="map_no_positions">None of your photos record where they were taken.</string>
+    <string name="map_preview_open">View</string>
+    <string name="map_preview_close">Close</string>
+
+    <plurals name="map_finding_locations">
+        <item quantity="one">Finding photo locations — %1$d photo left to read</item>
+        <item quantity="other">Finding photo locations — %1$d photos left to read</item>
+    </plurals>
+    <plurals name="map_cluster_photos">
+        <item quantity="one">%1$d photo here</item>
+        <item quantity="other">%1$d photos here</item>
     </plurals>
 
     <plurals name="cloud_count_photos">

@@ -1,0 +1,472 @@
+package com.lumovault.app.ui.map
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.SubcomposeAsyncImage
+import com.lumovault.app.R
+import android.net.Uri
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import com.lumovault.app.data.map.MapTileProvider
+import com.lumovault.app.domain.map.MapClustering
+import com.lumovault.app.domain.model.MapBounds
+import com.lumovault.app.domain.map.MapPin
+import com.lumovault.app.domain.model.MapPhoto
+import java.text.DateFormat
+import java.util.Date
+import kotlinx.coroutines.launch
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
+
+/**
+ * The photo map: every placed photograph in the rectangle the user is looking at.
+ *
+ * It is a map of the library, not a map of the world — the difference shows up in what this screen refuses to
+ * do. It never asks where the phone is, because PRD section 30 wants the locations the photographs carry. It
+ * never downloads a stored original to draw a marker, because the thumbnail on the device is already there.
+ * And it does not pretend to have tiles when the build has no tile host: the markers, the clusters, the strip
+ * and the hand-off to the viewer all work without a single tile, so an unconfigured build shows a real map of
+ * a plain canvas and says so, rather than a grey rectangle that looks like a network failure.
+ *
+ * A pan re-queries Room and re-clusters; a zoom does the same and, because the cluster cell is a fixed number
+ * of pixels while the world grows fourfold per level, the same code separates a city into its streets. That is
+ * the whole reason clustering lives in pure Kotlin — see [MapClustering] — rather than in a library that would
+ * not show its work here.
+ */
+@Composable
+fun MapScreen(
+    onOpenMedia: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: MapViewModel = viewModel(),
+) {
+    val context = LocalContext.current
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val pins by viewModel.pins.collectAsStateWithLifecycle()
+    val strip by viewModel.strip.collectAsStateWithLifecycle()
+    val selected by viewModel.selected.collectAsStateWithLifecycle()
+    val focus by viewModel.focusLocation.collectAsStateWithLifecycle()
+
+    var mapView by remember { mutableStateOf<MapView?>(null) }
+    var previews by remember { mutableStateOf<List<MapPhoto>>(emptyList()) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.onPermissionResult() }
+
+    // The map is only worth reading positions for while it is being looked at, so the pass is started by the
+    // screen appearing rather than by a scheduled job that would run against nobody's interest.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.resume()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { viewContext ->
+            MapTileProvider.configure(viewContext)
+            MapView(viewContext).apply {
+                // A MapView destroys itself on detach by default, and a Compose subtree leaving and returning
+                // is normal navigation — without this the second visit would be a map with no overlays and no
+                // listeners at all.
+                setDestroyMode(false)
+                MapTileProvider.tileSource()?.let { source -> setTileSource(source) }
+                setMultiTouchControls(true)
+                setZoomLevel(MapClustering.DEFAULT_ZOOM.toDouble())
+            }
+        },
+        update = { view -> mapView = view },
+    )
+
+    DisposableEffect(mapView) {
+        val map = mapView ?: return@DisposableEffect onDispose { }
+        map.onResume()
+        // osmdroid reports one scroll event per frame and its events carry no usable coordinates, so the
+        // listener is a debounced trigger and the bounding box is re-read from the map itself.
+        val listener = object : MapListener {
+            override fun onScroll(event: ScrollEvent?): Boolean {
+                publishViewport(map, viewModel)
+                return true
+            }
+
+            override fun onZoom(event: ZoomEvent?): Boolean {
+                publishViewport(map, viewModel)
+                return true
+            }
+        }
+        val delayed = org.osmdroid.events.DelayedMapListener(listener, VIEWPORT_DEBOUNCE_MILLIS)
+        map.addMapListener(delayed)
+        // Taps on empty map close the preview card. Added first so markers, which osmdroid asks in reverse
+        // order, keep priority over it.
+        val events = MapEventsOverlay(
+            object : MapEventsReceiver {
+                override fun singleTapConfirmedHelper(position: GeoPoint?): Boolean {
+                    viewModel.clearSelection()
+                    return false
+                }
+
+                override fun longPressHelper(position: GeoPoint?): Boolean = false
+            },
+        )
+        map.overlays.add(0, events)
+        onDispose {
+            map.removeMapListener(delayed)
+            map.overlays.remove(events)
+            map.onPause()
+        }
+    }
+
+    LaunchedEffect(mapView, pins) {
+        val map = mapView ?: return@LaunchedEffect
+        drawPins(map, pins, viewModel)
+    }
+
+    LaunchedEffect(mapView, focus) {
+        val map = mapView ?: return@LaunchedEffect
+        val location = focus ?: return@LaunchedEffect
+        map.controller.setCenter(GeoPoint(location.latitude, location.longitude))
+        if (map.zoomLevelDouble < FOCUS_ZOOM) map.setZoomLevel(FOCUS_ZOOM)
+        viewModel.focusConsumed()
+        publishViewport(map, viewModel)
+    }
+
+    LaunchedEffect(selected) {
+        val pin = selected ?: run { previews = emptyList(); return@LaunchedEffect }
+        previews = viewModel.photosIn(pin, PREVIEW_LIMIT)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (!viewModel.tilesConfigured) {
+            MapNotice(
+                text = stringResource(R.string.map_tiles_unconfigured),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+            )
+        }
+
+        if (state.shouldAskForLocations) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (viewModel.tilesConfigured) 8.dp else 64.dp)
+                    .padding(horizontal = 12.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = stringResource(R.string.map_locations_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(R.string.map_locations_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(onClick = { permissionLauncher.launch(viewModel.permissionToRequest()) }) {
+                            Text(stringResource(R.string.map_locations_action))
+                        }
+                    }
+                }
+            }
+        } else if (!state.hasPins && state.extractionWaiting > 0) {
+            MapNotice(
+                text = pluralStringResource(
+                    R.plurals.map_finding_locations,
+                    state.extractionWaiting,
+                    state.extractionWaiting,
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+            )
+        } else if (!state.hasPins && state.placedCount == 0) {
+            MapNotice(
+                text = stringResource(R.string.map_no_positions),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+            )
+        }
+
+        if (selected != null) {
+            MapPreviewCard(
+                pin = requireNotNull(selected),
+                previews = previews,
+                onOpen = { photo ->
+                    viewModel.clearSelection()
+                    onOpenMedia(photo)
+                },
+                onDismiss = viewModel::clearSelection,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+            )
+        }
+
+        if (strip.isNotEmpty() && selected == null) {
+            LazyRow(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp),
+            ) {
+                items(items = strip, key = { photo -> photo.mediaStoreId }) { photo ->
+                    StripThumbnail(photo = photo, onClick = { onOpenMedia(photo.mediaStoreId) })
+                }
+            }
+        }
+
+        if (viewModel.attribution.isNotBlank()) {
+            Text(
+                text = viewModel.attribution,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .background(Color(0x99000000))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The pins osmdroid should be showing right now.
+ *
+ * The overlay list is rebuilt rather than diffed. A cluster's identity is a cell in a grid that changes with
+ * every zoom, so keeping markers in sync would mean inventing a key for something that has a useful one only
+ * for single photos — and the list is bounded by [MapViewModel.PHOTO_LIMIT] divided into cells, which is
+ * hundreds of objects at worst. A diff would be more clever and would not survive a photo being deleted out
+ * from under a marker.
+ */
+private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel) {
+    map.overlays.removeAll { it is Marker }
+
+    pins.forEach { pin ->
+        val marker = Marker(map)
+        marker.position = GeoPoint(pin.latitude, pin.longitude)
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        marker.relatedObject = pin
+        if (pin is MapPin.Cluster) {
+            // The count *is* the icon. A drawn bubble would need a drawable, a tint and a measured font
+            // radius; osmdroid's text icon already puts the number where the marker goes, and the number is
+            // the only thing about a cluster the user needs to read.
+            marker.setTextIcon(pin.count.toString())
+        }
+        marker.setOnMarkerClickListener { clicked, _ ->
+            val target = clicked.relatedObject as? MapPin ?: return@setOnMarkerClickListener false
+            when (target) {
+                is MapPin.Photo -> viewModel.select(target)
+                // Zooming into a cluster rather than listing it: the point of a cluster is that there is too
+                // much to show, and a list is the map's own answer to that problem, one level closer.
+                is MapPin.Cluster -> {
+                    viewModel.clearSelection()
+                    map.controller.setCenter(GeoPoint(target.latitude, target.longitude))
+                    map.setZoomLevel(
+                        (map.zoomLevelDouble + ZOOM_PER_CLUSTER_TAP).coerceAtMost(map.maxZoomLevel),
+                    )
+                }
+            }
+            true
+        }
+        map.overlays.add(marker)
+    }
+    map.invalidate()
+}
+
+/** Reads where the map is looking and tells the model, in the units the query and the clustering need. */
+private fun publishViewport(map: MapView, viewModel: MapViewModel) {
+    val box = map.boundingBox ?: return
+    val zoom = map.zoomLevelDouble
+    // Mercator y grows downward and the box osmdroid reports is already north-first, so the only conversion
+    // that matters is the antimeridian: a view spanning the whole world must not become a box that inverts.
+    val west = box.lonWest
+    val east = box.lonEast
+    val bounds = if (east >= west) {
+        MapBounds(
+            minLatitude = box.latSouth,
+            maxLatitude = box.latNorth,
+            minLongitude = west,
+            maxLongitude = east,
+        )
+    } else {
+        // The view crosses ±180. osmdroid's own box cannot express it, so the query widens to the whole
+        // globe — matching everything is honest; matching the wrong half of the planet is not.
+        MapBounds(-90.0, 90.0, -180.0, 180.0)
+    }
+    viewModel.viewportChanged(bounds = bounds, zoomLevel = zoom)
+}
+
+@Composable
+private fun MapPreviewCard(
+    pin: MapPin,
+    previews: List<MapPhoto>,
+    onOpen: (Long) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dateTime = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
+    val first = previews.firstOrNull() ?: (pin as? MapPin.Photo)?.photo
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (first != null) {
+                    StripThumbnail(photo = first, onClick = { onOpen(first.mediaStoreId) }, size = 64.dp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = first?.let { photo ->
+                            photo.dateTakenSeconds?.let { dateTime.format(Date(it * 1000L)) }
+                                ?: photo.displayName
+                        }.orEmpty(),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (pin.count > 1) {
+                        Text(
+                            text = pluralStringResource(R.plurals.map_cluster_photos, pin.count, pin.count),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.map_preview_close)) }
+                first?.let { photo ->
+                    Button(onClick = { onOpen(photo.mediaStoreId) }) {
+                        Text(stringResource(R.string.map_preview_open))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One thumbnail on the map's strip and in its preview card.
+ *
+ * Decoded to the slot's size by Coil, which is the whole reason the strip can show twenty photos at once: a
+ * map viewport is not a place where 48-megapixel originals should be resident. Local `content://` only — the
+ * map draws positions from the device, and never fetches a stored original to label a marker.
+ */
+@Composable
+private fun StripThumbnail(
+    photo: MapPhoto,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = StripSize,
+) {
+    SubcomposeAsyncImage(
+        model = Uri.parse(photo.contentUri),
+        contentDescription = photo.displayName,
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .pointerInput(photo.mediaStoreId) { detectTapGestures { onClick() } },
+        contentScale = ContentScale.Crop,
+    )
+}
+
+@Composable
+private fun MapNotice(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/** Photos the preview card can show behind a cluster. */
+private const val PREVIEW_LIMIT = 4
+
+/** How much closer a tap on a cluster gets. Two levels separates a city from its streets in one gesture. */
+private const val ZOOM_PER_CLUSTER_TAP = 2.0
+
+/** A pan is continuous; the query should not be. */
+private const val VIEWPORT_DEBOUNCE_MILLIS = 250L
+
+/** Deep enough to recognise a place, shallow enough that a cluster has something to separate into. */
+private const val FOCUS_ZOOM = 12.0
+
+private val StripSize = 68.dp

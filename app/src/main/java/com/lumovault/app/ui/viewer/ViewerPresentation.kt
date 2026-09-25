@@ -107,13 +107,14 @@ enum class ViewerBackupStatus { NotBackedUp, Uploading, BackedUp, Failed }
 
 /** The control's two shapes: an action the user can take, and a state they can only watch. */
 sealed interface ViewerBackupAction {
+    /** What the glyph and the sentence say. Both shapes have one, which is why it is on the interface. */
     val status: ViewerBackupStatus
 
     /** A labelled button. */
-    data class Show(val status: ViewerBackupStatus, val enabled: Boolean) : ViewerBackupAction
+    data class Show(override val status: ViewerBackupStatus, val enabled: Boolean) : ViewerBackupAction
 
     /** No button: the queue is already working on this item. */
-    data class Busy(val status: ViewerBackupStatus) : ViewerBackupAction
+    data class Busy(override val status: ViewerBackupStatus) : ViewerBackupAction
 }
 
 /** A row of the details panel. Deliberately carries no text: the strings belong to the screen that draws them. */

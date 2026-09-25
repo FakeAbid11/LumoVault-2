@@ -10,7 +10,7 @@ import androidx.navigation.navArgument
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.screens.AlbumsScreen
 import com.lumovault.app.ui.screens.CloudScreen
-import com.lumovault.app.ui.screens.MapScreen
+import com.lumovault.app.ui.map.MapScreen
 import com.lumovault.app.ui.screens.PhotosScreen
 import com.lumovault.app.ui.screens.albums.AlbumDetailScreen
 import com.lumovault.app.ui.viewer.MediaViewerScreen
@@ -86,7 +86,16 @@ fun LumoVaultNavHost(
         }
 
         composable(LumoVaultDestination.Cloud.route) { CloudScreen() }
-        composable(LumoVaultDestination.Map.route) { MapScreen() }
+        composable(LumoVaultDestination.Map.route) {
+            MapScreen(
+                onOpenMedia = { mediaId ->
+                    // Swiping from a map marker walks the positioned photos in view, which is the timeline's
+                    // window for now: the map's own viewport is not a list Room can page through, and opening
+                    // the viewer on the library rather than on nothing is the useful half.
+                    navController.navigate(ViewerRoutes.of(mediaId, ViewerTarget.Photos))
+                },
+            )
+        }
 
         composable(
             route = ViewerRoutes.PATTERN,

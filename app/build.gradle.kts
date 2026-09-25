@@ -12,12 +12,45 @@ plugins {
 // TELEGRAM_API_ID 0 / empty hash means "not configured in this build", which the app reports as a
 // clear setup state instead of crashing or pretending to authenticate.
 // Locally: -PTELEGRAM_API_ID=... -PTELEGRAM_API_HASH=...  In CI: repository secrets passed as properties.
+private const val BACKSLASH_CODE = 92
+
 val telegramApiId: Int = providers.gradleProperty("TELEGRAM_API_ID")
     .orElse(providers.environmentVariable("TELEGRAM_API_ID"))
     .getOrElse("0")
     .filter { it.isDigit() }
     .toIntOrNull()
     ?: 0
+
+// Map tiles are a provider choice, not a constant. `MAP_TILE_URL` is a {z}/{x}/{y} template and
+// `MAP_TILE_USER_AGENT` is the identifying string the provider's terms require; both are build inputs like
+// the Telegram credentials, and an absent URL is a supported state — see MapTileProvider.
+val mapTileUrl: String = providers.gradleProperty("MAP_TILE_URL")
+    .orElse(providers.environmentVariable("MAP_TILE_URL"))
+    .getOrElse("")
+    // A template is only usable if it can name a tile at all; anything else is a typo that would otherwise
+    // surface as a blank map with no explanation.
+    .filter { url -> url.contains("{z}") && url.contains("{x}") && url.contains("{y}") }
+    // Quoted into BuildConfig as a Java string, so a quote or a backslash in the value would generate
+    // uncompilable source. Filtering is kinder than failing. 92 is the backslash, written as a code
+    // point so this line survives both the Kotlin lexer and whoever generates it next.
+    .filter { url -> url.none { c -> c == '"' || c.code == BACKSLASH_CODE || c == '$' } }
+
+val mapTileUserAgent: String = providers.gradleProperty("MAP_TILE_USER_AGENT")
+    .orElse(providers.environmentVariable("MAP_TILE_USER_AGENT"))
+    .getOrElse("LumoVault/0.1")
+    .filter { agent -> agent.none { c -> c == '"' || c.code == BACKSLASH_CODE } }
+
+val mapTileAttribution: String = providers.gradleProperty("MAP_TILE_ATTRIBUTION")
+    .orElse(providers.environmentVariable("MAP_TILE_ATTRIBUTION"))
+    .getOrElse("")
+    .filter { note -> note.none { c -> c == '"' || c.code == BACKSLASH_CODE } }
+
+val mapTileMaxZoom: Int = providers.gradleProperty("MAP_TILE_MAX_ZOOM")
+    .orElse(providers.environmentVariable("MAP_TILE_MAX_ZOOM"))
+    .getOrElse("19")
+    .toIntOrNull()
+    ?.coerceIn(1, 22)
+    ?: 19
 
 val telegramApiHash: String = providers.gradleProperty("TELEGRAM_API_HASH")
     .orElse(providers.environmentVariable("TELEGRAM_API_HASH"))
@@ -46,6 +79,11 @@ android {
 
         buildConfigField("int", "TELEGRAM_API_ID", telegramApiId.toString())
         buildConfigField("String", "TELEGRAM_API_HASH", "\"$telegramApiHash\"")
+
+        buildConfigField("String", "MAP_TILE_URL", "\"$mapTileUrl\"")
+        buildConfigField("String", "MAP_TILE_USER_AGENT", "\"$mapTileUserAgent\"")
+        buildConfigField("String", "MAP_TILE_ATTRIBUTION", "\"$mapTileAttribution\"")
+        buildConfigField("int", "MAP_TILE_MAX_ZOOM", mapTileMaxZoom.toString())
     }
 
     buildTypes {
@@ -150,6 +188,12 @@ dependencies {
     // from the map to avoid one dependency. AndroidX's version reads a FileDescriptor, which is what keeps
     // this a header parse rather than a file load — see ExifMediaMetadataReader.
     implementation(libs.androidx.exifinterface)
+
+    // The map. osmdroid draws OpenStreetMap-derived tiles; the tile host itself is a build input below,
+    // because the OSM Foundation's usage policy is explicit that the public servers are not a production
+    // service for other people's apps. With no host configured the map still plots every photo position on a
+    // plain canvas and says why, rather than fetching from a server nobody granted permission to use.
+    implementation(libs.osmdroid.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 
