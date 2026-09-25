@@ -40,6 +40,34 @@ class BackupQueueRepositoryTest {
         assertEquals("an id the index does not know is not queueable", 0, repository.enqueue(listOf(99L)))
     }
 
+    /**
+     * The rule the whole duplicate argument rests on, read from the queue's side.
+     *
+     * An item with a settled row is not work: not for a tap on "Back Up", and not for a worker looking for
+     * something to send. Both of those go through this one table, so a row in `backed_up` that could still
+     * be claimed would put a second copy of the same bytes into the user's channel — after a restore, after
+     * a reinstall, and after any repeated tap.
+     */
+    @Test
+    fun anItemThatIsAlreadyStoredIsNeitherEnqueuedNorClaimedAgain() = runBlocking {
+        dao.withMedia(1L)
+        check(
+            repository.recordRestored(
+                mediaStoreId = 1L,
+                remote = RemoteBackup(chatId = 555L, messageId = 777L),
+                identity = MediaIdentity(
+                    contentHash = "a".repeat(64),
+                    observedSizeBytes = FakeBackupQueueDao.DEFAULT_SIZE,
+                    observedModifiedSeconds = FakeBackupQueueDao.DEFAULT_MODIFIED,
+                ),
+            ),
+        )
+
+        assertEquals("a settled item is not something to ask for twice", 0, repository.enqueue(listOf(1L)))
+        assertNull("and there is nothing here for a worker to take", repository.claimNext(555L))
+        assertEquals(UploadState.BackedUp, dao.row(1L).state.asState())
+    }
+
     @Test
     fun claimTakesTheOldestWaitingItemAndRecordsWhereItIsGoing() = runBlocking {
         dao.withMedia(1L, 2L)

@@ -14,9 +14,10 @@ import org.junit.Test
  * build can see that: `app/schemas` is exported into the runner's workspace and compared to nothing, and
  * the entities and the migrations compile happily side by side while disagreeing.
  *
- * So what is checkable is the bookkeeping. The declared `@Database` version is not — Room retains that
- * annotation as BINARY, so it is absent at runtime — which leaves the shape of the chain: one migration
- * per step, no step skipped, no step doubled, and every one moving forward by exactly one version.
+ * So what is checkable is the bookkeeping: one migration per step, no step skipped, no step doubled, every
+ * one moving forward by exactly one version — and the chain ending at [LUMOVAULT_SCHEMA_VERSION], which is
+ * the same constant the `@Database` annotation reads. Without that last one, deleting a migration keeps
+ * every test here green while an upgraded install crashes on open.
  */
 class MigrationChainTest {
     private val migrations: List<Migration> = LumoVaultDatabase.ALL_MIGRATIONS.toList()
@@ -29,6 +30,16 @@ class MigrationChainTest {
             "a gap or a duplicate in the chain fails validation on an existing install, not at build time",
             (1 until lastVersion).toList(),
             migrations.sortedBy { it.startVersion }.map { it.startVersion },
+        )
+    }
+
+    @Test
+    fun theChainEndsWhereTheCompiledEntitiesSayTheSchemaIs() {
+        assertEquals(
+            "the entities are at version $LUMOVAULT_SCHEMA_VERSION and the migrations stop at " +
+                "${migrations.maxOf { it.endVersion }}, which is an install that cannot open its own database",
+            LUMOVAULT_SCHEMA_VERSION,
+            migrations.maxOf { it.endVersion },
         )
     }
 

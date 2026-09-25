@@ -4,9 +4,12 @@ import com.lumovault.app.data.local.backup.FakeBackupQueueDao
 import com.lumovault.app.data.local.backup.QueueClock
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
 import com.lumovault.app.domain.backup.BackupFailureKind
+import com.lumovault.app.domain.backup.MediaIdentity
+import com.lumovault.app.domain.repository.RemoteBackup
 import com.lumovault.app.domain.backup.UploadState
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -54,6 +57,44 @@ class RecognizeBackupUseCaseTest {
         )
         assertEquals(CHAT, dao.row(1L).chatId)
         assertEquals(HASH_A, dao.row(1L).contentHash)
+    }
+
+    /**
+     * A restored file has to survive the pass that runs straight after it.
+     *
+     * The restore writes the row itself — `backed_up`, against the message it downloaded from, with the
+     * identity taken from the media row the scanner had just indexed. Recognition is then the only thing
+     * that looks at that row again, and if its fast check disagreed with the size or the timestamp the
+     * restore recorded, the item would come back as changed media: the association revoked, the thumbnail
+     * losing its ✓, and the next queue pass sending the user's own download to the channel a second time.
+     * That is the exact outcome the phase rules out, and it is invisible from inside the restore test,
+     * which never runs a recognizer afterwards.
+     */
+    @Test
+    fun aRestoredItemSurvivesTheNextRecognitionPassAndIsNotUploadedAgain() = runBlocking {
+        dao.withMedia(1L)
+        check(
+            queue.recordRestored(
+                mediaStoreId = 1L,
+                remote = RemoteBackup(chatId = CHAT, messageId = 777L),
+                identity = MediaIdentity(
+                    contentHash = HASH_A,
+                    observedSizeBytes = FakeBackupQueueDao.DEFAULT_SIZE,
+                    observedModifiedSeconds = FakeBackupQueueDao.DEFAULT_MODIFIED,
+                ),
+            ),
+        )
+        cloud.given(HASH_A, CHAT, 777L)
+        cloud.unrecognized = 1
+
+        val run = recognizer().run()
+
+        assertEquals("a settled restore is not changed media", 0, run.revoked)
+        assertEquals("and it is not a discovery either — the row already names the message", 0, run.adopted)
+        assertEquals("recognising it must not cost a second read of the file", 0, hasher.reads)
+        assertEquals(UploadState.BackedUp, stateOf(1L))
+        assertEquals(777L, dao.row(1L).messageId)
+        assertNull("nothing about it is work for a worker", queue.claimNext(CHAT))
     }
 
     @Test

@@ -31,6 +31,17 @@ import com.lumovault.app.data.local.restore.MediaRestoreEntity
  * media index. Each step is an explicit migration: an installed app must not lose its theme or
  * its recorded setup choices, and no destructive fallback is used anywhere.
  */
+/**
+ * The schema version the compiled entities describe, in one place.
+ *
+ * It is a `const` rather than the literal in the annotation below so [MigrationChainTest] can compare the
+ * migration chain against it. Room keeps `@Database` with BINARY retention, so the annotation is invisible
+ * at runtime — which without this constant leaves nothing in the build able to notice that an entity gained
+ * a column and no migration produces it. That mismatch is not a warning; it is a crash on the first launch
+ * after an upgrade, on a person's own library.
+ */
+internal const val LUMOVAULT_SCHEMA_VERSION = 9
+
 @Database(
     entities = [
         AppSettingsEntity::class,
@@ -44,7 +55,7 @@ import com.lumovault.app.data.local.restore.MediaRestoreEntity
         MediaMetadataEntity::class,
         MediaRestoreEntity::class,
     ],
-    version = 9,
+    version = LUMOVAULT_SCHEMA_VERSION,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
