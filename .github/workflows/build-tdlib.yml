@@ -9,7 +9,8 @@ name: Build TDLib native libraries
 #
 # Provenance: pinned revision, TDLib's own example/android Dockerfile, SHA-256 recorded over both the
 # .so and the .java files, ELF class/machine asserted against the ABI. Nothing is committed to Git;
-# build.yml downloads these artifacts into jniLibs before assembling.
+# build.yml downloads these artifacts from this workflow's run and places the .so files in jniLibs and
+# the .java files on a source path before it assembles.
 
 on:
   workflow_dispatch:
@@ -35,8 +36,8 @@ permissions:
   contents: read
 
 jobs:
-  tdjson:
-    name: Build libtdjson for ${{ matrix.abi }}
+  tdlib:
+    name: Build libtdjni for ${{ matrix.abi }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -55,7 +56,7 @@ jobs:
         with:
           path: lumovault
 
-      - name: Build TDLib with the JSON interface
+      - name: Build TDLib with the Java interface
         # example/android/Dockerfile is the context root: it COPYs fetch-sdk.sh and build-openssl.sh
         # from its own directory, so `docker build .` from the repository top level has no Dockerfile
         # to read. It also clones TDLib itself at COMMIT_HASH, which is why the pinned revision is
