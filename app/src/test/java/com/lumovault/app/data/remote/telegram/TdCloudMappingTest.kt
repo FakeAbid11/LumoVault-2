@@ -249,7 +249,7 @@ class TdCloudMappingTest {
 
     @Test
     fun aMalformedOrFutureManifestIsReadAsNothingRatherThanAsAPartialHash() {
-        fun withCaption(id: Int, text: String) = TdCloudMapper.toCloudMedia(
+        fun withCaption(id: Long, text: String) = TdCloudMapper.toCloudMedia(
             message(
                 id = id,
                 content = TdApi.MessagePhoto().apply {

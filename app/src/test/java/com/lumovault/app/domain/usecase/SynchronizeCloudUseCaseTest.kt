@@ -4,6 +4,7 @@ import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.CloudTypeCount
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.CloudIndexRepository
+import com.lumovault.app.domain.repository.RemoteBackup
 import com.lumovault.app.domain.telegram.CloudAssociation
 import com.lumovault.app.domain.telegram.CloudChannelVerdict
 import com.lumovault.app.domain.telegram.CloudHistoryPage
@@ -102,6 +103,12 @@ class SynchronizeCloudUseCaseTest {
         }
 
         override suspend fun association(): CloudAssociation? = saved
+
+        // Recognition's two reads, unused by the walk: the fake answers them so the interface it
+        // implements stays the real one rather than a copy frozen at Phase 4.
+        override suspend fun remoteBackupFor(contentHash: String): RemoteBackup? = null
+        override suspend fun unrecognizedRemoteCount(): Int = 0
+
         override suspend fun saveAssociation(association: CloudAssociation) {
             saved = association
         }

@@ -164,7 +164,13 @@ interface BackupQueueRepository {
     /** Records where the staged copy landed, so completion or a later cleanup can remove it. */
     suspend fun markStaged(mediaStoreId: Long, path: String)
 
-    /** Records the message Telegram created; [telegramMessageId] is what Phase 6 will match against. */
+    /**
+     * Records the message that holds this content.
+     *
+     * Two things can stand behind that claim, and both are evidence rather than intent: a send Telegram
+     * confirmed, or the remote manifest Phase 6 matched before the bytes went out. What may not produce it
+     * is a row simply being ready — hence the [UploadState.Queued] rows this refuses.
+     */
     suspend fun markBackedUp(mediaStoreId: Long, chatId: Long, messageId: Long)
 
     /** Where the staged copy for this row lives, so a later cleanup can find it. Empty if none. */
@@ -190,9 +196,9 @@ interface BackupQueueRepository {
      * Rows left in [UploadState.Preparing] or [UploadState.Uploading] by a killed process.
      *
      * They go back to [UploadState.Queued] rather than being called failures: nothing went wrong with
-     * the media, the app simply stopped. The row may already exist in Telegram — an interrupted send
-     * can be committed server-side — and that duplicate is Phase 6's hash matching to detect, not
-     * something Phase 5 can know about here.
+     * the media, the app simply stopped. The row may already exist in Telegram — an interrupted send can
+     * be committed server-side — and that is what Phase 6's hash matching exists to catch: the next pass
+     * finds the content in the channel's manifest and adopts that message instead of sending it again.
      */
     suspend fun reconcileInterrupted(): Int
 }
