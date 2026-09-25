@@ -127,6 +127,32 @@ class BackupQueueRepositoryImpl(
             now = nowSeconds(),
         ) > 0
 
+    override suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long? =
+        dao.residentBackupFor(remote.chatId, remote.messageId, manifestHash.lowercase())
+
+    override suspend fun recordRestored(
+        mediaStoreId: Long,
+        remote: RemoteBackup,
+        identity: MediaIdentity,
+    ): Boolean {
+        val now = nowSeconds()
+        dao.recordRestored(
+            id = mediaStoreId,
+            chatId = remote.chatId,
+            messageId = remote.messageId,
+            hash = identity.contentHash,
+            sizeBytes = identity.observedSizeBytes,
+            modifiedSeconds = identity.observedModifiedSeconds,
+            backedUpState = UploadState.BackedUp.storageKey,
+            settleableStates = ADOPTABLE_STATES,
+            now = now,
+        )
+        // Read back rather than assumed: the statement can be skipped by the same guard that makes it
+        // safe, and a restore that reported success on a row a worker still owns would let Free Up Space
+        // delete a file the queue believes it is sending.
+        return dao.stateOf(mediaStoreId) == UploadState.BackedUp.storageKey
+    }
+
     override suspend fun revokeAssociation(mediaStoreId: Long): Boolean =
         dao.revokeAssociation(
             id = mediaStoreId,

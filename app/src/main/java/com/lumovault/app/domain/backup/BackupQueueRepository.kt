@@ -140,6 +140,34 @@ interface BackupQueueRepository {
     suspend fun adoptRemote(mediaStoreId: Long, remote: RemoteBackup): Boolean
 
     /**
+     * The local item that already holds this content, if the device has one.
+     *
+     * Matched by the message association or by [manifestHash] — never by filename, which two camera rolls
+     * on one device collide constantly. A blank [manifestHash] means the message carries no manifest, in
+     * which case only the association can answer, and the honest answer for a pre-Phase 6 upload is
+     * sometimes "unknown".
+     */
+    suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long?
+
+    /**
+     * Records a file this app just downloaded from that message as backed up, at the local row it landed in.
+     *
+     * The write a restore must make, and the reason Phase 6's rules hold rather than repeat: without it the
+     * restored file is a new item with a new hash, the queue offers it for upload, and the user's channel
+     * gains a second copy of a photo they downloaded a minute ago. With it, the content is on the device,
+     * its identity is recorded, and Free Up Space can treat it like any other completed backup.
+     *
+     * [identity] carries the hash of the bytes that actually arrived. That is deliberately not
+     * [RemoteBackup]'s manifest hash — Telegram stores photos and videos in containers of its own, so the
+     * two can legitimately differ, and a row that claimed otherwise would be asserting a byte-for-byte
+     * fidelity this app has never measured.
+     *
+     * Returns false when the row belonged to a worker at the moment of the write, which is the one case in
+     * which a restore cannot settle its own queue record.
+     */
+    suspend fun recordRestored(mediaStoreId: Long, remote: RemoteBackup, identity: MediaIdentity): Boolean
+
+    /**
      * Detaches a record from a backup that no longer describes it, because the file behind it became
      * different content.
      *

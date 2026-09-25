@@ -179,6 +179,74 @@ interface BackupQueueDao {
     ): Int
 
     /**
+     * The local item that already *is* this message's content, when one is on the device.
+     *
+     * Asked before anything is downloaded, because the duplicate worth preventing is the one a restore
+     * would create itself: fetching Telegram's copy of a photo that is already in the camera roll writes a
+     * second file, a second index row and a second backup record for one picture. Two ways of being that
+     * item are checked — a queue row pointing at this exact message, and a queue row whose recorded hash
+     * is the one the message's manifest carries. Both are joined against `media`, so an association left
+     * behind by a deleted file cannot answer "present".
+     *
+     * Returns one id rather than a list: a library with two rows for the same content is a question for
+     * Phase 6's duplicate detector, not something a restore should decide.
+     */
+    @Query(
+        """
+        SELECT b.media_store_id FROM backup_queue b
+        JOIN media m ON m.media_store_id = b.media_store_id
+        WHERE (b.chat_id = :chatId AND b.message_id = :messageId)
+           OR (:hash <> '' AND b.content_hash = :hash)
+        ORDER BY b.media_store_id LIMIT 1
+        """,
+    )
+    suspend fun residentBackupFor(chatId: Long, messageId: Long, hash: String): Long?
+
+    /**
+     * Records that this item's content is on the device *and* in that message, because the device just
+     * read it out of it.
+     *
+     * A restore is the strongest evidence this table can be given — stronger than recognition's hash
+     * match, which infers a stored copy from a caption — and it arrives on a row that may not exist yet,
+     * which is why this is an upsert rather than an `UPDATE`. Inserting it as
+     * [com.lumovault.app.domain.backup.UploadState.BackedUp] rather than `queued` is also the point: a
+     * row that passed through `queued` on its way here would be claimable by a worker in the window, and
+     * the result would be the user's own restored file uploaded a second time.
+     *
+     * The `WHERE state IN (:settleableStates)` guard is the same one [adoptFromRemote] runs on, and the
+     * caller passes it the same list: a `preparing` or `uploading` row belongs to a worker mid-send, and a
+     * restore that arrived while one was running must settle nothing on top of it. The hash written here is of the bytes that landed,
+     * which may legitimately differ from the manifest's — Telegram stores photos and videos in containers
+     * of its own — so what this row asserts is "this content is in that message", never "these are the
+     * bytes this device sent".
+     */
+    @Query(
+        """
+        INSERT INTO backup_queue (
+            media_store_id, state, chat_id, message_id, content_hash, content_size_bytes,
+            content_modified_seconds, hashed_at, queued_at, uploaded_at, updated_at
+        ) VALUES (:id, :backedUpState, :chatId, :messageId, :hash, :sizeBytes, :modifiedSeconds,
+            :now, :now, :now, :now)
+        ON CONFLICT(media_store_id) DO UPDATE SET
+            state = :backedUpState, chat_id = :chatId, message_id = :messageId, content_hash = :hash,
+            content_size_bytes = :sizeBytes, content_modified_seconds = :modifiedSeconds,
+            hashed_at = :now, uploaded_at = :now, updated_at = :now, failure = '', staged_path = ''
+        WHERE state IN (:settleableStates)
+        """,
+    )
+    suspend fun recordRestored(
+        id: Long,
+        chatId: Long,
+        messageId: Long,
+        hash: String,
+        sizeBytes: Long,
+        modifiedSeconds: Long,
+        backedUpState: String,
+        settleableStates: Collection<String>,
+        now: Long,
+    )
+
+    /**
      * Detaches a record from a backup that no longer describes it.
      *
      * The file behind a completed backup became different content, so the message holding the old bytes

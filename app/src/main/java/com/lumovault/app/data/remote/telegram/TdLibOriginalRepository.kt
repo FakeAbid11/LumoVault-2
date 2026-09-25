@@ -54,7 +54,7 @@ class TdLibOriginalRepository(
 
     override suspend fun download(
         original: RemoteOriginal,
-        onProgress: (DownloadProgress) -> Unit,
+        onProgress: suspend (DownloadProgress) -> Unit,
     ): OriginalDownload {
         if (original.remoteFileId.isBlank()) {
             return OriginalDownload.Failed(RestoreFailure(RestoreFailureKind.SourceGone))
@@ -107,7 +107,7 @@ class TdLibOriginalRepository(
     private suspend fun awaitTransfer(
         fileId: Int,
         declaredSize: Long,
-        onProgress: (DownloadProgress) -> Unit,
+        onProgress: suspend (DownloadProgress) -> Unit,
     ): OriginalDownload {
         var readable = 0L
         var lastAdvanceAt = nowMillis()

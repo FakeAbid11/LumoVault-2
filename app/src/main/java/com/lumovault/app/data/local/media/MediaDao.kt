@@ -60,6 +60,17 @@ interface MediaDao {
     suspend fun currentCount(): Int
 
     /**
+     * One item by its MediaStore id, or null when the index does not hold it.
+     *
+     * The lookup a restore and a deletion both have to make: the id is known exactly (MediaStore's own row
+     * id, which is what this table keys on), and the question is whether the scanner has caught up with it
+     * yet. Guessing from a filename instead would match the second copy of `IMG_0001.jpg` that every camera
+     * eventually produces.
+     */
+    @Query("SELECT * FROM media WHERE media_store_id = :id LIMIT 1")
+    suspend fun rowFor(id: Long): MediaEntity?
+
+    /**
      * Written in one transaction per chunk by the repository: a scan can produce tens of thousands
      * of rows, and one statement each would mean tens of thousands of fsyncs.
      */

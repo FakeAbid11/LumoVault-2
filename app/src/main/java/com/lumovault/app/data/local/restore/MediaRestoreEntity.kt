@@ -12,13 +12,18 @@ import com.lumovault.app.domain.restore.RestoreState
  * only identity a restore has before it finishes: there is no local file yet, and the MediaStore row is
  * created part-way through. It is also the identity the result has to be reconciled against afterwards.
  *
- * A row exists while work is happening for two reasons that a `StateFlow` in a ViewModel cannot serve. The
- * first is a process death mid-transfer: without this, the app comes back with a partial file in a temp
- * directory and nobody who remembers it was asked for — with it, startup has a list of paths to remove and
- * a state to report honestly. The second is that the Cloud grid and the item sheet are two different
- * places showing the same download, and two sources of truth for one progress bar disagree visibly.
+ * Nothing describing the *content* is stored here. The name, MIME type, size and remote id all belong to
+ * `cloud_media`, which is keyed by the same pair and is the index that is refreshed by a sync; repeating
+ * them would create a second answer to every question about a file that is, by definition, out of date the
+ * moment the index moves. What is kept is the transfer's own state, which exists nowhere else.
  *
- * [state] is a [RestoreState.storageKey] string, not an ordinal, like every other state column here.
+ * A row exists while work is happening for two reasons a `StateFlow` in a ViewModel cannot serve. The first
+ * is a process death mid-transfer: without this, the app comes back with a file in TDLib's cache that
+ * nobody remembers asking for — with it, startup has a list of ids to release and a state to report
+ * honestly. The second is that the Cloud grid and the item sheet are two places showing the same download,
+ * and two sources of truth for one progress bar disagree visibly.
+ *
+ * [state] holds a [RestoreState.storageKey] string, not an ordinal, like every other state column here.
  */
 @Entity(
     tableName = "media_restore",
@@ -34,38 +39,17 @@ data class MediaRestoreEntity(
     @ColumnInfo(name = "message_id")
     val messageId: Long,
 
-    /** `MediaType.storageKey`, which decides the MediaStore collection and the TDLib file type. */
-    @ColumnInfo(name = "media_type", defaultValue = "")
-    val mediaType: String = "",
+    /** TDLib's integer file id for the transfer; 0 until one exists. */
+    @ColumnInfo(name = "tdlib_file_id", defaultValue = "0")
+    val tdlibFileId: Int = 0,
 
-    @ColumnInfo(name = "mime_type", defaultValue = "")
-    val mimeType: String = "",
-
-    /** The name the cloud index knows. Used for the insert only; the local row's name comes from MediaStore. */
-    @ColumnInfo(name = "display_name", defaultValue = "")
-    val displayName: String = "",
-
-    /**
-     * Where the file will be saved, as a MediaStore `RELATIVE_PATH`.
-     *
-     * Stored rather than derived at save time because the choice is made once, when the request is taken:
-     * a retry after a restart must not land the same content in a second folder because the rule for
-     * choosing one changed.
-     */
-    @ColumnInfo(name = "relative_path", defaultValue = "")
-    val relativePath: String = "",
-
-    /** TDLib's `remote.id` for the original, which is what `getRemoteFile` is asked for. */
-    @ColumnInfo(name = "remote_file_id", defaultValue = "")
-    val remoteFileId: String = "",
-
-    /** The size the cloud index holds, used for the pre-flight space check and the progress denominator. */
-    @ColumnInfo(name = "expected_size_bytes", defaultValue = "0")
-    val expectedSizeBytes: Long = 0,
-
-    /** Bytes TDLib reported downloaded, from `local.downloadedPrefixSize + local.downloadedSize`. */
+    /** Bytes TDLib says are readable, from `local.downloadedPrefixSize`. */
     @ColumnInfo(name = "downloaded_bytes", defaultValue = "0")
     val downloadedBytes: Long = 0,
+
+    /** The size Telegram reported for its own copy, which is what a bar is measured against. */
+    @ColumnInfo(name = "expected_size_bytes", defaultValue = "0")
+    val expectedSizeBytes: Long = 0,
 
     @ColumnInfo(name = "state", defaultValue = "pending")
     val state: String = RestoreState.Pending.storageKey,
@@ -78,21 +62,15 @@ data class MediaRestoreEntity(
     @ColumnInfo(name = "media_store_id", defaultValue = "0")
     val mediaStoreId: Long = 0,
 
-    /** SHA-256 of the bytes that actually landed, which is what stops Phase 6 queueing a re-upload. */
+    /**
+     * SHA-256 of the bytes that landed, which is what stops Phase 6 queueing a re-upload.
+     *
+     * Deliberately *not* the hash in the message's manifest: those two numbers describe different files
+     * whenever Telegram stored its own re-encode, and recording the manifest's hash as this row's identity
+     * would claim a byte-for-byte match the app has not seen.
+     */
     @ColumnInfo(name = "content_hash", defaultValue = "")
     val contentHash: String = "",
-
-    /**
-     * TDLib's integer file id for the transfer this row is about; 0 until one exists.
-     *
-     * Stored instead of a path, because the only local file in a restore is inside TDLib's own cache and
-     * the only correct way to release it is `deleteFile` with that id — deleting the file from the
-     * filesystem behind TDLib's back leaves its bookkeeping pointing at a path that is gone. This is also
-     * what lets a row left live by a killed process be cleaned up on the next start, which is the whole
-     * reason the row is in a table.
-     */
-    @ColumnInfo(name = "tdlib_file_id", defaultValue = "0")
-    val tdlibFileId: Int = 0,
 
     @ColumnInfo(name = "requested_at", defaultValue = "0")
     val requestedAtSeconds: Long = 0,

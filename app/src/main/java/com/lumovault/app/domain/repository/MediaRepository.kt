@@ -31,6 +31,17 @@ interface MediaRepository {
      */
     suspend fun sync(): SyncResult
 
+    /**
+     * One item by its MediaStore id, or null when the index does not hold it.
+     *
+     * A restore needs this the moment it has created a file: the id is already known, because MediaStore
+     * hands out the same number it stores in `media.media_store_id`, and whether the scanner has caught up
+     * is a question with a yes-or-no answer rather than something to infer from a list. Free Up Space asks
+     * it again before deleting anything, because "eligible a minute ago" is not the same fact as "still
+     * here".
+     */
+    suspend fun local(mediaStoreId: Long): Media?
+
     /** Clears the index; used when media access is revoked, so stale rows are not shown. */
     suspend fun clear()
 }

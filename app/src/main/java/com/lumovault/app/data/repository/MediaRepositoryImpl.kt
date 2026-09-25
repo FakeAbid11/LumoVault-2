@@ -65,13 +65,11 @@ class MediaRepositoryImpl(
             // the row that described it; without this sweep the map quietly keeps markers for deleted photos
             // until the next time somebody notices one.
             metadata.cleanupOrphans()
-            // EXIF belongs to a file, not to a row that happened to survive a scan. When the file is gone
-            // the reading that described it is worth nothing and cannot be re-derived, so it goes with it —
-            // otherwise a library accumulates positions for photographs nobody still has.
-            metadata.cleanupOrphans()
             SyncResult(indexed = scanned.size, removed = removed)
         }
     }
+
+    override suspend fun local(mediaStoreId: Long): Media? = dao.rowFor(mediaStoreId)?.toMedia()
 
     override suspend fun clear() {
         database.withTransaction { dao.clear() }

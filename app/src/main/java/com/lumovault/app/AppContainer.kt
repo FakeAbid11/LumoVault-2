@@ -12,17 +12,21 @@ import com.lumovault.app.data.local.LumoVaultDatabase
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudMediaDao
+import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
+import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.data.local.organization.SystemAlbumDao
-import com.lumovault.app.data.local.metadata.MediaMetadataDao
-import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
+import com.lumovault.app.data.local.restore.MediaRestoreDao
 import com.lumovault.app.data.media.ContentResolverMediaHasher
 import com.lumovault.app.data.media.MediaFileStager
 import com.lumovault.app.data.media.MediaStoreLocalDeleter
+import com.lumovault.app.data.media.MediaStoreRestoredWriter
 import com.lumovault.app.data.metadata.ExifMediaMetadataReader
+import com.lumovault.app.data.remote.telegram.DeviceInfo
 import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
+import com.lumovault.app.data.remote.telegram.TdLibOriginalRepository
 import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
 import com.lumovault.app.data.remote.telegram.TdLibUploadRepository
 import com.lumovault.app.data.remote.telegram.TelegramAuthRepositoryImpl
@@ -30,16 +34,16 @@ import com.lumovault.app.data.remote.telegram.TelegramClient
 import com.lumovault.app.data.remote.telegram.TelegramClientInfo
 import com.lumovault.app.data.remote.telegram.TelegramCredentials
 import com.lumovault.app.data.remote.telegram.TelegramStorage
-import com.lumovault.app.data.remote.telegram.DeviceInfo
 import com.lumovault.app.data.repository.AlbumRepositoryImpl
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
-import com.lumovault.app.data.repository.MediaOrganizationRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
 import com.lumovault.app.data.repository.LocalPresenceLookup
 import com.lumovault.app.data.repository.MediaMetadataRepositoryImpl
+import com.lumovault.app.data.repository.MediaOrganizationRepositoryImpl
 import com.lumovault.app.data.repository.MediaRepositoryImpl
 import com.lumovault.app.data.repository.OnboardingRepositoryImpl
+import com.lumovault.app.data.repository.RestoreRepositoryImpl
 import com.lumovault.app.data.repository.SettingsRepositoryImpl
 import com.lumovault.app.data.repository.SystemPermissionsRepositoryImpl
 import com.lumovault.app.domain.backup.BackupQueueRepository
@@ -56,13 +60,17 @@ import com.lumovault.app.domain.repository.MediaMetadataRepository
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
+import com.lumovault.app.domain.repository.RestoreRepository
 import com.lumovault.app.domain.repository.SettingsRepository
+import com.lumovault.app.domain.restore.RestoredMediaWriter
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
-import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
+import com.lumovault.app.domain.telegram.TelegramOriginalRepository
+import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.usecase.ExtractMediaMetadataUseCase
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
+import com.lumovault.app.domain.usecase.RestoreCloudMediaUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
 import java.io.File
@@ -296,6 +304,63 @@ class AppContainer(context: Context) {
         // The same single client as authentication and the cloud scanner — TDLib permits one per
         // process, and an upload is a `sendMessage` like any other request.
         TdLibUploadRepository(client = telegramClient)
+    }
+
+    private val mediaRestoreDao: MediaRestoreDao by lazy { database.mediaRestoreDao() }
+
+    /** In-flight and finished restore requests — see [RestoreRepository]. */
+    val restoreRepository: RestoreRepository by lazy {
+        RestoreRepositoryImpl(dao = mediaRestoreDao, nowSeconds = ::unixNow)
+    }
+
+    /**
+     * Downloads originals through the same typed client as everything else, on the file type the cloud
+     * index recorded. A second TDLib client is not available to this process and `getRemoteFile` is not a
+     * transport — it is a lookup into the one client's own file table.
+     */
+    private val telegramOriginalRepository: TelegramOriginalRepository by lazy {
+        TdLibOriginalRepository(client = telegramClient)
+    }
+
+    /**
+     * Files a downloaded original into MediaStore.
+     *
+     * `downloadDirectory` is TDLib's own cache because that is where the bytes land, and `mediaVolume` is
+     * the app's external files directory used only as a *probe* of the shared volume's free space — asking
+     * `Environment.getExternalStorageDirectory()` for its space is deprecated from API 29, and this path is
+     * on the same volume MediaStore's primary collection lives on without needing a permission to stat it.
+     */
+    private val restoredMediaWriter: RestoredMediaWriter by lazy {
+        MediaStoreRestoredWriter(
+            resolver = appContext.contentResolver,
+            downloadDirectory = telegramStorage().filesDirectory,
+            mediaVolume = appContext.getExternalFilesDir(null) ?: appContext.filesDir,
+        )
+    }
+
+    /** PRD section 52's flow, end to end. */
+    val restoreCloudMedia: RestoreCloudMediaUseCase by lazy {
+        RestoreCloudMediaUseCase(
+            restores = restoreRepository,
+            downloads = telegramOriginalRepository,
+            writer = restoredMediaWriter,
+            queue = backupQueueRepository,
+            media = mediaRepository,
+            hasher = mediaContentHasher,
+            scope = applicationScope,
+        )
+    }
+
+    /**
+     * Settles restores a previous process left mid-transfer, before anything can draw a progress bar.
+     *
+     * Run from the Cloud screen's first composition rather than from Application.onCreate: releasing a file
+     * needs TDLib, and TDLib is not started by this class until something asks for Telegram. Nothing is lost
+     * by the delay — the row is honest about being live either way, and the file it names is in the app's own
+     * cache, which the system may reclaim regardless.
+     */
+    fun reconcileRestores() {
+        applicationScope.launch { restoreCloudMedia.reconcileAfterStart() }
     }
 
     /**

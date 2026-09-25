@@ -18,14 +18,16 @@ interface TelegramOriginalRepository {
     /**
      * Downloads [original] to a file TDLib owns, reporting byte progress as it goes.
      *
-     * [onProgress] is called with TDLib's own counters and only when they advance, so a caller can drive a
-     * real bar from it and show nothing at all when the size is unknown. The coroutine is the cancellation
-     * mechanism: cancelling this call tells TDLib to stop and releases whatever it had, rather than leaving
-     * a transfer running behind a screen that has gone.
+     * [onProgress] is called with TDLib's own counters and only when they advance — so a caller can drive a
+     * real bar from it, record it in Room, and show nothing at all when the size is unknown. It is a
+     * suspending callback because the useful thing to do with progress is write it down somewhere durable.
+     *
+     * The coroutine is the cancellation mechanism: cancelling this call tells TDLib to stop and releases
+     * whatever it had, rather than leaving bytes arriving for a screen that has gone.
      */
     suspend fun download(
         original: RemoteOriginal,
-        onProgress: (DownloadProgress) -> Unit = {},
+        onProgress: suspend (DownloadProgress) -> Unit = {},
     ): OriginalDownload
 
     /**

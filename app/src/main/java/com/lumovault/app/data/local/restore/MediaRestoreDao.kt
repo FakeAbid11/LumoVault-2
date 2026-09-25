@@ -106,6 +106,10 @@ interface MediaRestoreDao {
     )
     suspend fun advance(chatId: Long, messageId: Long, state: String, downloadedBytes: Long, updatedAt: Long): Int
 
+    /** A phase change that says nothing about bytes — verifying, and saving. */
+    @Query("UPDATE media_restore SET state = :state, updated_at = :updatedAt WHERE chat_id = :chatId AND message_id = :messageId")
+    suspend fun setState(chatId: Long, messageId: Long, state: String, updatedAt: Long): Int
+
     /**
      * Settles a restore that made it as far as MediaStore.
      *
