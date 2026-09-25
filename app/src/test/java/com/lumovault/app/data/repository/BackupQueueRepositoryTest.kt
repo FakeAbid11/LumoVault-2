@@ -201,8 +201,11 @@ class BackupQueueRepositoryTest {
         assertNull(states[3L])
     }
 
+    // `runBlocking<Unit>` because assertThrows hands back the throwable it caught: with the inferred
+    // Unit this method would return Throwable, and JUnit rejects a non-void @Test by refusing to run
+    // the whole class rather than reporting this one.
     @Test
-    fun aStateThisBuildCannotNameFailsClosedInsteadOfReQueueingItself() = runBlocking {
+    fun aStateThisBuildCannotNameFailsClosedInsteadOfReQueueingItself() = runBlocking<Unit> {
         val claimed = requireNotNull(claimedRequest())
         dao.forceRawState(claimed.mediaStoreId, "somesuch")
 
