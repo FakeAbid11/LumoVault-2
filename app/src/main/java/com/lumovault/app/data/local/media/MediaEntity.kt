@@ -9,9 +9,12 @@ import androidx.room.PrimaryKey
  * One indexed media file. The columns are exactly the metadata PRD section 61 asks the local
  * index to carry — nothing speculative.
  *
- * Backup-related state deliberately does *not* live here. PRD section 61 models it as its own
- * record (hash, Telegram message id, upload state, verified time), so Phase 6 adds a second table
- * keyed by [mediaStoreId] instead of widening this one and forcing every row to be rewritten.
+ * Backup state deliberately does *not* live here. PRD section 61 models it as its own record (hash,
+ * Telegram message id, upload state), and Phase 6 put those columns on `backup_queue` rather than on this
+ * table for the reason this comment was written for in the first place: a media row is rewritten from
+ * MediaStore on every scan and pruned when a row disappears, and a content hash — the one value that has
+ * to outlive a re-scan, and survive a MediaStore renumbering — cannot live on a row whose writer is the
+ * thing being checked.
  */
 @Entity(
     tableName = "media",

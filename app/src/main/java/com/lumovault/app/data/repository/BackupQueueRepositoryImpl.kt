@@ -4,12 +4,15 @@ import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.backup.ClaimedBackupRow
 import com.lumovault.app.domain.backup.BackupFailure
 import com.lumovault.app.domain.backup.BackupFailureKind
+import com.lumovault.app.domain.backup.BackupIdentityCandidate
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.backup.BackupRequest
+import com.lumovault.app.domain.backup.MediaIdentity
 import com.lumovault.app.domain.backup.UploadState
 import com.lumovault.app.domain.backup.UploadTransitions
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -44,6 +47,11 @@ class BackupQueueRepositoryImpl(
                     UploadState.BackedUp -> summary.copy(backedUp = summary.backedUp + row.itemCount)
                     UploadState.Failed -> summary.copy(failed = summary.failed + row.itemCount)
 
+                    // Known content with nowhere stored. It is the majority of a recognised library, and
+                    // counting it would put a number on the progress line that describes photos the user
+                    // never asked to back up.
+                    UploadState.NotBackedUp -> summary
+
                     // Withdrawn rather than pending or done. Counting it anywhere would put a number
                     // on screen that no user action explains.
                     UploadState.Cancelled -> summary
@@ -53,14 +61,82 @@ class BackupQueueRepositoryImpl(
 
     override suspend fun enqueue(mediaStoreIds: Collection<Long>): Int {
         if (mediaStoreIds.isEmpty()) return 0
-        // Room gives an INSERT no row count, so the difference across the statement is what "how many
-        // did you take" means here — and it counts only ids that ended up with a row, so an item that
+        val now = nowSeconds()
+
+        // Two populations, because recognition may have met these items first. A tap on "Back Up" has to
+        // reach into both: rows that exist and are merely *known*, and items with no row at all yet.
+        val promoted = dao.promoteRecognized(
+            ids = mediaStoreIds,
+            queuedState = UploadState.Queued.storageKey,
+            fromState = UploadState.NotBackedUp.storageKey,
+            now = now,
+        )
+
+        // Room gives an INSERT no row count, so the difference across the statement is what "how many did
+        // you take" means for the rest — and it counts only ids that ended up with a row, so an item that
         // left the media index between the tap and the query is reported as not queued rather than as
         // queued and then failed.
         val before = dao.countExisting(mediaStoreIds)
-        dao.insertMissing(mediaStoreIds, UploadState.Queued.storageKey, nowSeconds())
-        return dao.countExisting(mediaStoreIds) - before
+        dao.insertMissing(mediaStoreIds, UploadState.Queued.storageKey, now)
+        return promoted + (dao.countExisting(mediaStoreIds) - before)
     }
+
+    override suspend fun identityCandidates(
+        includeWholeLibrary: Boolean,
+        limit: Int,
+    ): List<BackupIdentityCandidate> {
+        if (limit <= 0) return emptyList()
+        val rows = if (includeWholeLibrary) {
+            dao.libraryIdentityCandidates(limit)
+        } else {
+            dao.recordIdentityCandidates(limit)
+        }
+        return rows.map { row ->
+            BackupIdentityCandidate(
+                mediaStoreId = row.mediaStoreId,
+                contentUri = row.contentUri,
+                mediaType = MediaType.fromStorageKey(row.mediaType),
+                mimeType = row.mimeType,
+                displayName = row.displayName,
+                sizeBytes = row.sizeBytes,
+                modifiedSeconds = row.modifiedSeconds,
+                knownHash = row.knownHash.orEmpty(),
+                state = row.stateKey?.let(UploadState::fromStorageKey),
+            )
+        }
+    }
+
+    override suspend fun recordIdentity(mediaStoreId: Long, identity: MediaIdentity) {
+        dao.recordIdentity(
+            id = mediaStoreId,
+            notBackedUpState = UploadState.NotBackedUp.storageKey,
+            hash = identity.contentHash,
+            sizeBytes = identity.observedSizeBytes,
+            modifiedSeconds = identity.observedModifiedSeconds,
+            hashedAt = nowSeconds(),
+        )
+    }
+
+    override suspend fun adoptRemote(mediaStoreId: Long, remote: RemoteBackup): Boolean =
+        dao.adoptFromRemote(
+            id = mediaStoreId,
+            chatId = remote.chatId,
+            messageId = remote.messageId,
+            backedUpState = UploadState.BackedUp.storageKey,
+            fromStates = ADOPTABLE_STATES,
+            now = nowSeconds(),
+        ) > 0
+
+    override suspend fun revokeAssociation(mediaStoreId: Long): Boolean =
+        dao.revokeAssociation(
+            id = mediaStoreId,
+            toState = UploadState.NotBackedUp.storageKey,
+            fromStates = REVOCABLE_STATES,
+            now = nowSeconds(),
+        ) > 0
+
+    override suspend fun hasQueuedWork(): Boolean =
+        dao.countIn(UploadState.Queued.storageKey) > 0
 
     override suspend fun claimNext(chatId: Long): BackupRequest? {
         val now = nowSeconds()
@@ -96,12 +172,16 @@ class BackupQueueRepositoryImpl(
             contentUri = contentUri,
             displayName = row.displayName.orEmpty(),
             expectedSizeBytes = row.sizeBytes ?: 0L,
+            modifiedSeconds = row.modifiedSeconds ?: 0L,
             width = row.width ?: 0,
             height = row.height ?: 0,
             durationMillis = row.durationMillis,
             state = UploadState.Preparing,
+            contentHash = row.contentHash,
+            contentSizeBytes = row.contentSizeBytes,
+            contentModifiedSeconds = row.contentModifiedSeconds,
             telegramChatId = row.chatId,
-            telegramMessageId = 0L,
+            telegramMessageId = row.messageId,
             attempts = row.attempts,
             failure = row.failureKey.toFailure(),
         )
@@ -174,6 +254,26 @@ class BackupQueueRepositoryImpl(
          * something the network will eventually fix.
          */
         const val ATTEMPT_CAP = 4
+
+        /**
+         * The states a worker does not own. A row in one of these can be settled by recognition alone,
+         * because nothing is in flight to contradict the write — and every one of them is a state the user
+         * can legitimately see a ✓ arrive on.
+         */
+        val ADOPTABLE_STATES: List<String> = listOf(
+            UploadState.NotBackedUp,
+            UploadState.Queued,
+            UploadState.Failed,
+            UploadState.Cancelled,
+            UploadState.BackedUp,
+        ).map(UploadState::storageKey)
+
+        /**
+         * The states that assert a stored home, and are therefore the only ones a revoked association
+         * should ever be taken from. Queued work is the user's to cancel, and in-flight work a worker's to
+         * settle — neither is a scan's to rewrite.
+         */
+        val REVOCABLE_STATES: List<String> = listOf(UploadState.BackedUp.storageKey)
     }
 }
 

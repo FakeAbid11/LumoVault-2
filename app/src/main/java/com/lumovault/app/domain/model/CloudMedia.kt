@@ -31,17 +31,30 @@ data class CloudMedia(
     val remoteFileId: String,
     val previewRemoteFileId: String,
     /**
-     * Caption text. Phase 4 stores it because it is part of the message, and it is also where the
-     * future manifest travels; [com.lumovault.app.domain.telegram.LumoVaultStorageProtocol.isMarker]
-     * is run against it during validation.
+     * Caption text, stored because it is part of the message — and because for a LumoVault backup it is
+     * also the manifest: [com.lumovault.app.domain.telegram.BackupManifestFormat] writes the content hash
+     * into the media message's own caption, and reads it back here during a scan. Kept raw so the Cloud
+     * screen can show what a user actually typed on a photo they added themselves.
      */
     val caption: String,
+    /**
+     * SHA-256 this message declares, lowercase hex; empty when it declares none.
+     *
+     * Empty is a real and common answer: every backup uploaded before Phase 6, and every photo the user
+     * put in the channel by hand. It is never filled by inference, because a hash this message does not
+     * carry cannot later explain why a local file was considered stored.
+     */
+    val contentHash: String,
 ) {
     val hasPreview: Boolean
         get() = previewRemoteFileId.isNotBlank()
 
     val hasDimensions: Boolean
         get() = width > 0 && height > 0
+
+    /** Whether this message identifies its own content, which is what makes it matchable. */
+    val isLumoVaultBackup: Boolean
+        get() = contentHash.isNotBlank()
 }
 
 /**

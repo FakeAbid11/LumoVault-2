@@ -19,11 +19,31 @@ class BackupCellStatusTest {
     fun everyQueueStateHasAMarkAndNothingQueuedHasNone() {
         assertEquals(BackupCellStatus.Unbacked, backupCellStatus(null))
         assertEquals(BackupCellStatus.Unbacked, backupCellStatus(UploadState.Cancelled))
+        assertEquals(BackupCellStatus.Unbacked, backupCellStatus(UploadState.NotBackedUp))
         assertEquals(BackupCellStatus.Queued, backupCellStatus(UploadState.Queued))
         assertEquals(BackupCellStatus.Preparing, backupCellStatus(UploadState.Preparing))
         assertEquals(BackupCellStatus.Uploading, backupCellStatus(UploadState.Uploading))
         assertEquals(BackupCellStatus.BackedUp, backupCellStatus(UploadState.BackedUp))
         assertEquals(BackupCellStatus.Failed, backupCellStatus(UploadState.Failed))
+    }
+
+    @Test
+    fun aRecognisedFileAndAnUnknownOneLookIdenticalOnAThumbnail() {
+        // Phase 6 puts a record on disk for a file it has only ever hashed, and the grid must not learn
+        // anything from that. PRD section 13 asks for a mark that stays subtle; a "measured but never
+        // asked about" glyph would put the app's own bookkeeping on the user's photos.
+        val overview = BackupOverview(states = mapOf(7L to UploadState.NotBackedUp))
+
+        assertEquals(overview.statusOf(8L), overview.statusOf(7L))
+        assertEquals(BackupCellStatus.Unbacked, overview.statusOf(7L))
+        assertEquals(
+            "and a recognised item is still not a queue, so selection stays where it was",
+            false,
+            BackupOverview(
+                states = mapOf(7L to UploadState.NotBackedUp),
+                summary = BackupQueueSummary(),
+            ).selectionEnabled,
+        )
     }
 
     @Test

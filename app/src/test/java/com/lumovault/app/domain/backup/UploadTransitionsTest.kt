@@ -21,11 +21,33 @@ class UploadTransitionsTest {
     }
 
     @Test
-    fun `a row cannot reach the done state without passing through an upload`() {
+    fun `a row cannot reach the done state without something standing behind it`() {
+        // A queued row has no owner and no evidence, so nothing may close it from here. `Preparing` is the
+        // one exception, and it is narrow: the worker that holds that claim may close it only with a
+        // message id read out of the remote index, which is recognition finding the content already
+        // stored — an outcome with more behind it than a send would have had.
         assertFalse(UploadTransitions.isLegal(UploadState.Queued, UploadState.BackedUp))
-        assertFalse(UploadTransitions.isLegal(UploadState.Preparing, UploadState.BackedUp))
+        assertFalse(UploadTransitions.isLegal(UploadState.NotBackedUp, UploadState.BackedUp))
         assertFalse(UploadTransitions.isLegal(UploadState.Failed, UploadState.BackedUp))
         assertFalse(UploadTransitions.isLegal(UploadState.Cancelled, UploadState.BackedUp))
+        assertTrue(UploadTransitions.isLegal(UploadState.Preparing, UploadState.BackedUp))
+    }
+
+    @Test
+    fun `recognition moves a known item into the queue and takes a changed one out of the done state`() {
+        // Phase 6's two legitimate edges: a tap on "Back Up" over an item the scan already identified,
+        // and PRD section 71's case where the file behind a completed backup became different content.
+        assertTrue(UploadTransitions.isLegal(UploadState.NotBackedUp, UploadState.Queued))
+        assertTrue(UploadTransitions.isLegal(UploadState.BackedUp, UploadState.NotBackedUp))
+
+        assertFalse(
+            "an identity is not a send: knowing what a file is does not retire anything",
+            UploadTransitions.isLegal(UploadState.NotBackedUp, UploadState.Uploading),
+        )
+        assertFalse(
+            "and a revoked item does not go back into the queue by itself — that is the user's call",
+            UploadTransitions.isLegal(UploadState.NotBackedUp, UploadState.Preparing),
+        )
     }
 
     @Test
@@ -67,6 +89,7 @@ class UploadTransitionsTest {
         assertTrue(UploadState.Preparing.isInFlight)
         assertTrue(UploadState.Uploading.isInFlight)
         assertFalse(UploadState.Queued.isInFlight)
+        assertFalse(UploadState.NotBackedUp.isInFlight)
         assertFalse(UploadState.BackedUp.isInFlight)
         assertFalse(UploadState.Failed.isInFlight)
         assertFalse(UploadState.Cancelled.isInFlight)
@@ -75,13 +98,16 @@ class UploadTransitionsTest {
     @Test
     fun `storage keys are stable strings, never ordinals`() {
         // Stored rows on installs already in use hold these values, so reordering the enum must not
-        // change what an existing row means.
+        // change what an existing row means — which is also why Phase 6 could add a state anywhere in it
+        // without a migration.
         assertEquals("queued", UploadState.Queued.storageKey)
         assertEquals("preparing", UploadState.Preparing.storageKey)
         assertEquals("uploading", UploadState.Uploading.storageKey)
         assertEquals("backed_up", UploadState.BackedUp.storageKey)
         assertEquals("failed", UploadState.Failed.storageKey)
         assertEquals("cancelled", UploadState.Cancelled.storageKey)
+        assertEquals("not_backed_up", UploadState.NotBackedUp.storageKey)
+        assertEquals(UploadState.NotBackedUp, UploadState.fromStorageKey("not_backed_up"))
     }
 
     @Test
@@ -90,6 +116,10 @@ class UploadTransitionsTest {
         assertTrue(BackupFailureKind.RateLimited.retryable)
         assertTrue(BackupFailureKind.NotAuthenticated.retryable)
         assertTrue(BackupFailureKind.Unknown.retryable)
+        assertTrue(
+            "a file that moved mid-copy is worth another pass: re-identifying it may show it needs no upload",
+            BackupFailureKind.SourceChanged.retryable,
+        )
 
         assertFalse(BackupFailureKind.SourceMissing.retryable)
         assertFalse(BackupFailureKind.SourceUnreadable.retryable)

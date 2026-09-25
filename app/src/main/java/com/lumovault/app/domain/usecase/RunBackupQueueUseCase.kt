@@ -9,6 +9,7 @@ import com.lumovault.app.domain.backup.StagedSource
 import com.lumovault.app.domain.backup.TelegramUploadRepository
 import com.lumovault.app.domain.backup.UploadEvent
 import com.lumovault.app.domain.backup.UploadRequest
+import com.lumovault.app.domain.telegram.BackupManifest
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -29,10 +30,19 @@ data class BackupProgress(val mediaStoreId: Long, val displayName: String, val f
  * dropped connection into a hundred, and on mobile data it costs the user money.
  */
 sealed interface QueueRun {
-    data class Done(val sent: Int, val failed: Int, val deferred: Boolean) : QueueRun
+    data class Done(
+        val sent: Int,
+        val failed: Int,
+        val deferred: Boolean,
+        /** Items this pass found already stored and closed without sending — Phase 6's whole point. */
+        val deduplicated: Int = 0,
+    ) : QueueRun
     data object NoChannel : QueueRun
     data object TelegramUnavailable : QueueRun
 }
+
+/** What became of one claimed item. */
+private enum class ItemRun { Sent, Deduplicated, Failed }
 
 /**
  * Drains the backup queue: claim one item, put its bytes where TDLib can read them, send them as the
@@ -42,7 +52,7 @@ sealed interface QueueRun {
  * is owed, MediaStore for the bytes, Telegram for the copy — so it belongs here rather than in the
  * worker that triggers it, or in a repository that would have to pretend to know about the others.
  *
- * Four rules it exists to hold:
+ * Five rules it exists to hold:
  * - One item at a time. TDLib uploads as part of sending, so concurrent sends mean concurrent file
  *   streams and memory spikes on exactly the devices this app targets. Reliability before throughput.
  * - Every outcome writes a state, including the failures that happen before Telegram is involved. A row
@@ -51,11 +61,15 @@ sealed interface QueueRun {
  * - A failure belongs to the item that failed. In a queue of five where one file was deleted, four
  *   back up and one is reported — not zero.
  * - Nothing is attempted twice in one pass.
+ * - Nothing is sent before its content is identified, and an item whose content the channel already holds
+ *   is closed against that message rather than uploaded again. Phase 5 could not know this; Phase 6 is
+ *   the phase that does, and a duplicate in the user's own library is the failure it exists to prevent.
  */
 class RunBackupQueueUseCase(
     private val queue: BackupQueueRepository,
     private val upload: TelegramUploadRepository,
     private val stager: MediaSourceStager,
+    private val recognition: RecognizeBackupUseCase,
     private val resolveChannel: suspend () -> Long,
 ) {
     suspend fun run(onProgress: suspend (BackupProgress) -> Unit = {}): QueueRun {
@@ -69,6 +83,7 @@ class RunBackupQueueUseCase(
 
         var sent = 0
         var failed = 0
+        var deduplicated = 0
         // Bounded by the queue itself: one entry per item this pass was refused, which is also the
         // worst case for how long the loop can run.
         val deferred = mutableSetOf<Long>()
@@ -83,13 +98,17 @@ class RunBackupQueueUseCase(
                 break
             }
 
-            if (send(chatId, request, onProgress)) sent++ else {
-                failed++
-                deferred += request.mediaStoreId
+            when (send(chatId, request, onProgress)) {
+                ItemRun.Sent -> sent++
+                ItemRun.Deduplicated -> deduplicated++
+                ItemRun.Failed -> {
+                    failed++
+                    deferred += request.mediaStoreId
+                }
             }
         }
 
-        return QueueRun.Done(sent, failed, deferred = deferred.isNotEmpty())
+        return QueueRun.Done(sent, failed, deferred = deferred.isNotEmpty(), deduplicated = deduplicated)
     }
 
     /** Withdraws everything still waiting. An in-flight send is left to finish on its own. */
@@ -102,24 +121,51 @@ class RunBackupQueueUseCase(
         chatId: Long,
         request: BackupRequest,
         onProgress: suspend (BackupProgress) -> Unit,
-    ): Boolean {
+    ): ItemRun {
         // A `when` over the sealed cases rather than an `if (x !is Ready)` guard: the exhaustive form is
         // the one whose branch types the compiler refines, and the unavailable branch is `Nothing`, so
         // the expression's type is the ready one with no cast.
         val staged = when (val source = stager.stage(request.contentUri, request.displayName)) {
             is StagedSource.Unavailable -> {
                 queue.release(request, source.failure)
-                return false
+                return ItemRun.Failed
             }
 
             is StagedSource.Ready -> source
         }
 
         queue.markStaged(request.mediaStoreId, staged.path)
+
+        // Nothing is sent before its content is identified. This is the step that answers the question a
+        // queue cannot ask on its own — "is the thing you are about to upload already in the channel?" —
+        // and it is asked after staging rather than before so that the hash and the bytes belong to the
+        // same file: the copy on disk is the thing Telegram is about to receive.
+        val manifest = when (
+            val identity = recognition.resolveForUpload(request, staged.path, staged.sizeBytes)
+        ) {
+            is UploadIdentity.Unreadable -> {
+                stager.discard(staged.path)
+                queue.release(request, identity.failure)
+                return ItemRun.Failed
+            }
+
+            is UploadIdentity.AlreadyStored -> {
+                // The copy was never needed, and the row closes against the message that already holds
+                // this content. `markBackedUp` takes its message id from the remote index, so the ✓ that
+                // appears on this thumbnail is a fact about the user's channel rather than an assumption
+                // about a send.
+                stager.discard(staged.path)
+                queue.markBackedUp(request.mediaStoreId, identity.remote.chatId, identity.remote.messageId)
+                return ItemRun.Deduplicated
+            }
+
+            is UploadIdentity.Sendable -> identity.manifest
+        }
+
         queue.markUploading(request.mediaStoreId)
 
         val terminal = try {
-            upload.upload(chatId, request.toUpload(staged))
+            upload.upload(chatId, request.toUpload(staged, manifest))
                 .transform { event ->
                     // Progress is forwarded and dropped; the last event decides the row's state, so it
                     // has to be the only thing that survives the flow.
@@ -148,12 +194,12 @@ class RunBackupQueueUseCase(
         return when (terminal) {
             is UploadEvent.Sent -> {
                 queue.markBackedUp(request.mediaStoreId, terminal.chatId, terminal.messageId)
-                true
+                ItemRun.Sent
             }
 
             is UploadEvent.Refused -> {
                 queue.release(request, terminal.failure)
-                false
+                ItemRun.Failed
             }
 
             // Nothing terminal came back — either the flow ended silently or it stopped on a progress
@@ -161,7 +207,7 @@ class RunBackupQueueUseCase(
             // is the honest answer rather than a failure invented on its behalf.
             null, is UploadEvent.Progress -> {
                 queue.release(request, BackupFailure(BackupFailureKind.Unknown))
-                false
+                ItemRun.Failed
             }
         }
     }
@@ -172,7 +218,7 @@ class RunBackupQueueUseCase(
     }
 }
 
-private fun BackupRequest.toUpload(staged: StagedSource.Ready) = UploadRequest(
+private fun BackupRequest.toUpload(staged: StagedSource.Ready, manifest: BackupManifest) = UploadRequest(
     mediaStoreId = mediaStoreId,
     mediaType = mediaType,
     mimeType = mimeType,
@@ -183,4 +229,5 @@ private fun BackupRequest.toUpload(staged: StagedSource.Ready) = UploadRequest(
     width = width,
     height = height,
     durationMillis = durationMillis,
+    manifest = manifest,
 )

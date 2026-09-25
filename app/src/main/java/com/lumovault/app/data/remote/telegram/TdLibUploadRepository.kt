@@ -6,6 +6,8 @@ import com.lumovault.app.domain.backup.TelegramUploadRepository
 import com.lumovault.app.domain.backup.UploadEvent
 import com.lumovault.app.domain.backup.UploadRequest
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.BackupManifest
+import com.lumovault.app.domain.telegram.BackupManifestFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -26,11 +28,16 @@ import org.drinkless.tdlib.TdApi
  * upload call and why the timeout is measured in hours rather than the two minutes a metadata read is
  * given.
  *
- * What this cannot promise is that Telegram stores those bytes unchanged: Telegram re-encodes the
- * photo and video containers as it chooses, and an animation may be transcoded to a looping video.
- * The original is preserved as far as Telegram's media path permits, which is a property of the server
- * and not of this call — Phase 6's content hash is what will tell a user whether what comes back
- * matches what went in.
+ * What this cannot promise is that Telegram stores those bytes unchanged: Telegram re-encodes the photo
+ * and video containers as it chooses, and an animation may be transcoded to a looping video. The original
+ * is preserved as far as Telegram's media path permits, which is a property of the server and not of this
+ * call.
+ *
+ * The manifest in the caption says so precisely, and that precision is what keeps Phase 6 honest. The hash
+ * it carries is of the bytes *this call sent*, which is the fact recognition needs — "the file on this
+ * phone with digest X is already in the channel" — and it is emphatically not a claim that Telegram's
+ * stored copy still hashes to X, because nothing here downloads it to check. Recognising a backup is done
+ * against what the user's own device hashed, never against a server-side echo of it.
  */
 class TdLibUploadRepository(
     private val client: TelegramClient,
@@ -94,7 +101,10 @@ class TdLibUploadRepository(
                 photo.addedStickerFileIds = IntArray(0)
                 photo.width = request.width
                 photo.height = request.height
-                TdApi.InputMessagePhoto().apply { this.photo = photo; caption = emptyCaption() }
+                TdApi.InputMessagePhoto().apply {
+                    this.photo = photo
+                    caption = captionFor(request.manifest)
+                }
             }
 
             MediaType.Video -> {
@@ -109,7 +119,10 @@ class TdLibUploadRepository(
                 video.height = request.height
                 // Asks Telegram to present it as streamable. It changes no byte of what is sent.
                 video.supportsStreaming = true
-                TdApi.InputMessageVideo().apply { this.video = video; caption = emptyCaption() }
+                TdApi.InputMessageVideo().apply {
+                    this.video = video
+                    caption = captionFor(request.manifest)
+                }
             }
 
             MediaType.Gif -> {
@@ -120,7 +133,10 @@ class TdLibUploadRepository(
                 animation.duration = request.durationSeconds
                 animation.width = request.width
                 animation.height = request.height
-                TdApi.InputMessageAnimation().apply { this.animation = animation; caption = emptyCaption() }
+                TdApi.InputMessageAnimation().apply {
+                    this.animation = animation
+                    caption = captionFor(request.manifest)
+                }
             }
         }
 
@@ -137,15 +153,16 @@ class TdLibUploadRepository(
     }
 
     /**
-     * An empty [TdApi.FormattedText] rather than a null one: `entities` is a vector TDLib iterates.
+     * The message's caption: this backup's manifest, so the stored file says what content it is.
      *
-     * A caption is deliberately not carried over from the local file — Telegram keeps no place for it
-     * on an ordinary media message from another account, and Phase 6's manifest will travel in a
-     * message of its own rather than in a field nothing reads today.
+     * A [TdApi.FormattedText] with an empty entity array rather than a null one, because `entities` is a
+     * vector TDLib iterates. No text entity is declared over the manifest — it is metadata, not formatted
+     * text, and an entity whose range did not survive Telegram's own parsing would be a claim about
+     * something this call cannot check.
      */
-    private fun emptyCaption(): TdApi.FormattedText {
+    private fun captionFor(manifest: BackupManifest): TdApi.FormattedText {
         val caption = TdApi.FormattedText()
-        caption.text = ""
+        caption.text = BackupManifestFormat.encode(manifest)
         caption.entities = emptyArray()
         return caption
     }

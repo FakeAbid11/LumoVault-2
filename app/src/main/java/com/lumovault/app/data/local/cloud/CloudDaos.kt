@@ -23,6 +23,47 @@ interface CloudMediaDao {
     @Query("SELECT COUNT(*) FROM cloud_media")
     suspend fun currentCount(): Int
 
+    /**
+     * The remote message that already holds these exact bytes, or null when nothing does.
+     *
+     * This is the query Phase 6 turns on: a SHA-256 of a local file in, a Telegram message id out. It is
+     * indexed ([CloudMediaEntity.contentHash]) because it runs once per item the app hashes, and because
+     * on a ten-thousand-message channel the unindexed alternative is a scan per photo.
+     *
+     * Oldest message wins when two carry the same hash, which is a real state rather than a bug: two
+     * phones can back up the same file, or an interrupted send can be retried. Any one of them is a
+     * correct home for the content, and picking deterministically means the same local file resolves to
+     * the same message on every pass instead of flickering between them.
+     */
+    @Query(
+        """
+        SELECT message_id AS messageId, chat_id AS chatId FROM cloud_media
+        WHERE content_hash = :hash ORDER BY message_id ASC LIMIT 1
+        """,
+    )
+    suspend fun backupFor(hash: String): RemoteBackupRow?
+
+    /**
+     * How many remote manifests no local record claims.
+     *
+     * This is the number that decides whether hashing anything is worth doing: recognition can only match
+     * content against a remote index that still has unmatched entries in it, so a library of 100,000
+     * files whose backups are all recognised costs zero file reads. When the number is 1,000 — a
+     * reinstall — the same figure bounds the work that matters.
+     *
+     * The join into `backup_queue` is deliberate and read-only. "Unrecognised" is a fact about the pair of
+     * indexes rather than about either alone, and the alternative was the same statement living on the
+     * other table, reaching into this one.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM cloud_media c
+        WHERE c.content_hash <> ''
+          AND NOT EXISTS (SELECT 1 FROM backup_queue b WHERE b.content_hash = c.content_hash)
+        """,
+    )
+    suspend fun unrecognizedManifestCount(): Int
+
     @Upsert
     suspend fun upsertAll(items: List<CloudMediaEntity>)
 
@@ -40,6 +81,12 @@ interface CloudMediaDao {
 data class CloudTypeCountRow(
     val mediaType: String,
     val itemCount: Int,
+)
+
+/** Where the channel says these exact bytes already live. Mapped to the domain in the repository. */
+data class RemoteBackupRow(
+    val messageId: Long,
+    val chatId: Long,
 )
 
 @Dao

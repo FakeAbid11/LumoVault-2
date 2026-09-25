@@ -1,6 +1,7 @@
 package com.lumovault.app.domain.backup
 
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.BackupManifest
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -15,12 +16,22 @@ data class UploadRequest(
     val mediaType: MediaType,
     val mimeType: String,
     val stagedPath: String,
-    /** Bytes as counted while staging, which is the figure Telegram will actually receive. */
+    /** Bytes of the staged copy, which is the figure Telegram will actually receive. */
     val sizeBytes: Long,
     val displayName: String,
     val width: Int,
     val height: Int,
     val durationMillis: Long?,
+    /**
+     * What the message must declare about these bytes, written into its caption so the backup can identify
+     * itself after a reinstall.
+     *
+     * Not optional in Phase 6. An upload without a manifest is a photo the user has stored and LumoVault
+     * cannot recognise — it will be uploaded a second time some day, to a channel that already holds it —
+     * which is the exact failure this phase exists to prevent, so there is no path here that sends without
+     * one.
+     */
+    val manifest: BackupManifest,
 )
 
 /**

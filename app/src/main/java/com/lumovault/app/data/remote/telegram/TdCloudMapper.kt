@@ -3,6 +3,7 @@ package com.lumovault.app.data.remote.telegram
 import com.lumovault.app.domain.model.CloudDateSource
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.BackupManifestFormat
 import com.lumovault.app.domain.telegram.LumoVaultStorageProtocol
 import org.drinkless.tdlib.TdApi
 
@@ -34,16 +35,26 @@ internal object TdCloudMapper {
             else -> null
         } ?: return null
 
+        // The manifest is what a LumoVault backup says about its own content. Null for anything the user
+        // dropped into the channel by hand, and for every backup made before Phase 6 — which the index
+        // records as an empty hash rather than a guess, because no lookup may resolve to a message that
+        // does not actually carry this content.
+        val manifest = BackupManifestFormat.decode(described.caption)
+
         return CloudMedia(
             messageId = messageId,
             chatId = chatId,
             type = described.type,
             mimeType = described.mimeType,
-            fileName = described.fileName,
+            // A photo message reports no file name of its own, so the declared one is the only name the
+            // Cloud screen can show for it. Anything Telegram states directly outranks it.
+            fileName = described.fileName.ifBlank { manifest?.fileName.orEmpty() },
             sizeBytes = described.sizeBytes,
             dateSeconds = date,
             // Section 42: this is when the message reached Telegram, and the model says so rather
-            // than dressing it up as a capture date.
+            // than dressing it up as a capture date. The manifest carries no capture date either,
+            // because nothing in this app reads EXIF yet — filing a photo under the day it happened to
+            // be uploaded is not the same fact and must not be labelled as one.
             dateSource = CloudDateSource.TelegramMessage,
             width = described.width,
             height = described.height,
@@ -51,6 +62,7 @@ internal object TdCloudMapper {
             remoteFileId = described.originalRemoteId,
             previewRemoteFileId = described.previewRemoteId,
             caption = described.caption,
+            contentHash = manifest?.contentHash.orEmpty(),
         )
     }
 

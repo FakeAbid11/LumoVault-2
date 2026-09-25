@@ -6,26 +6,30 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * One remote item in the Cloud index — PRD section 9's manifest, restricted to what a Telegram
- * message actually reports.
+ * One remote item in the Cloud index — PRD section 9's manifest, restricted to what a Telegram message
+ * actually reports plus what LumoVault writes into that message itself.
  *
- * Two PRD-named columns are deliberately absent. `hash` cannot be filled without reading the
- * original, which section 13 forbids during a scan, so it arrives with the backup engine. Latitude
- * and longitude have no source either: TDLib reports GPS only for a `messageLocation`, not for a
- * photo, so the Map phase adds them alongside the caption manifest that will carry them. Adding
- * empty columns now would only promise data nothing writes.
+ * Two PRD-named columns are still absent. Latitude and longitude have no source: TDLib reports GPS only
+ * for a `messageLocation`, not for a photo, and the local index never read EXIF, so the Map phase adds
+ * them alongside the capture date it will have to extract anyway. Adding empty columns now would only
+ * promise data nothing writes.
  *
- * Identity is [messageId]. File names are not unique across a channel, and position in a history
- * page changes as soon as one message is deleted, so neither can key a row.
+ * Identity is [messageId]. File names are not unique across a channel, and position in a history page
+ * changes as soon as one message is deleted, so neither can key a row. [contentHash] is the *other* half
+ * of identity: the remote address of a piece of content, which is what lets a reinstalled app with no
+ * memory of its own find where a file already lives.
  */
 @Entity(
     tableName = "cloud_media",
     indices = [
         // The timeline sorts by date, the header counts by type, and the prune filters by scan id.
-        // These are the three queries this table serves; nothing else is indexed.
+        // These are the queries this table serves; nothing else is indexed.
         Index("date_seconds"),
         Index("media_type"),
         Index("last_seen_scan_id"),
+        // "Have these bytes already been backed up, and to which message" is asked once per hashed local
+        // item, and it is the one question whose answer cannot be cached away — a miss is an upload.
+        Index("content_hash"),
     ],
 )
 data class CloudMediaEntity(
@@ -82,6 +86,18 @@ data class CloudMediaEntity(
     /** Same scan-generation trick as the local table: prune is one statement, not a huge `NOT IN`. */
     @ColumnInfo(name = "last_seen_scan_id", defaultValue = "0")
     val lastSeenScanId: Long = 0,
+
+    /**
+     * The content hash this message's own caption declares, lowercased; empty when the message carries
+     * no manifest — which is every backup made before Phase 6, and every photo the user dropped into the
+     * channel by hand.
+     *
+     * Declared last because a migrated table cannot have a column inserted anywhere else: `ALTER TABLE
+     * ADD COLUMN` appends, and putting this field mid-list in the entity would make a fresh install and
+     * an upgraded one disagree about column order.
+     */
+    @ColumnInfo(name = "content_hash", defaultValue = "")
+    val contentHash: String = "",
 )
 
 /**

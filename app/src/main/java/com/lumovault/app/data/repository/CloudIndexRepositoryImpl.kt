@@ -11,6 +11,7 @@ import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.CloudTypeCount
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.CloudIndexRepository
+import com.lumovault.app.domain.repository.RemoteBackup
 import com.lumovault.app.domain.telegram.CloudAssociation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -51,6 +52,13 @@ class CloudIndexRepositoryImpl(
             removed
         }
 
+    override suspend fun remoteBackupFor(contentHash: String): RemoteBackup? {
+        if (contentHash.isBlank()) return null
+        return media.backupFor(contentHash.lowercase())?.let { RemoteBackup(it.chatId, it.messageId) }
+    }
+
+    override suspend fun unrecognizedRemoteCount(): Int = media.unrecognizedManifestCount()
+
     override suspend fun association(): CloudAssociation? =
         channel.row(CloudChannelEntity.SINGLETON_ROW_ID)?.toDomain()
 
@@ -88,6 +96,7 @@ private fun CloudMediaEntity.toDomain(): CloudMedia = CloudMedia(
     remoteFileId = remoteFileId,
     previewRemoteFileId = previewRemoteFileId,
     caption = caption,
+    contentHash = contentHash,
 )
 
 private fun CloudMedia.toEntity(chatId: Long, scanId: Long): CloudMediaEntity = CloudMediaEntity(
@@ -106,6 +115,7 @@ private fun CloudMedia.toEntity(chatId: Long, scanId: Long): CloudMediaEntity = 
     previewRemoteFileId = previewRemoteFileId,
     caption = caption,
     lastSeenScanId = scanId,
+    contentHash = contentHash,
 )
 
 private fun CloudAssociation.toEntity(): CloudChannelEntity = CloudChannelEntity(

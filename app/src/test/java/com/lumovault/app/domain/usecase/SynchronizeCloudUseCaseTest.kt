@@ -45,6 +45,7 @@ class SynchronizeCloudUseCaseTest {
         remoteFileId = "R$id",
         previewRemoteFileId = "P$id",
         caption = "",
+        contentHash = "",
     )
 
     /** Pages newest-first; [pages] is consumed in order, and the last one ends the walk. */

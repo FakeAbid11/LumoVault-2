@@ -12,6 +12,7 @@ import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
+import com.lumovault.app.data.media.ContentResolverMediaHasher
 import com.lumovault.app.data.media.MediaFileStager
 import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
@@ -32,6 +33,7 @@ import com.lumovault.app.data.repository.OnboardingRepositoryImpl
 import com.lumovault.app.data.repository.SettingsRepositoryImpl
 import com.lumovault.app.data.repository.SystemPermissionsRepositoryImpl
 import com.lumovault.app.domain.backup.BackupQueueRepository
+import com.lumovault.app.domain.backup.MediaContentHasher
 import com.lumovault.app.domain.backup.MediaSourceStager
 import com.lumovault.app.domain.backup.TelegramUploadRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
@@ -44,6 +46,7 @@ import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
+import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
 import java.io.File
@@ -186,6 +189,31 @@ class AppContainer(context: Context) {
         TdLibUploadRepository(client = telegramClient)
     }
 
+    /**
+     * Reads files to hash them, and nothing else.
+     *
+     * Separate from [mediaStager] on purpose: staging exists because TDLib needs a path, while recognition
+     * needs only to know what the bytes are, and copying a four-gigabyte video into the cache to hash it
+     * would spend disk to learn a fact a stream can give for free.
+     */
+    private val mediaContentHasher: MediaContentHasher by lazy {
+        ContentResolverMediaHasher(resolver = appContext.contentResolver)
+    }
+
+    /**
+     * Backup recognition: content identity, and whether the channel already holds it.
+     *
+     * It spans three collaborators — the queue's records, the cloud index, and the file system behind
+     * MediaStore — which is what puts it in `domain/usecase` rather than inside either repository.
+     */
+    val recognizeBackup: RecognizeBackupUseCase by lazy {
+        RecognizeBackupUseCase(
+            queue = backupQueueRepository,
+            cloud = cloudIndexRepository,
+            hasher = mediaContentHasher,
+        )
+    }
+
     val backupNotifications: BackupNotifications by lazy { BackupNotifications(appContext) }
 
     /**
@@ -201,6 +229,7 @@ class AppContainer(context: Context) {
             queue = backupQueueRepository,
             upload = telegramUploadRepository,
             stager = mediaStager,
+            recognition = recognizeBackup,
             resolveChannel = { cloudIndexRepository.association()?.chatId ?: NO_CHANNEL },
         )
     }
@@ -213,6 +242,7 @@ class AppContainer(context: Context) {
         parameters = parameters,
         queue = backupQueueRepository,
         runner = runBackupQueue,
+        recognizer = recognizeBackup,
         notifications = backupNotifications,
     )
 

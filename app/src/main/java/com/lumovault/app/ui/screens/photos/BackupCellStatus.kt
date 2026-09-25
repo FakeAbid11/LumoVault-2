@@ -6,7 +6,7 @@ import com.lumovault.app.domain.backup.UploadState
 /**
  * What a grid cell shows about one item's backup, and nothing else.
  *
- * The internal queue has six states; a thumbnail can carry one glyph. Collapsing them is a rendering
+ * The internal queue has seven states; a thumbnail can carry one glyph. Collapsing them is a rendering
  * decision, so it lives here as a pure function rather than inside the cell, where it could not be
  * tested — and rather than in [UploadState], which must not know that a screen exists.
  *
@@ -26,9 +26,11 @@ enum class BackupCellStatus {
 }
 
 fun backupCellStatus(state: UploadState?): BackupCellStatus = when (state) {
-    // No row is the common case and means nothing has been queued; PRD section 48's NOT_BACKED_UP is
-    // the absence of a record rather than a stored state.
-    null, UploadState.Cancelled -> BackupCellStatus.Unbacked
+    // Two ways of saying the same thing to a thumbnail. No row at all is still the common case, and a row
+    // that only carries an identity says nothing more than "this content is here and nothing stores it" —
+    // PRD section 48's NOT_BACKED_UP, and section 13's ☁ either way. What recognition's record *is* for is
+    // the next scan, not this glyph.
+    null, UploadState.Cancelled, UploadState.NotBackedUp -> BackupCellStatus.Unbacked
     UploadState.Queued -> BackupCellStatus.Queued
     UploadState.Preparing -> BackupCellStatus.Preparing
     UploadState.Uploading -> BackupCellStatus.Uploading

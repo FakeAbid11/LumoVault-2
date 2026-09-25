@@ -27,7 +27,7 @@ import com.lumovault.app.data.local.media.MediaEntity
         CloudChannelEntity::class,
         BackupQueueEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
@@ -201,6 +201,47 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        /**
+         * Mirrors Room's generated DDL for the Phase 6 columns on [BackupQueueEntity] and
+         * [CloudMediaEntity], appending in declaration order because `ALTER TABLE` can do nothing else.
+         *
+         * Every existing row survives untouched, which matters more here than in any earlier migration:
+         * `message_id` is the record that a user's photos are safe, and a Phase 5 install has real
+         * backups in it. The new columns start empty, and empty means what it says — nothing has been
+         * hashed and nothing has been recognised — so an upgrade never claims a backup it does not know
+         * about. Recognition fills them in afterwards, one bounded pass at a time.
+         *
+         * `app/schemas` is written only in the runner's workspace, so nothing compares this text against
+         * what Room compiles: a flipped default or a missing index surfaces as a schema-validation crash
+         * on an existing install's first launch, not as a red build.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `backup_queue` ADD COLUMN `content_hash` TEXT NOT NULL DEFAULT ''",
+                )
+                db.execSQL(
+                    "ALTER TABLE `backup_queue` ADD COLUMN `content_size_bytes` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "ALTER TABLE `backup_queue` ADD COLUMN `content_modified_seconds` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "ALTER TABLE `backup_queue` ADD COLUMN `hashed_at` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_backup_queue_content_hash` ON `backup_queue` (`content_hash`)",
+                )
+                db.execSQL(
+                    "ALTER TABLE `cloud_media` ADD COLUMN `content_hash` TEXT NOT NULL DEFAULT ''",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_cloud_media_content_hash` ON `cloud_media` (`content_hash`)",
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS =
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
     }
 }

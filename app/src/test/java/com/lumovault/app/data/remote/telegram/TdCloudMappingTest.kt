@@ -1,6 +1,8 @@
 package com.lumovault.app.data.remote.telegram
 
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.BackupManifest
+import com.lumovault.app.domain.telegram.BackupManifestFormat
 import com.lumovault.app.domain.telegram.LumoVaultStorageProtocol
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
@@ -204,6 +206,71 @@ class TdCloudMappingTest {
     }
 
     @Test
+    fun aBackupManifestInACaptionBecomesTheHashCodeAndTheOnlyFileNameAPhotoHas() {
+        // A photo message reports no name and no identity of its own — TDLib gives a file name for a
+        // document and a video, and nothing for a photo — so the manifest LumoVault wrote is both.
+        val manifest = BackupManifest(
+            contentHash = DIGEST,
+            sizeBytes = 4_320_112L,
+            modifiedSeconds = 1_790_000_000L,
+            fileName = "IMG_20260925_184211.jpg",
+        )
+        val backedUp = message(
+            id = 21,
+            content = TdApi.MessagePhoto().apply {
+                photo = TdApi.Photo().apply { sizes = arrayOf(photoSize("x", 10, 10, "P")) }
+                caption = TdApi.FormattedText().apply { text = BackupManifestFormat.encode(manifest) }
+            },
+        )
+
+        val mapped = TdCloudMapper.toCloudMedia(backedUp, 7)
+
+        assertEquals(DIGEST, mapped?.contentHash)
+        assertEquals("IMG_20260925_184211.jpg", mapped?.fileName)
+        assertEquals(true, mapped?.isLumoVaultBackup)
+    }
+
+    @Test
+    fun aCaptionThatIsOrdinaryTextDeclaresNoContent() {
+        val handUploaded = message(
+            id = 22,
+            content = TdApi.MessagePhoto().apply {
+                photo = TdApi.Photo().apply { sizes = arrayOf(photoSize("x", 10, 10, "P")) }
+                caption = TdApi.FormattedText().apply { text = "LumoVault backup of my holiday" }
+            },
+        )
+
+        val mapped = TdCloudMapper.toCloudMedia(handUploaded, 7)
+
+        assertEquals("", mapped?.contentHash)
+        assertEquals(false, mapped?.isLumoVaultBackup)
+        assertEquals("holiday text is kept as the caption it is", "LumoVault backup of my holiday", mapped?.caption)
+    }
+
+    @Test
+    fun aMalformedOrFutureManifestIsReadAsNothingRatherThanAsAPartialHash() {
+        fun withCaption(id: Int, text: String) = TdCloudMapper.toCloudMedia(
+            message(
+                id = id,
+                content = TdApi.MessagePhoto().apply {
+                    photo = TdApi.Photo().apply { sizes = arrayOf(photoSize("x", 10, 10, "P")) }
+                    caption = TdApi.FormattedText().apply { this.text = text }
+                },
+            ),
+            7,
+        )
+
+        assertEquals("", withCaption(23, "LUMOVAULT_META v1 h=$DIGEST")?.contentHash)
+        assertEquals("", withCaption(24, "LUMOVAULT_META v2 h=$DIGEST s=10")?.contentHash)
+        assertEquals("", withCaption(25, "LUMOVAULT_META v1 h=${DIGEST.dropLast(1)}")?.contentHash)
+        assertEquals(
+            "an unknown field alongside a real digest is decoration, not a reason to discard the identity",
+            DIGEST,
+            withCaption(26, "LUMOVAULT_META v1 early h=$DIGEST")?.contentHash,
+        )
+    }
+
+    @Test
     fun markerMessageIsTextAndNotMedia() {
         val marker = message(
             id = 1,
@@ -267,6 +334,9 @@ class TdCloudMappingTest {
         assertNull(TdCloudMapper.toCloudMedia(message(id = 19, date = 0, content = aPhoto()), 7))
         assertNull(TdCloudMapper.toCloudMedia(message(id = 20, content = TdApi.MessageAudio()), 7))
     }
+
+    /** A real SHA-256 of a real input ("abc"), so a length-64 digest is not accidentally faked here. */
+    private val DIGEST = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
     private fun aPhoto() = TdApi.MessagePhoto().apply {
         photo = TdApi.Photo().apply { sizes = arrayOf(photoSize("x", 10, 10, "P")) }

@@ -87,19 +87,69 @@ or animation — with the bytes staged unmodified rather than re-encoded.
 What that means precisely, because the phrase "original quality" is easy to over-claim: LumoVault
 performs no resizing, recompression or transcoding of its own, and hands TDLib the file as staged.
 Telegram's own photo and video containers are the server's to encode, and an animation may be shown as
-a looping video. Whether the bytes that come back match the bytes that went in is what Phase 6's
-content hash will establish; nothing claims it today.
+a looping video. Nothing claims the stored bytes match the bytes that went in: the content hash Phase 6
+added identifies *what this device sent*, and no code downloads a backup to compare it against.
 
 States are `QUEUED → PREPARING → UPLOADING → BACKED_UP`, with `FAILED` and `CANCELLED`, persisted in
-`backup_queue` keyed by `media_store_id`. PRD section 48's `HASHING` and `VERIFYING` are deliberately
-absent — Phase 5 can enter neither honestly, and a state nothing can leave is a claim rather than a
-placeholder. Likewise there is no hash column, no remote manifest and no duplicate detection: those are
-Phase 6, and this table is where they will be added.
+`backup_queue` keyed by `media_store_id`. PRD section 48's `HASHING` and `VERIFYING` are still absent —
+hashing is a step *about* an item rather than a state it waits in, and nothing reads a stored object back
+to verify it. Phase 6 did add that table's hash columns and its remote manifest, and PRD section 48's
+`NOT_BACKED_UP` with them.
 
 **Run on a device, backup has not been verified by me.** The queue, the worker, the foreground
 promotion, offline waiting and a real upload into Telegram are all unexercised — unit tests stop at the
 `TelegramClient` boundary and never call JNI. See the next section for what was and was not confirmed
 on a phone.
+
+## Backup recognition — Phase 6
+
+LumoVault can now tell whether a local file is already stored, without uploading it to find out.
+
+```
+local file → size + mtime unchanged? ──yes→ reuse the hash on record (no file read)
+                   │no
+                   ↓
+            streamed SHA-256 → cloud index → match: adopt that message, no upload
+                                            → miss:  eligible for Phase 5's queue, and the
+                                                     upload now carries a manifest
+```
+
+- **Content identity** is SHA-256 of the file's own bytes, streamed a buffer at a time and never loaded
+  into memory — not a thumbnail, not a decoded bitmap, not a resized copy. Photos, videos and GIFs are
+  hashed the same way, from `content://` for recognition and from the staged copy when a send is about to
+  happen, so the hash and the bytes uploaded are the same bytes.
+- **The record** lives in `backup_queue` (v5→v6): the hash, the size and modification time it was taken
+  against, and when. Indexed on the hash, because "have these bytes been stored" is asked once per file.
+  A file that cannot be read is recorded as *attempted with no hash*, which keeps it out of the next
+  pass's candidates without ever making it look backed up.
+- **The remote manifest** is the backup message's own caption — `LUMOVAULT_META v1 h=… s=… m=… n=…`. It
+  travels in the message it describes, so the association cannot drift and a reinstall that loses Room
+  loses nothing that the channel cannot restate. It is read back by the history walk Phase 4 already
+  runs page by page; recognising a backup costs no original download.
+- **Duplicate prevention** is the hash lookup, in two places: the recognition pass marks a match
+  `BACKED_UP` against the message that holds it, and the upload path asks the same question after staging
+  and before sending, so tapping "Back Up" on a photo the channel already has closes the row instead of
+  posting a copy.
+- **Changed media** gets a new identity and loses the old association; the message that holds the earlier
+  bytes is left alone in Telegram, because deleting a user's stored photo is not a scan's business.
+- **Scale**: the pass only hashes while the remote index holds manifests no local record claims, so a
+  settled library of 100,000 items costs zero file reads. It works in stages of 20, yields the moment the
+  queue has anything to deliver, and stops at a five-minute budget rather than running into an upload.
+- **Race safety**: recognition writes identity columns and never state, and its one state write is a
+  conditional `UPDATE` that excludes `preparing` and `uploading`, so a scan cannot settle a row a worker
+  owns or withdraw one the user queued.
+
+**What this does not do.** A backup uploaded before Phase 6 carries no manifest, so after a reinstall it
+cannot be recognised by content and will be uploaded once more — this time with a manifest. Nothing
+matches those messages heuristically on file name and size, because a guess there is a ✓ on a photo that
+may not be stored. PRD section 9's `dateTaken`, `latitude` and `longitude` are absent from the manifest
+too: the local index reads no EXIF, so there is no source for them until the metadata work Phase 8 asks
+for. And `VERIFYING` remains unbuilt — recognition confirms that a message declares this content, which
+is a different claim from having read the stored bytes back.
+
+**Verified by CI, not by a phone:** the same caveat as Phase 5 applies, more strongly here. Reinstall
+recovery, duplicate prevention and changed-media detection are the three behaviours a device has to
+confirm, and none of them has been run on one.
 
 ## Telegram status — what is real and what is deferred
 
@@ -170,7 +220,7 @@ app/src/main/java/com/lumovault/app/
 ├── MainActivity.kt           edge-to-edge host, nothing else
 ├── data/
 │   ├── local/                Room database, UserSettings row, DAO, single-writer store
-│   ├── remote/telegram/      TDLib JSON client, auth repository, credentials, error mapping
+│   ├── remote/telegram/      TDLib's typed Client/TdApi layer, auth repository, credentials, error mapping
 │   └── repository/           Room / libphonenumber / permission implementations
 ├── domain/
 │   ├── model/                ThemeMode, Country, onboarding state + checklist derivation
@@ -188,8 +238,9 @@ app/src/main/java/com/lumovault/app/
 
 Composables never touch a database, network or file storage; the Activity only hosts Compose; and
 each screen reads one immutable UI state. Room owns all persisted state — there is no second
-preference mechanism. `domain/usecase/` remains absent on purpose: nothing yet needs logic spanning
-two repositories, and a pass-through wrapper would only add a hop.
+preference mechanism. `domain/usecase/` holds exactly what earns it: a flow that spans two repositories
+(cloud synchronisation, backup recognition), and none that spans one — the queue's policy lives with its
+repository rather than in a wrapper that would only add a hop.
 
 Decisions worth knowing about:
 

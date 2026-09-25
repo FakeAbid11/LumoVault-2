@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.usecase.QueueRun
+import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -30,6 +31,7 @@ class BackupUploadWorker(
     parameters: WorkerParameters,
     private val queue: BackupQueueRepository,
     private val runner: RunBackupQueueUseCase,
+    private val recognizer: RecognizeBackupUseCase,
     private val notifications: BackupNotifications,
 ) : CoroutineWorker(context, parameters) {
 
@@ -59,6 +61,12 @@ class BackupUploadWorker(
             }
             .launchIn(this)
 
+        // Recognition runs first and on purpose: an item that is about to be sent may turn out to be
+        // already stored, and finding that out before the upload rather than after it is what keeps a
+        // duplicate out of the user's channel. It is bounded — it yields to the queue the moment anything
+        // is queued — so this is never a reason an upload waits.
+        val recognition = recognizer.run()
+
         val outcome = runner.run { progress ->
             label = progress.displayName
             // Rounded, so a burst of TDLib file updates becomes a handful of notifications rather than
@@ -74,7 +82,15 @@ class BackupUploadWorker(
             // [deferred] is the retry signal: an item that Telegram or the network refused is back in
             // the queue, and WorkManager's exponential backoff is what spaces the attempts out — this
             // worker must not sit in a loop doing it faster and worse.
-            is QueueRun.Done -> if (outcome.deferred) Result.retry() else Result.success()
+            //
+            // A recognition pass that ran out of its time budget borrows the same signal rather than
+            // scheduling work of its own. The frontier strictly shrinks — every item it reaches either
+            // gets a hash or is recorded as unreadable, and both leave the candidate set — so asking to be
+            // run again terminates, which is what makes a second worker name unnecessary here.
+            is QueueRun.Done -> when {
+                outcome.deferred || recognition.stoppedEarly -> Result.retry()
+                else -> Result.success()
+            }
 
             // Nothing to do about either from here: the user has to sign in, or the build has no
             // Telegram. Retrying would re-run a pass that cannot make progress.

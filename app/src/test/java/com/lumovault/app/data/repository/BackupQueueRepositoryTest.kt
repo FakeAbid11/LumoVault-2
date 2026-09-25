@@ -1,20 +1,15 @@
 package com.lumovault.app.data.repository
 
-import com.lumovault.app.data.local.backup.BackupQueueDao
-import com.lumovault.app.data.local.backup.BackupQueueEntity
-import com.lumovault.app.data.local.backup.BackupStateCountRow
-import com.lumovault.app.data.local.backup.ClaimedBackupRow
+import com.lumovault.app.data.local.backup.FakeBackupQueueDao
+import com.lumovault.app.data.local.backup.QueueClock
 import com.lumovault.app.domain.backup.BackupFailure
 import com.lumovault.app.domain.backup.BackupFailureKind
-import com.lumovault.app.domain.backup.BackupItemState
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupRequest
+import com.lumovault.app.domain.backup.MediaIdentity
 import com.lumovault.app.domain.backup.UploadState
-import com.lumovault.app.domain.model.MediaType
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -24,10 +19,11 @@ import org.junit.Test
 /**
  * The queue's policy, exercised without a database.
  *
- * [FakeBackupQueueDao] stores rows and applies the same state writes the SQL does, so what is under
- * test is the repository's decisions — which transition is legal, how many attempts an item gets, what
- * counts as in flight — rather than Room. Those decisions are what makes a ✓ on a thumbnail mean
- * something, and they would be unreachable from a unit test if they lived inside a query.
+ * [FakeBackupQueueDao] stores rows and applies the same state writes the SQL does, so what is under test
+ * is the repository's decisions — which transition is legal, how many attempts an item gets, what counts
+ * as in flight, and which write a guarded `WHERE` clause is allowed to refuse. Those decisions are what
+ * makes a ✓ on a thumbnail mean something, and they would be unreachable from a unit test if they lived
+ * only inside a query.
  */
 class BackupQueueRepositoryTest {
     private val clock = QueueClock()
@@ -93,15 +89,18 @@ class BackupQueueRepositoryTest {
     }
 
     @Test
-    fun aSuccessWrittenFromTheWrongStateIsRefused() = runBlocking {
-        val claimed = requireNotNull(claimedRequest())
+    fun aSuccessWrittenFromTheWrongStateIsRefused() = runBlocking<Unit> {
+        dao.withMedia(1L)
+        repository.enqueue(listOf(1L))
 
-        // Straight from `preparing`, with no upload in between: exactly the write that would put a ✓ on
-        // a photo nothing sent.
+        // A row still in line, with nothing in flight and nothing stored: this is the write that would put
+        // a ✓ on a photo nothing sent. `preparing` is allowed to close on remote evidence, which is a
+        // decision with a message id behind it — see [RecognizeBackupUseCaseTest]'s dedup cases — and an
+        // unclaimed row has no such evidence and no owner to hold it.
         assertThrows(IllegalStateException::class.java) {
-            runBlocking { repository.markBackedUp(claimed.mediaStoreId, chatId = 5L, messageId = 1L) }
+            runBlocking { repository.markBackedUp(1L, chatId = 5L, messageId = 1L) }
         }
-        assertEquals(UploadState.Preparing, dao.row(claimed.mediaStoreId).state.asState())
+        assertEquals(UploadState.Queued, dao.row(1L).state.asState())
     }
 
     @Test
@@ -214,187 +213,181 @@ class BackupQueueRepositoryTest {
         }
     }
 
+    @Test
+    fun recordingAnIdentityLeavesARowsStateAloneEvenWhileItIsUploading() = runBlocking {
+        val claimed = requireNotNull(claimedRequest())
+        repository.markUploading(claimed.mediaStoreId)
+
+        repository.recordIdentity(claimed.mediaStoreId, identity(HASH_A))
+
+        val row = dao.row(claimed.mediaStoreId)
+        assertEquals(
+            "a scan learning what a file is must not decide what has happened to it",
+            UploadState.Uploading,
+            row.state.asState(),
+        )
+        assertEquals(HASH_A, row.contentHash)
+        assertEquals("the queue's own claim survives the scan", 5L, row.chatId)
+    }
+
+    @Test
+    fun anUnreadableFileIsRecordedAsAttemptedAndCallsItselfNothing() = runBlocking {
+        dao.withItem(1L, sizeBytes = 4096L, modifiedSeconds = 900L)
+
+        repository.recordIdentity(1L, MediaIdentity.unreadable(4096L, 900L))
+
+        val row = dao.row(1L)
+        assertEquals("no hash means no claim of any kind", "", row.contentHash)
+        assertEquals(UploadState.NotBackedUp, row.state.asState())
+        assertEquals(1L, row.hashedAt)
+        assertEquals(
+            "an attempted hash is not retried while the file's own figures are unchanged",
+            emptyList<Any>(),
+            repository.identityCandidates(includeWholeLibrary = true, limit = 10),
+        )
+    }
+
+    @Test
+    fun tappingBackUpMovesARecognisedItemWithoutDiscardingItsHash() = runBlocking {
+        dao.withItem(1L, sizeBytes = 4096L, modifiedSeconds = 900L)
+        repository.recordIdentity(1L, identity(HASH_A, size = 4096L, modified = 900L))
+
+        assertEquals(1, repository.enqueue(listOf(1L)))
+
+        val row = dao.row(1L)
+        assertEquals(UploadState.Queued, row.state.asState())
+        assertEquals(HASH_A, row.contentHash)
+        assertEquals(4096L, row.contentSizeBytes)
+        assertEquals(
+            "a second tap spends nothing it has already paid for",
+            0,
+            repository.enqueue(listOf(1L)),
+        )
+    }
+
+    @Test
+    fun adoptionRefusesToSettleARowThatIsMidSend() = runBlocking {
+        val claimed = requireNotNull(claimedRequest())
+        repository.markUploading(claimed.mediaStoreId)
+
+        assertEquals(
+            false,
+            repository.adoptRemote(claimed.mediaStoreId, RemoteBackup(chatId = 9L, messageId = 99L)),
+        )
+
+        val row = dao.row(claimed.mediaStoreId)
+        assertEquals(UploadState.Uploading, row.state.asState())
+        assertEquals("the message id belongs to the send that is running", 0L, row.messageId)
+    }
+
+    @Test
+    fun adoptionClosesAQueuedItemAgainstTheMessageThatAlreadyHoldsIt() = runBlocking {
+        dao.withMedia(1L)
+        repository.enqueue(listOf(1L))
+        repository.recordIdentity(1L, identity(HASH_A))
+
+        assertEquals(true, repository.adoptRemote(1L, RemoteBackup(chatId = 42L, messageId = 777L)))
+
+        val row = dao.row(1L)
+        assertEquals(UploadState.BackedUp, row.state.asState())
+        assertEquals(42L, row.chatId)
+        assertEquals(777L, row.messageId)
+        assertEquals("an adopted item leaves the queue", 0, repository.observeSummary().first().queued)
+    }
+
+    @Test
+    fun onlyACompletedBackupCanHaveItsAssociationTakenAway() = runBlocking {
+        dao.withMedia(1L, 2L)
+        repository.enqueue(listOf(1L))
+        repository.recordIdentity(1L, identity(HASH_A))
+        repository.adoptRemote(1L, RemoteBackup(chatId = 42L, messageId = 777L))
+        repository.recordIdentity(2L, identity(HASH_B))
+        repository.enqueue(listOf(2L))
+
+        assertEquals(true, repository.revokeAssociation(1L))
+        assertEquals(
+            "queued work is the user's to cancel, not a scan's to demote",
+            false,
+            repository.revokeAssociation(2L),
+        )
+
+        val revoked = dao.row(1L)
+        assertEquals(UploadState.NotBackedUp, revoked.state.asState())
+        assertEquals("the association goes; the message in Telegram does not", 0L, revoked.messageId)
+        assertEquals(0L, revoked.chatId)
+        assertEquals("the identity just measured stays", HASH_A, revoked.contentHash)
+        assertEquals(UploadState.Queued, dao.row(2L).state.asState())
+    }
+
+    @Test
+    fun recognisedItemsAreNotCountedAsPendingAnything() = runBlocking {
+        dao.withMedia(1L, 2L, 3L)
+        repository.recordIdentity(1L, identity(HASH_A))
+        repository.recordIdentity(2L, identity(HASH_B))
+        repository.enqueue(listOf(3L))
+
+        val summary = repository.observeSummary().first()
+
+        assertEquals(1, summary.queued)
+        assertEquals("two files identified and never asked about are not a queue", 1, summary.total)
+    }
+
+    @Test
+    fun aClaimedRowCarriesTheIdentityItWasRecordedWith() = runBlocking {
+        dao.withItem(1L, sizeBytes = 4096L, modifiedSeconds = 900L)
+        repository.recordIdentity(1L, identity(HASH_A, size = 4096L, modified = 900L))
+        repository.enqueue(listOf(1L))
+
+        val claimed = requireNotNull(repository.claimNext(chatId = 5L))
+
+        assertEquals(HASH_A, claimed.contentHash)
+        assertEquals(4096L, claimed.contentSizeBytes)
+        assertEquals(900L, claimed.contentModifiedSeconds)
+        assertEquals("the fast check holds for an untouched file", true, claimed.identityIsCurrent)
+    }
+
+    @Test
+    fun aRowWhoseFileGrewSinceItWasHashedIsNoLongerCurrent() = runBlocking {
+        dao.withItem(1L, sizeBytes = 4096L, modifiedSeconds = 900L)
+        repository.recordIdentity(1L, identity(HASH_A, size = 4096L, modified = 900L))
+        repository.enqueue(listOf(1L))
+        dao.changeMedia(1L, sizeBytes = 8192L, modifiedSeconds = 900L)
+
+        val claimed = requireNotNull(repository.claimNext(chatId = 5L))
+
+        assertEquals(8192L, claimed.expectedSizeBytes)
+        assertEquals(
+            "a size that moved since the hash is grounds for reading the file again, never for trusting it",
+            false,
+            claimed.identityIsCurrent,
+        )
+    }
+
+    @Test
+    fun theQueueReportsWhetherAnythingIsWaiting() = runBlocking {
+        assertEquals(false, repository.hasQueuedWork())
+        dao.withMedia(1L)
+        repository.enqueue(listOf(1L))
+        assertEquals(true, repository.hasQueuedWork())
+    }
+
     /** Queues one item and claims it, which is the only way to be in `PREPARING` legitimately. */
     private suspend fun claimedRequest(): BackupRequest? {
         dao.withMedia(1L)
         repository.enqueue(listOf(1L))
         return repository.claimNext(chatId = 5L)
     }
+
+    private fun identity(
+        hash: String,
+        size: Long = FakeBackupQueueDao.DEFAULT_SIZE,
+        modified: Long = FakeBackupQueueDao.DEFAULT_MODIFIED,
+    ) = MediaIdentity(hash, observedSizeBytes = size, observedModifiedSeconds = modified)
+
+    private companion object {
+        val HASH_A = "a".repeat(64)
+        val HASH_B = "b".repeat(64)
+    }
 }
 
 fun String.asState(): UploadState = UploadState.fromStorageKey(this)
-
-/** Movable so a test can make two items queue at different times without sleeping. */
-class QueueClock {
-    var nowValue = 1L
-
-    fun now(): Long = nowValue
-
-    fun advance(by: Long) {
-        nowValue += by
-    }
-}
-
-/**
- * An in-memory [BackupQueueDao].
- *
- * Mirrors the real queries rather than the real SQL: oldest-first claiming, the left join that can
- * return a row with no media behind it, and grouping for the summary. Anything the repository can do to
- * a row is applied here so the two cannot drift into agreeing by accident.
- */
-private class FakeBackupQueueDao : BackupQueueDao {
-    private val rows = LinkedHashMap<Long, BackupQueueEntity>()
-    private val media = LinkedHashMap<Long, FakeMedia>()
-    private val tick = MutableStateFlow(0)
-
-    fun withMedia(vararg ids: Long) {
-        ids.forEach { media[it] = FakeMedia(contentUri = "content://media/external/images/media/$it") }
-        bump()
-    }
-
-    fun dropMedia(id: Long) {
-        media.remove(id)
-        bump()
-    }
-
-    fun row(id: Long): BackupQueueEntity = rows.getValue(id)
-
-    fun forceState(id: Long, state: UploadState) = forceRawState(id, state.storageKey)
-
-    fun forceRawState(id: Long, state: String) {
-        rows.getValue(id).let { rows[id] = it.copy(state = state) }
-        bump()
-    }
-
-    override fun observeStatesFor(ids: Collection<Long>): Flow<List<BackupItemState>> = snapshots().map {
-        current -> current.filter { it.mediaStoreId in ids }.map { BackupItemState(it.mediaStoreId, it.state) }
-    }
-
-    override fun observeCounts(): Flow<List<BackupStateCountRow>> = snapshots().map { current ->
-        current.groupingBy { it.state }.eachCount()
-            .map { (state, count) -> BackupStateCountRow(state, count) }
-    }
-
-    override suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long) {
-        ids.forEach { id ->
-            if (id in media && id !in rows) {
-                rows[id] = BackupQueueEntity(
-                    mediaStoreId = id,
-                    state = queuedState,
-                    queuedAt = now,
-                    updatedAt = now,
-                )
-            }
-        }
-        bump()
-    }
-
-    override suspend fun countExisting(ids: Collection<Long>): Int =
-        rows.values.count { it.mediaStoreId in ids }
-
-    override suspend fun claimOldest(
-        queuedState: String,
-        preparingState: String,
-        chatId: Long,
-        now: Long,
-    ): Int {
-        val oldest = rows.values
-            .filter { it.state == queuedState }
-            .sortedWith(compareBy({ it.queuedAt }, { it.mediaStoreId }))
-            .firstOrNull() ?: return 0
-
-        rows[oldest.mediaStoreId] = oldest.copy(
-            state = preparingState,
-            chatId = chatId,
-            updatedAt = now,
-        )
-        bump()
-        return 1
-    }
-
-    override suspend fun newestIn(state: String): ClaimedBackupRow? {
-        val row = rows.values.filter { it.state == state }.maxByOrNull { it.updatedAt } ?: return null
-        val item = media[row.mediaStoreId]
-
-        return ClaimedBackupRow(
-            mediaStoreId = row.mediaStoreId,
-            chatId = row.chatId,
-            attempts = row.attempts,
-            stagedPath = row.stagedPath,
-            stateKey = row.state,
-            failureKey = row.failure,
-            mediaType = item?.mediaType,
-            mimeType = item?.mimeType,
-            contentUri = item?.contentUri,
-            displayName = item?.displayName,
-            sizeBytes = item?.sizeBytes,
-            width = item?.width,
-            height = item?.height,
-            durationMillis = item?.durationMillis,
-        )
-    }
-
-    override suspend fun setState(id: Long, state: String, now: Long): Int = update(id) {
-        it.copy(state = state, updatedAt = now)
-    }
-
-    override suspend fun setStagedPath(id: Long, path: String, now: Long): Int = update(id) {
-        it.copy(stagedPath = path, updatedAt = now)
-    }
-
-    override suspend fun markSent(id: Long, chatId: Long, messageId: Long, sentState: String, now: Long): Int =
-        update(id) {
-            it.copy(
-                state = sentState,
-                chatId = chatId,
-                messageId = messageId,
-                uploadedAt = now,
-                updatedAt = now,
-                failure = "",
-                stagedPath = "",
-            )
-        }
-
-    override suspend fun settle(id: Long, state: String, attempts: Int, failure: String, now: Long): Int =
-        update(id) {
-            it.copy(state = state, attempts = attempts, failure = failure, updatedAt = now)
-        }
-
-    override suspend fun stagedPath(id: Long): String? = rows[id]?.stagedPath
-
-    override suspend fun stateOf(id: Long): String? = rows[id]?.state
-
-    override suspend fun moveAll(from: String, to: String, now: Long): Int {
-        val matching = rows.values.filter { it.state == from }
-        matching.forEach { rows[it.mediaStoreId] = it.copy(state = to, updatedAt = now) }
-        bump()
-        return matching.size
-    }
-
-    override suspend fun countIn(state: String): Int = rows.values.count { it.state == state }
-
-    private suspend fun update(id: Long, transform: (BackupQueueEntity) -> BackupQueueEntity): Int {
-        val existing = rows[id] ?: return 0
-        rows[id] = transform(existing)
-        bump()
-        return 1
-    }
-
-    private fun snapshots(): Flow<List<BackupQueueEntity>> = tick.map { rows.values.toList() }
-
-    private fun bump() {
-        tick.value++
-    }
-}
-
-/** A row of the media index, as far as the queue's join cares about it. */
-private data class FakeMedia(
-    val mediaType: String = MediaType.Photo.storageKey,
-    val mimeType: String = "image/jpeg",
-    val contentUri: String = "content://media/external/images/media/1",
-    val displayName: String = "IMG_1.jpg",
-    val sizeBytes: Long = 1024L,
-    val width: Int = 4,
-    val height: Int = 3,
-    val durationMillis: Long? = null,
-)

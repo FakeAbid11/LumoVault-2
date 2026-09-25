@@ -111,7 +111,14 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
                 // Repeated calls are safe, and needed: the Cloud tab can be opened without onboarding
                 // having touched TDLib, and a chat request before a session is meaningless.
                 container.telegramAuthRepository.connect()
-                container.cloudSync.synchronize()
+                val adopted = container.cloudSync.synchronize()
+                if (adopted != null) {
+                    // The index has just changed, which is the one moment recognition is certain to have
+                    // something new to match: after a reinstall this is what turns 1,000 channel messages
+                    // into 1,000 backed-up photos without a single upload. A pass that finds nothing to do
+                    // costs one query, and the queue's own rows are drained by the same call.
+                    container.backupScheduler.start()
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

@@ -4,6 +4,8 @@ import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.UploadEvent
 import com.lumovault.app.domain.backup.UploadRequest
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.BackupManifest
+import com.lumovault.app.domain.telegram.BackupManifestFormat
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.drinkless.tdlib.TdApi
@@ -40,6 +42,16 @@ class TdLibUploadRepositoryTest {
         width = 4,
         height = 3,
         durationMillis = durationMillis,
+        manifest = BackupManifest(
+            contentHash = HASH,
+            sizeBytes = 4096L,
+            modifiedSeconds = 1_790_000_000L,
+            fileName = "IMG_1.jpg",
+        ),
+    )
+
+    private val manifestText = BackupManifestFormat.encode(
+        BackupManifest(HASH, 4096L, 1_790_000_000L, "IMG_1.jpg"),
     )
 
     private fun sentContent(): TdApi.InputMessageContent =
@@ -65,7 +77,34 @@ class TdLibUploadRepositoryTest {
         assertEquals(3, photo.height)
         assertEquals("no stickers are being added", 0, photo.addedStickerFileIds.size)
         assertNull("nothing is generated or recompressed here", photo.video)
-        assertEquals("", content.caption.text)
+        assertEquals(
+            "the caption is how this message will identify itself after a reinstall",
+            manifestText,
+            content.caption.text,
+        )
+        assertEquals(
+            "declared with no entities, because the manifest is metadata and not formatted text",
+            0,
+            content.caption.entities.size,
+        )
+    }
+
+    @Test
+    fun everyMediaTypeCarriesTheSameManifestSoNoneOfThemIsUnrecognisableLater() = runBlocking {
+        client.answer = { TdApi.Message().apply { id = 7004L } }
+
+        repository.upload(CHAT, request(MediaType.Video, durationMillis = 8_000L)).toList()
+        val videoCaption = (sentContent() as TdApi.InputMessageVideo).caption.text
+
+        client.sent.clear()
+        repository.upload(CHAT, request(MediaType.Gif, durationMillis = 3_000L)).toList()
+        val gifCaption = (sentContent() as TdApi.InputMessageAnimation).caption.text
+
+        assertEquals(manifestText, videoCaption)
+        assertEquals(manifestText, gifCaption)
+        // A photo the Cloud screen cannot name is a photo whose manifest is the only name it has; the
+        // hash inside that caption is what a reinstall matches the local file against.
+        assertTrue(HASH in videoCaption)
     }
 
     @Test
@@ -183,6 +222,9 @@ class TdLibUploadRepositoryTest {
 private const val CHAT = 55_000_000_000L
 
 private const val STAGED = "/data/user/0/com.lumovault.app/cache/backup_staging/media_1.jpg"
+
+/** A digest of the right shape and length; which file it came from is this test's business alone. */
+private const val HASH = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 /** A [TdApi.File] as TDLib reports one mid-upload: size known, path ours, bytes partly away. */
 private fun file(size: Long, uploaded: Long, path: String = STAGED): TdApi.File {
