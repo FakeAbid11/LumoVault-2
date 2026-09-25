@@ -3,12 +3,13 @@ package com.lumovault.app.data.remote.telegram
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
 
 /**
- * Translates a TDLib `error` object into something the UI can show.
+ * Translates a TDLib error into something the UI can show.
  *
- * TDLib's messages are machine tokens such as `PHONE_NUMBER_INVALID` or `FLOOD_WAIT_312`. Mapping
- * them here — rather than passing `message` through — is what keeps a raw response containing a
- * phone number or session detail away from the screen, and it turns rate limits into an actual
- * "try again in a few minutes" instead of a mystery failure.
+ * TDLib's messages are machine tokens such as `PHONE_NUMBER_INVALID` or `FLOOD_WAIT_312` — the two
+ * fields of a [org.drinkless.tdlib.TdApi.Error], which [TelegramRequestException] carries. Mapping
+ * them here rather than passing `message` through is what keeps a raw response containing a phone
+ * number or session detail away from the screen, and it turns rate limits into an actual "try again
+ * in a few minutes" instead of a mystery failure.
  */
 object TdErrorMapper {
     fun from(code: Int, message: String): TelegramAuthFailure {

@@ -7,9 +7,10 @@ import org.drinkless.tdlib.TdApi
  * The client shape the repositories code against: one typed TDLib request object in, its typed
  * answer back, plus the updates TDLib sends unprompted.
  *
- * `org.drinkless.tdlib` deliberately stops at this line — the shape is typed rather than stringly so
- * no caller can send a method Telegram never advertised, and so a field that changed name between
- * TDLib releases fails at compile time instead of at login.
+ * This is the first line TDLib's own types appear on, and the last — above it the app works in
+ * LumoVault's models. Typing the boundary rather than stringing it is what makes a request Telegram
+ * never advertised impossible to write, and a field that changed name between TDLib releases a
+ * compile error instead of a login that silently never finishes.
  */
 interface TelegramClient {
     /** False when this build has no TDLib binary or no API credentials. */
