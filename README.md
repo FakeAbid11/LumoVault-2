@@ -337,8 +337,9 @@ because positions come from EXIF that is read on demand; and a photo taken befor
 
 ## Restore, free up space, background — Phase 9
 
-**Phase 9 — restore, free up space and background backup:** implemented. See the CI runs listed at the
-end of this section for the build state.
+**Phase 9 — restore, free up space and background backup:** complete and CI-verified green (run
+[36195740042](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36195740042), 408 unit tests across
+44 classes, debug APK published). Phase 9 added seven test classes and 73 tests.
 
 ```
 cloud record ──user taps Download──▶ TDLib original ─▶ hash what landed ─▶ MediaStore (pending → live)
@@ -406,8 +407,11 @@ that a restored video actually plays, that it appears in the gallery, that the c
 intended, that the periodic pass survives a reboot, and that v8→v9 opens over an installed library are all
 device questions and none has been asked.
 
-**Runs:** the last green run covering this section is listed in the Phase 9 report; the red ones after it, if
-any, are the ones that have not been chased to green yet.
+**Runs:** 21 in Phase 9, of which the last is green and each earlier red one named a real defect — a package
+that disagreed with its path, `ByteArray.startsWith` and `InputStream.readNBytes` (API 34 on a 29 floor), two
+`vararg` overloads of one name, `in` on a `ConcurrentHashMap`, a companion object closed in the middle of its
+body, a `private` extension three files wanted, two fakes sharing a name, and an unescaped apostrophe that
+AAPT2 reported as an invalid unicode escape.
 
 ## Telegram status — what is real and what is deferred
 
