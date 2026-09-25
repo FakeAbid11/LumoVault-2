@@ -255,14 +255,19 @@ class BackupHealthRepositoryTest {
     }
 
     @Test
-    fun cancelledWorkCountsAsWaitingAndNotAsFailed() = runBlocking<Unit> {
+    fun cancelledWorkIsNotAFailureAndNotSafetyEither() = runBlocking<Unit> {
         withQueueRows(1L)
         queue.forceState(1L, UploadState.Cancelled)
 
         val health = repository(cloudOnly = 0, lastBackup = null, lastScan = null).observe().first()
 
-        assertEquals(0, health.failed)
-        assertEquals("a row that asserts nothing is outstanding work", 1, health.waiting)
+        assertEquals("a cancel is not something that went wrong", 0, health.failed)
+        assertEquals("and it is not waiting to be sent; the user said not to", 0, health.waiting)
+        assertEquals("but it is still local with nothing proven elsewhere", 1, health.notBackedUp)
+        assertTrue(
+            "which is why a cancelled item cannot let the screen promise everything is stored",
+            !health.allLocalMediaBackedUp,
+        )
     }
 }
 
