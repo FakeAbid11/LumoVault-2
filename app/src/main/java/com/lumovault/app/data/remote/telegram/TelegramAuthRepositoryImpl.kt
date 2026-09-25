@@ -3,7 +3,6 @@ package com.lumovault.app.data.remote.telegram
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
-import com.lumovault.app.util.Privacy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -211,9 +210,14 @@ class TelegramAuthRepositoryImpl(
             else -> TelegramAuthFailure(TelegramAuthFailure.Kind.Unexpected)
         }
 
-        // Only the code and the mapped kind are logged; the raw reason goes through digit masking
-        // because Telegram's own text can quote the number being dialled.
-        android.util.Log.w(TAG, "telegram auth failed code=${error.diagnosticsCode()} kind=${failure.kind} detail=${Privacy.maskDigits(error.localizedMessage.orEmpty())}")
+        // The code, the mapped kind and the exception's own class — and no message text at all. Digit
+        // masking hid the number being dialled but not a path, and a TDLib I/O failure quotes the directory
+        // it could not write, which is the rule every other log call in this app already follows.
+        android.util.Log.w(
+            TAG,
+            "telegram auth failed code=${error.diagnosticsCode()} kind=${failure.kind} " +
+                "from=${error.javaClass.simpleName}",
+        )
         _state.value = TelegramAuthState.Failed(failure)
     }
 

@@ -295,7 +295,11 @@ class AppContainer(context: Context) {
      * otherwise have to agree with the first by coincidence.
      */
     val backupQueueRepository: BackupQueueRepository by lazy {
-        BackupQueueRepositoryImpl(dao = backupQueueDao, nowSeconds = ::unixNow)
+        BackupQueueRepositoryImpl(
+            dao = backupQueueDao,
+            nowSeconds = ::unixNow,
+            inTransaction = { block -> database.withTransaction(block) },
+        )
     }
 
     /**

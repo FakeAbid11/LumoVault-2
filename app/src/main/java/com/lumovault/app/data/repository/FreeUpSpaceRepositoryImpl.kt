@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.backup.EligibilityRow
 import com.lumovault.app.data.local.backup.FreeUpSpaceDao
 import com.lumovault.app.domain.backup.UploadState
@@ -56,8 +57,4 @@ class FreeUpSpaceRepositoryImpl(
         trashed = trashedAt != 0L,
     )
 
-    private companion object {
-        /** The same ceiling every other `IN (…)` in this database respects. */
-        const val MAX_IDS_PER_QUERY = 400
-    }
 }

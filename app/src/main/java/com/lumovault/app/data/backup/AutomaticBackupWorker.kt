@@ -30,8 +30,11 @@ class AutomaticBackupWorker(
 
     override suspend fun doWork(): Result = when (val outcome = runPass()) {
         // The grant can come back without another periodic period elapsing, so this is worth another try
-        // rather than a silent success over a library nobody scanned.
-        RunAutomaticBackupUseCase.Outcome.NoMediaAccess -> Result.retry()
+        // rather than a silent success over a library nobody scanned — but a bounded number of them. A
+        // person who chose "Don't allow" and meant it would otherwise be woken every backoff interval,
+        // forever, by work that can only ever come back with the same answer.
+        RunAutomaticBackupUseCase.Outcome.NoMediaAccess ->
+            if (runAttemptCount < ACCESS_RETRY_LIMIT) Result.retry() else Result.success()
 
         // Off, or never configured: nothing to do, and nothing to retry.
         RunAutomaticBackupUseCase.Outcome.Disabled,
@@ -42,5 +45,10 @@ class AutomaticBackupWorker(
             // More work remains only when the window filled, which is the pass saying "keep going" to
             // itself rather than the app pretending a hundred-thousand-photo library was one pass.
             if (outcome.moreRemaining) Result.retry() else Result.success()
+    }
+
+    private companion object {
+        /** Roughly an hour of retries at this worker's backoff curve, then the next period decides. */
+        const val ACCESS_RETRY_LIMIT = 6
     }
 }

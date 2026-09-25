@@ -44,7 +44,7 @@ class BackupScheduler(private val context: Context) {
      * just made in front of it.
      */
     fun start() {
-        enqueueUpload(connectedOnly())
+        enqueueUpload(MANUAL_WORK_NAME, connectedOnly())
     }
 
     /**
@@ -56,10 +56,20 @@ class BackupScheduler(private val context: Context) {
      * report "waiting" as a state instead of a row of errors.
      */
     fun startAutomatic(preferences: BackupPreferences) {
-        enqueueUpload(constraintsFor(preferences.toAutomaticWorkRequest()))
+        enqueueUpload(AUTOMATIC_WORK_NAME, constraintsFor(preferences.toAutomaticWorkRequest()))
     }
 
-    private fun enqueueUpload(constraints: Constraints) {
+    /**
+     * The name is part of the constraint contract, not just a label.
+     *
+     * Both paths used to enqueue under one unique name with `APPEND_OR_REPLACE`, so a hand-tapped backup
+     * arrived to find the unattended chain already there and joined it — and a chain waits for the
+     * constraints of the work in it. Tapping "Back Up" on mobile data then meant waiting for a Wi-Fi
+     * network the user had not agreed to use, which is the one outcome [BackupPreferences] promises is
+     * impossible. Two names, two chains: the strict constraints can only ever hold up the work that
+     * inherited them from a setting, never work that came from a tap.
+     */
+    private fun enqueueUpload(name: String, constraints: Constraints) {
         val request = OneTimeWorkRequestBuilder<BackupUploadWorker>()
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
@@ -67,7 +77,7 @@ class BackupScheduler(private val context: Context) {
             .build()
 
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
+            .enqueueUniqueWork(name, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
     }
 
     /**
@@ -115,11 +125,18 @@ class BackupScheduler(private val context: Context) {
      * tap on cancel cannot orphan a half-sent file.
      */
     fun stop() {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        // Both send chains: a tap on cancel means "stop uploading", and which of the two enqueued the row
+        // makes no difference to the user. The periodic *scan* keeps its own name — cancelling a send is
+        // not a way to switch off the setting that finds the next one.
+        val work = WorkManager.getInstance(context)
+        work.cancelUniqueWork(MANUAL_WORK_NAME)
+        work.cancelUniqueWork(AUTOMATIC_WORK_NAME)
     }
 
     private companion object {
-        const val WORK_NAME = "lumovault-backup-queue"
+        const val MANUAL_WORK_NAME = "lumovault-backup-queue-manual"
+
+        const val AUTOMATIC_WORK_NAME = "lumovault-backup-queue-automatic"
 
         /** The periodic scan-and-queue pass. Its own name, so cancelling it never touches a send. */
         const val PERIODIC_WORK_NAME = "lumovault-automatic-backup"

@@ -54,47 +54,56 @@ class BackupUploadWorker(
     override suspend fun doWork(): Result = supervisorScope {
         // Collected as a child of this scope: the notifier only posts status, so a failure inside it
         // must not end — or be mistaken for — an upload.
-        queue.observeSummary()
+        //
+        // The Job is kept because `supervisorScope` waits for its children before it returns, and this one
+        // is an infinite Room flow. Left running, `doWork` never finishes after the queue drains, and the
+        // dataSync foreground service — with its "backing up" notification — stays up until the system
+        // kills it, which is exactly the permanent foreground service PRD section 62 rules out.
+        val notifier = queue.observeSummary()
             .onEach { latest ->
                 summary = latest
                 setForeground(getForegroundInfo())
             }
             .launchIn(this)
 
-        // Recognition runs first and on purpose: an item that is about to be sent may turn out to be
-        // already stored, and finding that out before the upload rather than after it is what keeps a
-        // duplicate out of the user's channel. It is bounded — it yields to the queue the moment anything
-        // is queued — so this is never a reason an upload waits.
-        val recognition = recognizer.run()
+        try {
+            // Recognition runs first and on purpose: an item that is about to be sent may turn out to be
+            // already stored, and finding that out before the upload rather than after it is what keeps a
+            // duplicate out of the user's channel. It is bounded — it yields to the queue the moment anything
+            // is queued — so this is never a reason an upload waits.
+            val recognition = recognizer.run()
 
-        val outcome = runner.run { progress ->
-            label = progress.displayName
-            // Rounded, so a burst of TDLib file updates becomes a handful of notifications rather than
-            // one per buffer. Nothing else in the app needs byte resolution.
-            val rounded = (progress.fraction * 100f).toInt().coerceIn(0, 100)
-            if (percent != rounded) {
-                percent = rounded
-                setForeground(getForegroundInfo())
-            }
-        }
-
-        return@supervisorScope when (outcome) {
-            // [deferred] is the retry signal: an item that Telegram or the network refused is back in
-            // the queue, and WorkManager's exponential backoff is what spaces the attempts out — this
-            // worker must not sit in a loop doing it faster and worse.
-            //
-            // A recognition pass that ran out of its time budget borrows the same signal rather than
-            // scheduling work of its own. The frontier strictly shrinks — every item it reaches either
-            // gets a hash or is recorded as unreadable, and both leave the candidate set — so asking to be
-            // run again terminates, which is what makes a second worker name unnecessary here.
-            is QueueRun.Done -> when {
-                outcome.deferred || recognition.stoppedEarly -> Result.retry()
-                else -> Result.success()
+            val outcome = runner.run { progress ->
+                label = progress.displayName
+                // Rounded, so a burst of TDLib file updates becomes a handful of notifications rather than
+                // one per buffer. Nothing else in the app needs byte resolution.
+                val rounded = (progress.fraction * 100f).toInt().coerceIn(0, 100)
+                if (percent != rounded) {
+                    percent = rounded
+                    setForeground(getForegroundInfo())
+                }
             }
 
-            // Nothing to do about either from here: the user has to sign in, or the build has no
-            // Telegram. Retrying would re-run a pass that cannot make progress.
-            QueueRun.NoChannel, QueueRun.TelegramUnavailable -> Result.failure()
+            when (outcome) {
+                // [deferred] is the retry signal: an item that Telegram or the network refused is back in
+                // the queue, and WorkManager's exponential backoff is what spaces the attempts out — this
+                // worker must not sit in a loop doing it faster and worse.
+                //
+                // A recognition pass that ran out of its time budget borrows the same signal rather than
+                // scheduling work of its own. The frontier strictly shrinks — every item it reaches either
+                // gets a hash or is recorded as unreadable, and both leave the candidate set — so asking to be
+                // run again terminates, which is what makes a second worker name unnecessary here.
+                is QueueRun.Done -> when {
+                    outcome.deferred || recognition.stoppedEarly -> Result.retry()
+                    else -> Result.success()
+                }
+
+                // Nothing to do about either from here: the user has to sign in, or the build has no
+                // Telegram. Retrying would re-run a pass that cannot make progress.
+                QueueRun.NoChannel, QueueRun.TelegramUnavailable -> Result.failure()
+            }
+        } finally {
+            notifier.cancel()
         }
     }
 

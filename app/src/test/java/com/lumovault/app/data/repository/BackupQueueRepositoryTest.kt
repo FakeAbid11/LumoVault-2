@@ -29,7 +29,7 @@ class BackupQueueRepositoryTest {
     private val clock = QueueClock()
     private val dao = FakeBackupQueueDao()
     private val repository: BackupQueueRepository =
-        BackupQueueRepositoryImpl(dao, clock::now, attemptCap = 3)
+        BackupQueueRepositoryImpl(dao, clock::now, inTransaction = { it() }, attemptCap = 3)
 
     @Test
     fun enqueueAddsOnlyKnownItemsAndOnlyOnce() = runBlocking {

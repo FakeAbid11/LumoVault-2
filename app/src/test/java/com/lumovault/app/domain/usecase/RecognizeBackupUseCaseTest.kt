@@ -22,7 +22,7 @@ import org.junit.Test
 class RecognizeBackupUseCaseTest {
     private val clock = QueueClock()
     private val dao = FakeBackupQueueDao()
-    private val queue = BackupQueueRepositoryImpl(dao, clock::now)
+    private val queue = BackupQueueRepositoryImpl(dao, clock::now, inTransaction = { it() })
     private val cloud = FakeCloudIndexRepository()
     private val hasher = FakeMediaContentHasher()
 

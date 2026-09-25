@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.metadata.MapPhotoRow
 import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.metadata.MediaMetadataEntity
@@ -99,7 +100,6 @@ class MediaMetadataRepositoryImpl(
 
     private companion object {
         /** Comfortably under SQLite's parameter ceiling, and far more than a preview strip can draw. */
-        const val MAX_IDS_PER_QUERY = 400
     }
 }
 

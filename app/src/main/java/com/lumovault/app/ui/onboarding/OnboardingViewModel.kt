@@ -121,7 +121,13 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         } else {
             emptyList()
         }
-        viewModelScope.launch { container.onboardingRepository.setBackupSource(source, folders) }
+        viewModelScope.launch {
+            container.onboardingRepository.setBackupSource(source, folders)
+            // The source is also what switches unattended backup on, so the schedule has to be re-read in
+            // the same breath the settings screen does it — otherwise "back up automatically" is a promise
+            // the app keeps only after the process is restarted.
+            container.refreshAutomaticBackup()
+        }
     }
 
     fun toggleFolder(folder: String) {
@@ -130,6 +136,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch {
             container.onboardingRepository.setBackupSource(BackupSource.SelectedFolders, next.sorted())
+            container.refreshAutomaticBackup()
         }
     }
 

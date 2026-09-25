@@ -57,7 +57,7 @@ import org.junit.Test
 class RestoreCloudMediaUseCaseTest {
     private val clock = QueueClock()
     private val dao = FakeBackupQueueDao()
-    private val queue = BackupQueueRepositoryImpl(dao, clock::now, attemptCap = 3)
+    private val queue = BackupQueueRepositoryImpl(dao, clock::now, inTransaction = { it() }, attemptCap = 3)
 
     private val restores = FakeRestores()
     private val downloads = FakeDownloads()

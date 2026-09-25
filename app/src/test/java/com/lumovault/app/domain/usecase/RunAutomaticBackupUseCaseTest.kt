@@ -40,7 +40,7 @@ import org.junit.Test
 class RunAutomaticBackupUseCaseTest {
     private val clock = QueueClock()
     private val dao = FakeBackupQueueDao()
-    private val queue = BackupQueueRepositoryImpl(dao, clock::now, attemptCap = 3)
+    private val queue = BackupQueueRepositoryImpl(dao, clock::now, inTransaction = { it() }, attemptCap = 3)
     private val media = FakeLibrary()
     private val onboarding = FakeOnboarding()
     private val settings = FakeSettings()

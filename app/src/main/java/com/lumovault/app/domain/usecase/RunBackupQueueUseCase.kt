@@ -11,7 +11,6 @@ import com.lumovault.app.domain.backup.UploadEvent
 import com.lumovault.app.domain.backup.UploadRequest
 import com.lumovault.app.domain.telegram.BackupManifest
 import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.transform
@@ -136,6 +135,23 @@ class RunBackupQueueUseCase(
 
         queue.markStaged(request.mediaStoreId, staged.path)
 
+        // A copy this process made is this process's to delete — including on the paths where something
+        // threw instead of deciding. `purgeStale` at start-up is a backstop, not a plan: without this the
+        // worker carries a full-size duplicate of every file it touched until the app is next restarted,
+        // and on a phone that is the difference between a retry and an out-of-storage device.
+        return try {
+            settleStaged(staged, request, chatId, onProgress)
+        } finally {
+            stager.discard(staged.path)
+        }
+    }
+
+    private suspend fun settleStaged(
+        staged: StagedSource.Ready,
+        request: BackupRequest,
+        chatId: Long,
+        onProgress: suspend (BackupProgress) -> Unit,
+    ): ItemRun {
         // Nothing is sent before its content is identified. This is the step that answers the question a
         // queue cannot ask on its own — "is the thing you are about to upload already in the channel?" —
         // and it is asked after staging rather than before so that the hash and the bytes belong to the
@@ -144,7 +160,6 @@ class RunBackupQueueUseCase(
             val identity = recognition.resolveForUpload(request, staged.path, staged.sizeBytes)
         ) {
             is UploadIdentity.Unreadable -> {
-                stager.discard(staged.path)
                 queue.release(request, identity.failure)
                 return ItemRun.Failed
             }
@@ -154,7 +169,6 @@ class RunBackupQueueUseCase(
                 // this content. `markBackedUp` takes its message id from the remote index, so the ✓ that
                 // appears on this thumbnail is a fact about the user's channel rather than an assumption
                 // about a send.
-                stager.discard(staged.path)
                 queue.markBackedUp(request.mediaStoreId, identity.remote.chatId, identity.remote.messageId)
                 return ItemRun.Deduplicated
             }
@@ -164,6 +178,8 @@ class RunBackupQueueUseCase(
 
         queue.markUploading(request.mediaStoreId)
 
+        // On cancellation the row is left in flight for the next pass to reconcile, and the staged copy
+        // goes in the caller's `finally` like every other exit.
         val terminal = try {
             upload.upload(chatId, request.toUpload(staged, manifest))
                 .transform { event ->
@@ -182,14 +198,7 @@ class RunBackupQueueUseCase(
                     }
                 }
                 .lastOrNull()
-        } catch (cancelled: CancellationException) {
-            // The row stays in flight and the next pass reconciles it. The copy belongs to this
-            // process, so it goes now rather than waiting for the start-up sweep.
-            stager.discard(staged.path)
-            throw cancelled
         }
-
-        stager.discard(staged.path)
 
         return when (terminal) {
             is UploadEvent.Sent -> {

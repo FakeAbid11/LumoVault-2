@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.restore.MediaRestoreDao
 import com.lumovault.app.data.local.restore.MediaRestoreEntity
 import com.lumovault.app.domain.restore.CloudRestoreTarget
@@ -151,7 +152,6 @@ class RestoreRepositoryImpl(
     )
 
     private companion object {
-        const val MAX_IDS_PER_QUERY = 400
 
         val LIVE_STATES = listOf(
             RestoreState.Pending.storageKey,

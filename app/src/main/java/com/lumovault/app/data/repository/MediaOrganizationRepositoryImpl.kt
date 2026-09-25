@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
@@ -83,8 +84,13 @@ class MediaOrganizationRepositoryImpl(
     override fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>> {
         // Guarded because an empty `IN ()` is not valid SQL, and a window with nothing in it yet is an
         // ordinary first frame on an empty device rather than an error.
-        if (mediaStoreIds.isEmpty()) return flowOf(emptySet())
-        return organization.observeFavoritesIn(mediaStoreIds).map { it.toSet() }
+        val chunks = mediaStoreIds.chunked(MAX_IDS_PER_QUERY)
+        if (chunks.isEmpty()) return flowOf(emptySet())
+        if (chunks.size == 1) return organization.observeFavoritesIn(chunks[0]).map { it.toSet() }
+        // A loaded window outgrows SQLite's parameter ceiling after a few screens of scrolling, so the
+        // window is asked in pieces and the pieces merged — `combine` because Room re-emits one chunk at
+        // a time and the screen wants the whole answer.
+        return combine(chunks.map { organization.observeFavoritesIn(it) }) { parts -> parts.flatMap { it }.toSet() }
     }
 
     override suspend fun setFavorite(mediaStoreIds: Collection<Long>, favorite: Boolean) {
@@ -119,9 +125,15 @@ class MediaOrganizationRepositoryImpl(
     override suspend fun forgetDeletedLocally(mediaStoreIds: Collection<Long>) {
         if (mediaStoreIds.isEmpty()) return
         inTransaction {
-            organization.clearFor(mediaStoreIds)
-            albums.removeFromEveryAlbum(mediaStoreIds)
-            media.deleteByIds(mediaStoreIds)
+            // Chunked *inside* the transaction, not before it: "empty the Trash" hands this every trashed
+            // id at once, and SQLite's ceiling on bind parameters is a property of the statement rather than
+            // of how the list was built. Keeping one transaction means a library of any size still clears a
+            // row, its organisation and its memberships together.
+            mediaStoreIds.chunked(MAX_IDS_PER_QUERY).forEach { chunk ->
+                organization.clearFor(chunk)
+                albums.removeFromEveryAlbum(chunk)
+                media.deleteByIds(chunk)
+            }
         }
     }
 

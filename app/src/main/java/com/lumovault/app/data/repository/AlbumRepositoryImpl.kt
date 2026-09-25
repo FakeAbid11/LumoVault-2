@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.media.toMedia
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.AlbumEntity
@@ -60,7 +61,7 @@ class AlbumRepositoryImpl(
         if (albums.album(albumId) == null) return 0
 
         val before = albums.countMembers(albumId)
-        albums.addMembers(albumId, mediaStoreIds, nowSeconds())
+        mediaStoreIds.chunked(MAX_IDS_PER_QUERY).forEach { albums.addMembers(albumId, it, nowSeconds()) }
         // Room gives an `INSERT` no row count, so the difference is what "how many did you add" means —
         // and it excludes both the ids already in the album and any that are not in the index.
         return albums.countMembers(albumId) - before
@@ -68,12 +69,15 @@ class AlbumRepositoryImpl(
 
     override suspend fun removeMedia(albumId: Long, mediaStoreIds: Collection<Long>): Int {
         if (mediaStoreIds.isEmpty()) return 0
-        return albums.removeMembers(albumId, mediaStoreIds)
+        return mediaStoreIds.chunked(MAX_IDS_PER_QUERY)
+            .sumOf { albums.removeMembers(albumId, it) }
     }
 
     override suspend fun membersWithin(albumId: Long, mediaStoreIds: Collection<Long>): List<Long> {
         if (mediaStoreIds.isEmpty()) return emptyList()
-        return albums.membersWithin(albumId, mediaStoreIds)
+        // The add-media sheet asks about its whole loaded window, which grows past SQLite's parameter
+        // ceiling after a few screens of scrolling; see [MAX_IDS_PER_QUERY].
+        return mediaStoreIds.chunked(MAX_IDS_PER_QUERY).flatMap { albums.membersWithin(albumId, it) }
     }
 
     override suspend fun albumsContaining(mediaStoreId: Long): List<Long> =

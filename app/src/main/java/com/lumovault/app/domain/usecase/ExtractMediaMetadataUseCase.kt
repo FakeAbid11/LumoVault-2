@@ -4,6 +4,7 @@ import com.lumovault.app.domain.metadata.MediaContentMetadataReader
 import com.lumovault.app.domain.metadata.MetadataCandidate
 import com.lumovault.app.domain.metadata.MetadataRead
 import com.lumovault.app.domain.repository.MediaMetadataRepository
+import java.util.concurrent.AtomicBoolean
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -53,16 +54,18 @@ class ExtractMediaMetadataUseCase(
         val stoppedEarly: Boolean = false,
     )
 
-    private var running = false
+    // An atomic compare-and-set rather than a `Boolean`: three screens can ask for a pass at once (the map
+    // on open, the map on resume, and the permission callback after a grant), and this runs on the
+    // application scope, so a check-then-set can let both through and have two passes writing the same rows.
+    private val running = AtomicBoolean(false)
 
     /** Runs one bounded pass, or returns an empty [Run] when another is already in flight. */
     suspend fun run(): Run {
-        if (running) return Run(stoppedEarly = true)
-        running = true
+        if (!running.compareAndSet(false, true)) return Run(stoppedEarly = true)
         try {
             return readStage()
         } finally {
-            running = false
+            running.set(false)
         }
     }
 

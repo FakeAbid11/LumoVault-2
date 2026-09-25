@@ -173,6 +173,12 @@ jobs:
             | grep -q .; then
             echo "the JSON TDLib transport is still present somewhere in app/src"; exit 1
           fi
+          # The check above only catches the file names. The transport itself is a set of C symbols, and a
+          # regression that called them from Kotlin or JNI source would leave the typed client looking
+          # intact while a JSON loop quietly came back underneath it.
+          if grep -rlE 'td_json_client|td_send|td_receive' app/src; then
+            echo "the TDLib JSON transport returned to the source tree"; exit 1
+          fi
 
       - name: Build debug APK and run unit tests
         env:

@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.domain.model.CloudMedia
@@ -34,7 +35,7 @@ class LocalPresenceLookup(
 
     private suspend fun hashMatched(items: List<CloudMedia>, hashes: List<String>): Set<Long> {
         val onDevice = mutableSetOf<String>()
-        hashes.chunked(QUERY_CHUNK).forEach { chunk ->
+        hashes.chunked(MAX_IDS_PER_QUERY).forEach { chunk ->
             queue.hashesStillOnDevice(chunk).forEach { onDevice += it }
         }
         return items.filter { it.contentHash in onDevice }.map { it.messageId }.toSet()
@@ -47,14 +48,10 @@ class LocalPresenceLookup(
         if (names.isEmpty()) return emptySet()
 
         val onDevice = mutableSetOf<Pair<String, Long>>()
-        names.chunked(QUERY_CHUNK).forEach { chunk ->
+        names.chunked(MAX_IDS_PER_QUERY).forEach { chunk ->
             media.findByName(chunk).forEach { match -> onDevice += match.displayName to match.sizeBytes }
         }
         return candidates.filter { it.fileName to it.sizeBytes in onDevice }.map { it.messageId }.toSet()
     }
 
-    private companion object {
-        /** SQLite's own parameter limit is ~999; 400 leaves room for the rest of the statement. */
-        const val QUERY_CHUNK = 400
-    }
 }

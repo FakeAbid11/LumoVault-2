@@ -1,7 +1,10 @@
 package com.lumovault.app.data.repository
 
 import com.lumovault.app.data.local.backup.BackupQueueDao
+import com.lumovault.app.data.local.backup.ClaimedBackupRow
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.domain.backup.BackupFailure
+import com.lumovault.app.domain.backup.BackupItemState
 import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.BackupIdentityCandidate
 import com.lumovault.app.domain.backup.BackupQueueRepository
@@ -14,7 +17,9 @@ import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * The queue's policy, in one place, over a DAO that only stores.
@@ -28,12 +33,27 @@ import kotlinx.coroutines.flow.map
 class BackupQueueRepositoryImpl(
     private val dao: BackupQueueDao,
     private val nowSeconds: () -> Long,
+    /**
+     * Runs a block as one database transaction, so a sequence of statements either all lands or none does.
+     *
+     * Required rather than defaulted: the one place that needs it is [claimNext], where "none does" is the
+     * difference between two uploads of the same photo and one.
+     */
+    private val inTransaction: suspend (suspend () -> Unit) -> Unit,
     private val attemptCap: Int = ATTEMPT_CAP,
 ) : BackupQueueRepository {
 
     override fun observeStatesFor(mediaStoreIds: Collection<Long>): Flow<Map<Long, UploadState>> =
-        dao.observeStatesFor(mediaStoreIds).map { rows ->
-            rows.associate { it.mediaStoreId to it.state }
+        mediaStoreIds.chunked(MAX_IDS_PER_QUERY).let { chunks ->
+            when {
+                // A timeline's first frame is empty, and `IN ()` is not a statement SQLite will take.
+                chunks.isEmpty() -> flowOf(emptyMap())
+                chunks.size == 1 -> dao.observeStatesFor(chunks[0]).map { it.associateById() }
+                else ->
+                    // Room re-emits only the chunk whose table changed, so the chunks have to be merged
+                    // rather than concatenated: `combine` waits for each one's latest list.
+                    combine(chunks.map { dao.observeStatesFor(it) }) { parts -> parts.flatMap { it }.associateById() }
+            }
         }
 
     override fun observeSummary(): Flow<BackupQueueSummary> =
@@ -183,7 +203,32 @@ class BackupQueueRepositoryImpl(
     override suspend fun hasQueuedWork(): Boolean =
         dao.countIn(UploadState.Queued.storageKey) > 0
 
+    /**
+     * Hands the caller the one row this pass owns, or null when the queue has nothing waiting.
+     *
+     * The claim and the read-back are one transaction on purpose. [BackupQueueDao.claimOldest] is atomic by
+     * itself — a second caller whose subquery resolved the same row matches nothing — but the row it moved is
+     * then identified by being *the newest one in `preparing`*, which is a second statement. Two passes
+     * overlapping therefore each claim a different row and both read back the same newest one, and that is the
+     * worst shape a queue can produce: one photo uploaded twice, and another stranded in `preparing` with
+     * nobody holding it. It stops being hypothetical the moment a manual "Back Up" and the unattended chain
+     * exist at the same time, which is why [BackupScheduler] gives them separate work names.
+     */
     override suspend fun claimNext(chatId: Long): BackupRequest? {
+        while (true) {
+            var outcome: Claimed = Claimed.None
+            inTransaction { outcome = claimWithin(chatId) }
+            when (val claimed = outcome) {
+                Claimed.None -> return null
+                // The row was refused here; the next one is still waiting to be claimed.
+                Claimed.Skipped -> continue
+                is Claimed.Held -> return claimed.row.toRequest(claimed.mediaType, claimed.contentUri)
+            }
+        }
+    }
+
+    /** The claim itself. Only correct inside a transaction — see [claimNext]. */
+    private suspend fun claimWithin(chatId: Long): Claimed {
         val now = nowSeconds()
         val claimed = dao.claimOldest(
             queuedState = UploadState.Queued.storageKey,
@@ -191,9 +236,9 @@ class BackupQueueRepositoryImpl(
             chatId = chatId,
             now = now,
         )
-        if (claimed == 0) return null
+        if (claimed == 0) return Claimed.None
 
-        val row = dao.newestIn(UploadState.Preparing.storageKey) ?: return null
+        val row = dao.newestIn(UploadState.Preparing.storageKey) ?: return Claimed.None
         val mediaType = row.mediaType?.let { key -> MediaType.entries.firstOrNull { it.storageKey == key } }
         val contentUri = row.contentUri
 
@@ -207,29 +252,10 @@ class BackupQueueRepositoryImpl(
                 failure = BackupFailureKind.SourceMissing.name,
                 now = now,
             )
-            return claimNext(chatId)
+            return Claimed.Skipped
         }
 
-        return BackupRequest(
-            mediaStoreId = row.mediaStoreId,
-            mediaType = mediaType,
-            mimeType = row.mimeType.orEmpty(),
-            contentUri = contentUri,
-            displayName = row.displayName.orEmpty(),
-            expectedSizeBytes = row.sizeBytes ?: 0L,
-            modifiedSeconds = row.modifiedSeconds ?: 0L,
-            width = row.width ?: 0,
-            height = row.height ?: 0,
-            durationMillis = row.durationMillis,
-            state = UploadState.Preparing,
-            contentHash = row.contentHash,
-            contentSizeBytes = row.contentSizeBytes,
-            contentModifiedSeconds = row.contentModifiedSeconds,
-            telegramChatId = row.chatId,
-            telegramMessageId = row.messageId,
-            attempts = row.attempts,
-            failure = row.failureKey.toFailure(),
-        )
+        return Claimed.Held(row, mediaType, contentUri)
     }
 
     override suspend fun markUploading(mediaStoreId: Long) {
@@ -340,3 +366,40 @@ private fun String?.toFailure(): BackupFailure? {
     val key = this?.takeIf { it.isNotBlank() } ?: return null
     return BackupFailure(BackupFailureKind.entries.firstOrNull { it.name == key } ?: BackupFailureKind.Unknown)
 }
+
+/** Queue rows keyed the way every caller wants them: id to state. */
+private fun List<BackupItemState>.associateById(): Map<Long, UploadState> =
+    associate { it.mediaStoreId to it.state }
+
+/** What one attempt inside [claimNext] decided, including that it decided nothing. */
+private sealed interface Claimed {
+    /** Nothing was waiting, or the row that was waiting has already been handed to another pass. */
+    data object None : Claimed
+
+    /** Claimed and refused here, because the file it described has left the media index. */
+    data object Skipped : Claimed
+
+    /** The row this pass now owns, with the media columns it needs to send. */
+    class Held(val row: ClaimedBackupRow, val mediaType: MediaType, val contentUri: String) : Claimed
+}
+
+private fun ClaimedBackupRow.toRequest(mediaType: MediaType, contentUri: String) = BackupRequest(
+    mediaStoreId = mediaStoreId,
+    mediaType = mediaType,
+    mimeType = mimeType.orEmpty(),
+    contentUri = contentUri,
+    displayName = displayName.orEmpty(),
+    expectedSizeBytes = sizeBytes ?: 0L,
+    modifiedSeconds = modifiedSeconds ?: 0L,
+    width = width ?: 0,
+    height = height ?: 0,
+    durationMillis = durationMillis,
+    state = UploadState.Preparing,
+    contentHash = contentHash,
+    contentSizeBytes = contentSizeBytes,
+    contentModifiedSeconds = contentModifiedSeconds,
+    telegramChatId = chatId,
+    telegramMessageId = messageId,
+    attempts = attempts,
+    failure = failureKey.toFailure(),
+)
