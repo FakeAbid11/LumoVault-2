@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.sample
 
 /**
  * The map's state: what is on screen, what is placed, and what the user has picked.
@@ -66,9 +69,19 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
      * Recomputed from [photos] and the viewport's zoom, so zooming in separates a cluster into its members
      * without any state being carried between the two levels.
      */
-    val pins: StateFlow<List<MapPin>> = combine(photos, viewport) { found, window ->
+    val pins: StateFlow<List<MapPin>> = combine(
+        // Coalesced before it is clustered: one metadata pass writes hundreds of rows, each of which
+        // invalidates the query underneath this, and a map that redrew its markers once per row would be
+        // rebuilding thousands of objects to show a screen nobody has finished looking at.
+        photos.sample(PINS_SAMPLE_MILLIS),
+        viewport,
+    ) { found, window ->
         MapClustering.cluster(found, zoom = window?.zoom ?: MapClustering.DEFAULT_ZOOM)
-    }.stateIn(viewModelScope, STOP_POLICY, emptyList())
+    }
+        // Up to [PHOTO_LIMIT] rows grouped into cells, and `stateIn` would run it on the thread that
+        // collects — the main one, while the user is panning.
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, STOP_POLICY, emptyList())
 
     /** The strip: the same window's photos, capped at what a row can usefully show. */
     val strip: StateFlow<List<MapPhoto>> = photos
@@ -176,6 +189,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         container.mediaMetadataRepository.mapPhotos(pin.mediaStoreIds, limit)
 
     private companion object {
+        /** How long the pin layer waits for a burst of database invalidations to settle. */
+        const val PINS_SAMPLE_MILLIS = 250L
+
         /**
          * Photos a single viewport may pull.
          *

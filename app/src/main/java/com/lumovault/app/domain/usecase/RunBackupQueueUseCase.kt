@@ -180,25 +180,23 @@ class RunBackupQueueUseCase(
 
         // On cancellation the row is left in flight for the next pass to reconcile, and the staged copy
         // goes in the caller's `finally` like every other exit.
-        val terminal = try {
-            upload.upload(chatId, request.toUpload(staged, manifest))
-                .transform { event ->
-                    // Progress is forwarded and dropped; the last event decides the row's state, so it
-                    // has to be the only thing that survives the flow.
-                    if (event is UploadEvent.Progress) {
-                        onProgress(
-                            BackupProgress(
-                                mediaStoreId = request.mediaStoreId,
-                                displayName = request.displayName,
-                                fraction = event.fraction,
-                            ),
-                        )
-                    } else {
-                        emit(event)
-                    }
+        val terminal = upload.upload(chatId, request.toUpload(staged, manifest))
+            .transform { event ->
+                // Progress is forwarded and dropped; the last event decides the row's state, so it
+                // has to be the only thing that survives the flow.
+                if (event is UploadEvent.Progress) {
+                    onProgress(
+                        BackupProgress(
+                            mediaStoreId = request.mediaStoreId,
+                            displayName = request.displayName,
+                            fraction = event.fraction,
+                        ),
+                    )
+                } else {
+                    emit(event)
                 }
-                .lastOrNull()
-        }
+            }
+            .lastOrNull()
 
         return when (terminal) {
             is UploadEvent.Sent -> {

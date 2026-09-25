@@ -12,6 +12,7 @@ import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
 import com.lumovault.app.domain.organization.SystemAlbumCounts
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf

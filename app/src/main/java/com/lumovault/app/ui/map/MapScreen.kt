@@ -120,7 +120,8 @@ fun MapScreen(
             MapView(viewContext).apply {
                 // A MapView destroys itself on detach by default, and a Compose subtree leaving and returning
                 // is normal navigation — without this the second visit would be a map with no overlays and no
-                // listeners at all.
+                // listeners at all. The teardown is not lost, only moved: the `onRelease` handler below is the
+                // point where leaving is permanent, and every visit otherwise only pauses the view.
                 setDestroyMode(false)
                 val source = MapTileProvider.tileSource()
                 if (source == null) {
@@ -138,6 +139,10 @@ fun MapScreen(
             }
         },
         update = { view -> mapView = view },
+        // Every visit to this screen built a MapView that was only ever paused: osmdroid's own teardown
+        // releases its tile loader, its memory policy and its network workers, and without it a handful of
+        // map visits leaves a handful of live tile caches for the life of the process.
+        onRelease = { view -> runCatching { view.destroy() } },
     )
 
     DisposableEffect(mapView) {

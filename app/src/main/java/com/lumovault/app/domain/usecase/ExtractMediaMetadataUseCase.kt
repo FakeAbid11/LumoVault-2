@@ -4,7 +4,7 @@ import com.lumovault.app.domain.metadata.MediaContentMetadataReader
 import com.lumovault.app.domain.metadata.MetadataCandidate
 import com.lumovault.app.domain.metadata.MetadataRead
 import com.lumovault.app.domain.repository.MediaMetadataRepository
-import java.util.concurrent.AtomicBoolean
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 

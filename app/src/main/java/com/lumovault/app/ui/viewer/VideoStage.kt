@@ -41,6 +41,9 @@ import com.lumovault.app.R
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
 import com.lumovault.app.ui.theme.OnMedia
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * A clip, played.
@@ -61,9 +64,10 @@ import com.lumovault.app.ui.theme.OnMedia
  *    resources — unthemable, untranslatable, and appearing over a screen the app owns. An `OnErrorListener`
  *    that returns true claims the error, which is the only thing that suppresses it, and LumoVault's own
  *    sentence is drawn in its place.
- *  - **Lifetime.** The player is released when the page leaves the composition and paused the moment it stops
- *    being the visible one. A clip that keeps playing off-screen is sound coming from a photograph nobody is
- *    looking at, and a pager that decoded three pages at once would hold three players.
+ *  - **Lifetime.** Nothing is decoded until the page is the visible one, it is paused the moment it stops
+ *    being visible or the screen stops being foreground, and the player is released when the page leaves the
+ *    composition. A clip that keeps playing off-screen is sound coming from a photograph nobody is looking at,
+ *    and a pager that prepared three pages at once would hold three hardware decoders for one video.
  */
 @Composable
 fun VideoStage(
@@ -78,12 +82,20 @@ fun VideoStage(
     var durationMs by remember(contentUri) { mutableLongStateOf(0L) }
     var positionMs by remember(contentUri) { mutableLongStateOf(0L) }
 
+    // Where a drag has reached, kept apart from the playhead so the thumb follows the finger while the
+    // decoder stays still, and reset to "nobody is dragging" once it lets go.
+    var scrubbingTo by remember(contentUri) { mutableLongStateOf(NO_SCRUB) }
+
+    // Guards the prepare below: `isActive` flips on every swipe, and a second `setDataSource` on a player
+    // that is already prepared is an IllegalStateException that would read as a broken file.
+    var starting by remember(contentUri) { mutableStateOf(false) }
+
     val player = remember(contentUri) { MediaPlayer() }
 
-    DisposableEffect(contentUri) {
+    // The listeners belong to the player, and the player to this page's content — so a page that is simply
+    // not being looked at yet still cannot leak one.
+    DisposableEffect(player) {
         runCatching {
-            player.setDataSource(Uri.parse(contentUri).toString())
-            player.isLooping = false
             player.setOnPreparedListener { mp ->
                 prepared = true
                 failed = false
@@ -101,14 +113,27 @@ fun VideoStage(
                 playing = false
                 true
             }
-            player.prepareAsync()
-        }.onFailure {
-            failed = true
         }
         onDispose {
             runCatching { player.release() }
             prepared = false
             playing = false
+        }
+    }
+
+    // Decoding starts when the page becomes the visible one, not when the pager composes it. A viewer that
+    // prepares its neighbours hands the device three hardware decoders for a clip the user will probably
+    // never reach; the swipe that reveals a page is the same gesture that asks for it to be ready.
+    LaunchedEffect(contentUri, isActive) {
+        if (!isActive || prepared || failed || starting) return@LaunchedEffect
+        starting = true
+        runCatching {
+            player.setDataSource(Uri.parse(contentUri).toString())
+            player.isLooping = false
+            player.prepareAsync()
+        }.onFailure {
+            failed = true
+            starting = false
         }
     }
 
@@ -123,6 +148,20 @@ fun VideoStage(
             runCatching { if (player.isPlaying) player.pause() }
             playing = false
         }
+    }
+
+    // Screen-off and backgrounding land here, and neither changes `isActive` — a pager page the user is
+    // still on is "active" while the phone is in their pocket. The codec and the sound both have to stop.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                runCatching { if (player.isPlaying) player.pause() }
+                playing = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // `MediaPlayer` has no progress callback, so the playhead is polled while it runs. A tenth of a second is
@@ -167,9 +206,11 @@ fun VideoStage(
             contentAlignment = Alignment.Center,
         ) {
             AndroidView(
-                factory = { context ->
-                    SurfaceView(context).also { view -> player.setDisplay(view.holder) }
-                },
+                // `AndroidView` keeps its view across content changes, so the surface is attached in
+                // `update` as well as in `factory`. A player built for a new page otherwise gets the old
+                // page's already-composed view — or none at all, which is sound and a black rectangle.
+                factory = { context -> SurfaceView(context).also { player.setDisplay(it.holder) } },
+                update = { view -> player.setDisplay(view.holder) },
                 modifier = Modifier.fillMaxSize(),
             )
             if (!prepared) {
@@ -208,15 +249,24 @@ fun VideoStage(
             }
 
             Slider(
-                value = if (durationMs > 0L) positionMs.toFloat() else 0f,
+                value = if (durationMs > 0L) {
+                    (if (scrubbingTo == NO_SCRUB) positionMs else scrubbingTo).toFloat()
+                } else {
+                    0f
+                },
                 onValueChange = { value ->
-                    if (prepared && durationMs > 0L) {
-                        val target = value.toLong().coerceIn(0L, durationMs)
+                    if (prepared && durationMs > 0L) scrubbingTo = value.toLong().coerceIn(0L, durationMs)
+                },
+                // One seek per drag. Seeking on every frame asks the decoder to resynchronise a dozen
+                // times a second, which is what a scrub on a long clip should not cost.
+                onValueChangeFinished = {
+                    if (prepared && durationMs > 0L && scrubbingTo != NO_SCRUB) {
                         // `seekTo` takes milliseconds, unlike the EXIF durations this phase reads elsewhere;
                         // mixing the two is a five-minute clip jumping to a thirty-second mark.
-                        runCatching { player.seekTo(target.toInt()) }
-                        positionMs = target
+                        runCatching { player.seekTo(scrubbingTo.toInt()) }
+                        positionMs = scrubbingTo
                     }
+                    scrubbingTo = NO_SCRUB
                 },
                 valueRange = 0f..(if (durationMs > 0L) durationMs.toFloat() else 1f),
                 enabled = prepared && durationMs > 0L,
@@ -235,3 +285,6 @@ fun VideoStage(
 
 /** How often the playhead is read while a clip runs. */
 private const val POSITION_POLL_MILLIS = 100L
+
+/** "The thumb is not being held", because position 0 is a place a person can drag to. */
+private const val NO_SCRUB = -1L
