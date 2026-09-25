@@ -33,10 +33,9 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   be confused; permission, scanning, empty, error and pull-to-refresh states
 - The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Still not built, by design:** the photo viewer and EXIF metadata (Phase 8), restoring a cloud original
-to the device and freeing up space (Phase 9), Settings, and the map (Phase 10). Later phases added the
-backup engine, recognition and the library's own organisation — see the sections below, which are the
-current record.
+**Still not built, by design:** restoring a cloud original to the device and freeing up space, and
+Settings (Phase 9). Later phases added the backup engine, recognition, the library's own organisation,
+and the viewer + map — see the sections below, which are the current record.
 
 ## Build in the cloud — never locally
 
@@ -78,6 +77,44 @@ On CI the same two values are read from repository secrets when they exist. They
 any meaningful sense once compiled in — anything distributed inside an APK can be lifted out of it —
 so a debug artifact built with them set is a build of a client that is shareable, and
 `build.yml` states on each run whether they were present.
+
+### Map tiles
+
+The map plots photo positions with osmdroid, and osmdroid needs a tile host to draw anything behind
+them. It is a **build input**, the same shape as the credentials above, because the OSM Foundation's
+[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is explicit that the public
+servers are not a production backend for somebody else's app: a declared, meaningful User-Agent is
+mandatory, bulk or preventive fetching is forbidden, and tiles must be cached. Which host a build
+uses is therefore a distribution decision, not a constant in a repository.
+
+| Build input | Meaning | Default |
+| --- | --- | --- |
+| `MAP_TILE_URL` | a `{z}/{x}/{y}` template, `http(s)://…` | empty → **no tiles** |
+| `MAP_TILE_USER_AGENT` | what the host is asked to identify the traffic as | `LumoVault/0.1` |
+| `MAP_TILE_ATTRIBUTION` | the credit line drawn under the map | empty |
+| `MAP_TILE_MAX_ZOOM` | the deepest zoom the host allows, clamped to 1–22 | 19 |
+
+```
+./gradlew assembleDebug \
+  -PMAP_TILE_URL='https://tile.example.org/{z}/{x}/{y}.png' \
+  -PMAP_TILE_USER_AGENT='LumoVault/0.1 (your-contact@example.org)' \
+  -PMAP_TILE_ATTRIBUTION='© Example map contributors'
+```
+
+Each value is trimmed and then dropped if it carries a `"`, a backslash or a `$` — those would fail
+the build from generated `BuildConfig` source nobody reads, and a dropped value lands in the state
+below instead. A template is kept only if it names `{z}`, `{x}` and `{y}`; `TileTemplate.isUsable`
+applies the same test at runtime, so the build cannot accept a template the app would then refuse.
+
+**With no `MAP_TILE_URL` the map still works and says it has no tiles.** Every photo position, every
+cluster, the bottom strip and the viewer hand-off all render on a blank canvas, and the screen shows
+a notice naming the missing build input. Fetching is turned off outright rather than left alone:
+osmdroid's own default tile source is Mapnik at `tile.openstreetmap.org`, so an unset source would
+quietly mean the public servers — the one thing this policy says not to assume. Tiles are cached in
+the app's own `cacheDir/osmdroid`, and no storage permission is involved.
+
+Nothing is fetched from a tile host until the map screen is actually open; there is no pre-fetch of a
+bounding box, and the pass that reads EXIF costs no network at all.
 
 ## Backup status — Phase 5
 
@@ -216,6 +253,89 @@ and nothing here presents it as one. The free-up-space flow (PRD section 74) is 
 what a restored, archived or trashed item looks like after a reinstall all need a device. The behaviours
 are covered by unit tests over fakes that mirror the SQL; the pixels are not covered by anything.
 
+## Viewer and map — Phase 8
+
+**Phase 8 — photo viewer and map:** complete and CI-verified green (run
+[36181115710](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36181115710),
+335 unit tests across 37 classes, debug APK published). Phase 8 added eight test classes and 72 tests.
+
+```
+media ──1:0..1── media_metadata    position · camera · lens · exposure · extracted_at
+   │
+   └── viewer/{mediaId}/{kind}/{argument}    kind = photos | album | system-album
+```
+
+- **One capture time, and it is not EXIF's.** `media.date_taken_seconds` comes from MediaStore's
+  `DATE_TAKEN` — the column Phase 3's scan already queries — so the timeline's date costs no file I/O.
+  EXIF's `DateTimeOriginal` is read but deliberately *not* stored beside it: two columns answering the same
+  question would disagree on some photo forever, and nothing in the app could say which one wins.
+- **The EXIF row is its own table** (v7→v8), with no foreign key to `media` for the standing reason that the
+  scanner rewrites that table, every field nullable because a real photo carries only some of them, and one
+  index on `(latitude, longitude)` because the map asks exactly one question of it: what is in this box.
+- **A header read, not a file load.** `ExifInterface` gets the `FileDescriptor`, so a 40 MB photo costs the
+  bytes around its APP1 block. The AndroidX class rather than `android.media.ExifInterface`, because the
+  platform one does not parse the HEIF/HEIC and PNG containers photos actually arrive in — choosing it would
+  have quietly dropped part of every library. Photos only: a GIF carries no EXIF and a video's position is
+  not in an EXIF block, so opening either would spend a read that can only return nothing, and then store
+  that nothing as a fact.
+- **`ACCESS_MEDIA_LOCATION` is requested where it is needed** — the map screen, with the reason on screen,
+  not during onboarding — and re-read from the system every time the screen resumes, because it can be
+  revoked outside the app. Without it MediaProvider serves a *redacted* copy whose GPS block is simply
+  absent, and `setRequireOriginal` throws when the uri is opened, so the request is made only while the
+  grant is held. On grant, the stored "read, nothing there" rows are deleted: otherwise a library scanned
+  before the consent would be permanent, and the map would stay empty for the one reason the user just
+  fixed. `ACCESS_FINE_LOCATION` is *not* in the manifest — device location is a different permission than
+  reading a coordinate a camera already wrote into your own file.
+- **The pass terminates.** Stages of 12, a four-second budget, cancellable between steps, and a candidate
+  list that over-asks by what it already tried this run so a permanently unreadable file at the head cannot
+  starve the ones behind it. A successful or empty read is recorded, so the list only ever shrinks.
+- **The viewer is a route, not a state holder**: `viewer/{mediaId}/{kind}/{argument}` survives process death
+  with the back stack, and the pager rebuilds the list from the same Room query the source screen uses
+  rather than from a passed-in collection. `Listing` distinguishes *not answered yet* from *the list does
+  not contain that photo* — the second case says so, instead of opening index 0 of some other picture.
+- **Three renderers, one pager.** A photo is zoomable; a GIF is handed to `coil-gif`, which is the only thing
+  that makes an animated file move — without it a GIF is a still image that looks correct; a video plays
+  through `MediaPlayer` over a `SurfaceView`, with play/pause, seek, position and duration. No Media3: the
+  library is available at 1.11.1 but local `content://` playback does not need it, and it would have arrived
+  as seven AARs plus Guava plus RecyclerView. The bytes are never re-encoded, so what plays is the original.
+- **The zoom arithmetic is pure** (`ViewerZoom`): 1×–5×, double-tap to 3× toward the point that was tapped,
+  and a pan limited to the overhang the current scale actually has, so a photo cannot be dragged off into
+  black. Pinch recognition itself cannot be tested off-device, which is why every *decision* the gesture
+  makes lives in that one file.
+- **The details sheet shows only what exists.** A camera, lens, focal length, aperture, ISO or shutter line
+  appears if and only if the read found that tag; dimensions and file size come from the MediaStore columns
+  the scanner already reads, so nothing decodes an image to describe it. The one absence the sheet names is
+  location, because that one has a button attached to it. Where EXIF had no capture date at all, the sheet
+  says *"Added on this device"* over `date_added` rather than presenting an import timestamp as a birthday.
+- **Nothing about an action is new.** Back up enqueues on `backup_queue` through the same repository the
+  Photos selection uses — same hashing, same manifest, same duplicate check; favourite, archive, trash and
+  add-to-album all go through the Phase 7 repositories. The viewer has no upload path and no organisation
+  table of its own.
+- **The map plots what the files say.** Grid bucketing in projected pixels at the zoom on screen (a 64-px
+  cell), a cluster's position taken as the mean of its members' *projected* positions, markers painted
+  smallest-first so a bubble that says 400 covers the pin it overlaps rather than hiding under it, one
+  bounding-box query per viewport (debounced, capped at 2,000 photos, indexed) instead of a query per pin,
+  and no Google Maps SDK in any form. A cluster tap zooms in two levels and takes the cluster apart; a
+  photo tap opens the viewer at that photo, and the sheet's "View on map" centres the map on the one photo.
+
+**What this does not do.** No restore, no downloading an original back, no "free up space" — those are
+Phase 9 and nothing here pretends otherwise. No search, no People/Pets/OCR, no Locked Folder. Metadata is
+read once per photo and never re-read, so editing a photo's GPS in another app is not noticed; a photo whose
+read failed transiently stays pending rather than being recorded as having nothing. There is no merge ladder
+between cell sizes — the antimeridian is the visible cost, stated rather than papered over: two photos on
+either side of ±180° are two markers at world zoom, because a cell boundary is a cell boundary wherever it
+falls. Rotation tags are not applied to a video's presentation, and the viewer does not offer a
+frame-accurate scrub preview.
+
+**Verified by CI, not by a phone:** nothing in this phase has run on a device. The gestures, whether a GIF
+actually animates, whether a video surface appears or stays black, whether the permission dialog reads as
+the explanation it is meant to be, and whether tiles render from a configured host are all the developer's
+to confirm — the unit tests cover the arithmetic and the queries behind each of them, and none of the
+pixels. Three warnings worth repeating before a first run: the tile host must be configured (see *Map
+tiles*) or the map is deliberately blank; the map is empty until photos are opened or consent is given,
+because positions come from EXIF that is read on demand; and a photo taken before this build has no
+`date_taken_seconds` until the next scan sees it.
+
 ## Telegram status — what is real and what is deferred
 
 The client is TDLib, behind interfaces, over TDLib's **own Java binding** rather than its JSON one:
@@ -264,17 +384,23 @@ login that silently never finishes.
 | Compose BOM | 2026.09.00 (Material 3) |
 | Room | 2.8.5 |
 | libphonenumber | 9.0.40 |
-| Coil | 3.6.3 (`coil-compose`, `coil-video`; no network artifact) |
+| Coil | 3.6.3 (`coil-compose`, `coil-video`, `coil-gif`; no network artifact) |
+| androidx.exifinterface | 1.4.2 (not `android.media.ExifInterface`; reads a `FileDescriptor`) |
+| osmdroid | 6.1.20 (`org.osmdroid:osmdroid-android`, no transitive dependencies) |
 | TDLib | pinned revision `ea97bcd`, Java interface (`libtdjni.so`) |
 | compileSdk / targetSdk / minSdk | 37 / 37 / 29 |
 
 Versions live in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Kotlin stays on the 2.3
 line because KSP has no 2.4.x release; moving Kotlin first would break Room's annotation processing.
 
-Two dependencies were added deliberately, each for a job that hand-rolling would do worse:
+Three dependencies were added deliberately, each for a job that hand-rolling would do worse:
 libphonenumber (calling codes, example numbers, E.164 parsing) and Coil (thumbnail decode and cache
 for `content://` URIs). TDLib contributes no dependency at all: its generated Java sources and its
-`libtdjni.so` are build inputs fetched by CI, not artifacts resolved from a repository.
+`libtdjni.so` are build inputs fetched by CI, not artifacts resolved from a repository. Phase 8 added
+three more, each for the same kind of reason: `coil-gif` (nothing else in Coil 3 animates a GIF, and a
+still GIF is a wrong answer that looks right), `androidx.exifinterface` (the platform class misses HEIF
+and PNG), and osmdroid (drawing slippy-map tiles well is a decade of cache, decode and gesture code that
+is not this app's subject). Media3 was considered for video and declined — see the Phase 8 section.
 
 ## Architecture
 
@@ -284,24 +410,32 @@ app/src/main/java/com/lumovault/app/
 ├── AppContainer.kt           lazy dependencies + the application-scoped coroutine scope
 ├── MainActivity.kt           edge-to-edge host, nothing else
 ├── data/
-│   ├── local/                Room database (v7) and its DAOs: settings, media index, cloud index,
-│   │                         backup queue, albums + organisation, MediaStore scanning
+│   ├── local/                Room database (v8) and its DAOs: settings, media index, cloud index,
+│   │                         backup queue, albums + organisation, EXIF, MediaStore scanning
 │   ├── media/                staged copies for upload, and streamed content hashing
+│   ├── metadata/             reads one photo's EXIF through a FileDescriptor
+│   ├── map/                  the tile provider, and the build inputs behind it
 │   ├── backup/               the WorkManager queue runner and its notification
 │   ├── remote/telegram/      TDLib's typed Client/TdApi layer, auth repository, credentials, error mapping
 │   └── repository/           Room / libphonenumber / permission implementations
 ├── domain/
-│   ├── model/                ThemeMode, Country, Media, SystemAlbum, onboarding state + checklist derivation
+│   ├── model/                ThemeMode, Country, Media, MediaMetadata, SystemAlbum, onboarding state
+│   │                         + checklist derivation
 │   ├── organization/         Album, MediaOrganization repository interfaces
+│   ├── metadata/             the EXIF facts, and the reader interface they are read into
+│   ├── map/                  Web Mercator, clustering, the tile template, the viewer→map hand-off
 │   ├── backup/               upload state, identity, hashing and staging interfaces
 │   ├── repository/           Settings, Onboarding, Permission, Country, Media interfaces
 │   ├── telegram/             TelegramAuthRepository, auth state, auth failure, code channel, manifest
-│   └── usecase/              the two flows that span repositories: cloud sync + recognition, the queue
+│   └── usecase/              the flows that span repositories: cloud sync + recognition, the queue, the
+│                             metadata extraction pass
 └── ui/
     ├── LumoVaultRoot.kt      launch decision: onboarding or main
-    ├── LumoVaultApp.kt       the four-tab shell
+    ├── LumoVaultApp.kt       the four-tab shell, which stands down on the chrome the viewer owns
     ├── onboarding/           the six screens, their flow host, and flow state
-    ├── navigation/           main destinations and routes
+    ├── navigation/           main destinations, routes, and the viewer's route
+    ├── viewer/               the pager, its three renderers, the details sheet, and the zoom arithmetic
+    ├── map/                  the osmdroid screen, its pins and its preview strip
     ├── components/           shared composables (country picker, placeholders)
     ├── theme/                Color.kt, Theme.kt, Type.kt
     └── screens/              Photos, Albums, Cloud, Map
@@ -318,16 +452,17 @@ Decisions worth knowing about:
 - **One settings row, one writer.** `AppSettingsStore` performs every change as a
   read-modify-write inside a transaction, so the theme toggle and the onboarding flow sharing one
   row cannot overwrite each other.
-- **Room v7, upgraded by hand-written migrations only.** Phase 1 shipped a v1 the first cloud build
+- **Room v8, upgraded by hand-written migrations only.** Phase 1 shipped a v1 the first cloud build
   rejected (an entity-free `@Database` is illegal), so PRD section 61's `UserSettings` row became the first
   entity. Every step since is explicit — settings fields, `media`, the cloud index, `backup_queue`, its
-  Phase 6 identity columns, and Phase 7's three organisation tables — and each one mirrors the DDL Room
-  compiles, because a schema the entities describe and no migration produces is a crash on upgrade rather
-  than a build failure. `fallbackToDestructiveMigration` appears nowhere.
+  Phase 6 identity columns, Phase 7's three organisation tables, and Phase 8's `media_metadata` with the
+  capture-time column on `media` — and each one mirrors the DDL Room compiles, because a schema the entities
+  describe and no migration produces is a crash on upgrade rather than a build failure.
+  `fallbackToDestructiveMigration` appears nowhere.
 - **Nothing cascades from `media`.** The index is rewritten with `INSERT OR REPLACE` on every scan, so a
-  child table with a cascading foreign key on it is emptied on every sync. `backup_queue`, `album_media`
-  and `media_organization` therefore relate to media by id and a join, with an explicit sweep for orphans
-  once a scan has decided what exists.
+  child table with a cascading foreign key on it is emptied on every sync. `backup_queue`, `album_media`,
+  `media_organization` and `media_metadata` therefore relate to media by id and a join, with an explicit
+  sweep for orphans once a scan has decided what exists.
 - **Permission state is read live, decisions are stored.** A remembered "granted" would be wrong the
   moment the user revokes access in system settings.
 - **The country list is derived, not bundled.** `Locale.getISOCountries()` for names,
