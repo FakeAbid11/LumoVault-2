@@ -12,7 +12,7 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.RemoteBackup
-import com.lumovault.app.domain.repository.RestoreRepository
+import com.lumovault.app.domain.restore.RestoreRepository
 import com.lumovault.app.domain.repository.SyncResult
 import com.lumovault.app.domain.restore.CloudRestoreTarget
 import com.lumovault.app.domain.restore.RestorableSource

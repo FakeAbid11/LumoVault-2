@@ -1,5 +1,7 @@
 package com.lumovault.app.domain.restore
 
+import com.lumovault.app.domain.model.MediaType
+
 /**
  * Files a downloaded original into MediaStore, where the rest of Android can see it.
  *

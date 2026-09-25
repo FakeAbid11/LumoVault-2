@@ -21,9 +21,6 @@ internal object FileKindSniffing {
     /** Bytes read to decide: enough for a box signature, which starts with a length word. */
     private const val HEADER_BYTES = 16
 
-    /** A `ftyp` box is the signature of the MP4 family, at offset 4 through 8. */
-    private const val FTYPE_MARKER = "ftyp"
-
     /**
      * The container the bytes announce, or null when nothing here matched.
      *
@@ -36,27 +33,17 @@ internal object FileKindSniffing {
         if (header.isEmpty()) return null
 
         // JPEG: SOI marker.
-        if (header.startsWith(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte()))) {
-            return FileKind.Jpeg
-        }
-        // PNG: the eight-byte signature, then IHDR.
-        if (header.startsWith(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte()))) {
-            return FileKind.Png
-        }
+        if (header.hasPrefix(0xFF, 0xD8, 0xFF)) return FileKind.Jpeg
+        // PNG: the start of the eight-byte signature.
+        if (header.hasPrefix(0x89, 'P', 'N', 'G')) return FileKind.Png
         // GIF: "GIF8".
-        if (header.startsWith(byteArrayOf('G'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), '8'.code.toByte()))) {
-            return FileKind.Gif
-        }
-        // WEBP: "RIFF" … "WEBP".
-        if (header.startsWith(byteArrayOf('R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte())) &&
-            header.size >= 12 &&
-            String(header, 8, 4, Charsets.ISO_8859_1) == "WEBP"
-        ) {
+        if (header.hasPrefix('G', 'I', 'F', '8')) return FileKind.Gif
+        // WEBP: "RIFF" at the front and "WEBP" four fields in.
+        if (header.hasPrefix('R', 'I', 'F', 'F') && header.hasPrefixAt(8, 'W', 'E', 'B', 'P')) {
             return FileKind.WebP
         }
-        if (header.size >= 8 && String(header, 4, 4, Charsets.ISO_8859_1) == FTYPE_MARKER) {
-            return FileKind.Mp4
-        }
+        // The MP4 family: a box whose type is "ftyp", which sits at byte four.
+        if (header.hasPrefixAt(4, 'f', 't', 'y', 'p')) return FileKind.Mp4
         return null
     }
 
@@ -78,6 +65,30 @@ internal object FileKindSniffing {
         }
         return buffer.copyOf(filled)
     }
+
+    /**
+     * These bytes, at the start or at [offset].
+     *
+     * Its own helpers rather than standard-library calls because `ByteArray` has no `startsWith`: the
+     * overloads that exist are for `Array<T>` and `List<T>`, and comparing a signed byte against an `Int`
+     * literal is exactly the conversion a header check should not repeat at every call site. Two names, not
+     * one defaulted parameter, so `hasPrefix(0xFF, …)` cannot be read as an offset of 255.
+     */
+    private fun ByteArray.hasPrefix(vararg bytes: Int): Boolean = hasPrefixAt(0, *bytes)
+
+    /** The character spelling, so `"GIF8"` reads as the four bytes it names rather than as four numbers. */
+    private fun ByteArray.hasPrefix(vararg chars: Char): Boolean =
+        hasPrefixAt(0, *chars.map { it.code }.toIntArray())
+
+    private fun ByteArray.hasPrefixAt(offset: Int, vararg bytes: Int): Boolean {
+        if (offset < 0 || size < offset + bytes.size) return false
+        return bytes.indices.all { index ->
+            this[offset + index].toInt() and 0xFF == bytes[index] and 0xFF
+        }
+    }
+
+    private fun ByteArray.hasPrefixAt(offset: Int, vararg chars: Char): Boolean =
+        hasPrefixAt(offset, *chars.map { it.code }.toIntArray())
 }
 
 /**

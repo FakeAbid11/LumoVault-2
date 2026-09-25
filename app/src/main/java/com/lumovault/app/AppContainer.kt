@@ -60,7 +60,7 @@ import com.lumovault.app.domain.repository.MediaMetadataRepository
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
-import com.lumovault.app.domain.repository.RestoreRepository
+import com.lumovault.app.domain.restore.RestoreRepository
 import com.lumovault.app.domain.repository.SettingsRepository
 import com.lumovault.app.domain.restore.RestoredMediaWriter
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
