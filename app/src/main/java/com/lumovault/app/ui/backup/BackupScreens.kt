@@ -382,7 +382,7 @@ private fun Row(@androidx.annotation.StringRes label: Int, value: String) {
     }
 }
 
-private fun BackupPreferences.constraintsSummaryRes(): Int = when {
+internal fun BackupPreferences.constraintsSummaryRes(): Int = when {
     wifiOnly && chargingOnly -> R.string.diag_constraints_wifi_charging
     wifiOnly -> R.string.diag_constraints_wifi
     chargingOnly -> R.string.diag_constraints_charging
