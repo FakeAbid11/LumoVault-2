@@ -141,7 +141,7 @@ class RecognizeBackupUseCase(
         } else {
             when (val digest = hashFile(stagedPath)) {
                 is ContentDigest.Unavailable -> return UploadIdentity.Unreadable(digest.failure)
-                is ContentDigest.Computed -> digest.hex.also {
+                is ContentDigest.Computed -> digest.hash.also {
                     // The snapshot recorded is the index's own pair, because that is the pair the next
                     // fast check compares against. Recording the byte count from the stream instead would
                     // never match a provider that declines to state a length, and the item would be
@@ -187,7 +187,7 @@ class RecognizeBackupUseCase(
                 Outcome(unreadableCount = 1)
             }
 
-            is ContentDigest.Computed -> settle(candidate, digest.hex)
+            is ContentDigest.Computed -> settle(candidate, digest.hash)
         }
 
     private suspend fun settle(candidate: BackupIdentityCandidate, hash: String): Outcome {
