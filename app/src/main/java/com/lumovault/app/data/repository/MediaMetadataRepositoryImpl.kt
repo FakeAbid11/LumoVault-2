@@ -21,14 +21,14 @@ import kotlinx.coroutines.flow.map
  * worth of photos into a Compose list, and clustering exists precisely so that is never needed.
  */
 class MediaMetadataRepositoryImpl(
-    private val metadata: MediaMetadataDao,
+    private val mediaMetadata: MediaMetadataDao,
 ) : MediaMetadataRepository {
 
     override fun observe(mediaStoreId: Long): Flow<MediaMetadata?> =
-        metadata.observe(mediaStoreId).map { row -> row?.toMetadata() }
+        mediaMetadata.observe(mediaStoreId).map { row -> row?.toMetadata() }
 
     override fun observeMapPhotos(bounds: MapBounds, limit: Int): Flow<List<MapPhoto>> =
-        metadata.observeInBoundingBox(
+        mediaMetadata.observeInBoundingBox(
             minLatitude = bounds.minLatitude,
             maxLatitude = bounds.maxLatitude,
             minLongitude = bounds.minLongitude,
@@ -42,18 +42,18 @@ class MediaMetadataRepositoryImpl(
         // a query rather than a crash.
         if (mediaStoreIds.isEmpty()) return emptyList()
         val ids = mediaStoreIds.take(MAX_IDS_PER_QUERY)
-        return metadata.photosWithIds(ids, limit).map(MapPhotoRow::toMapPhoto)
+        return mediaMetadata.photosWithIds(ids, limit).map(MapPhotoRow::toMapPhoto)
     }
 
-    override fun observeLocatedCount(): Flow<Int> = metadata.observeLocatedCount()
+    override fun observeLocatedCount(): Flow<Int> = mediaMetadata.observeLocatedCount()
 
     override suspend fun locationFor(mediaStoreId: Long): MediaLocation? =
-        metadata.coordinatesFor(mediaStoreId)?.let { MediaLocation(it.latitude, it.longitude) }
+        mediaMetadata.coordinatesFor(mediaStoreId)?.let { MediaLocation(it.latitude, it.longitude) }
 
     override suspend fun record(mediaStoreId: Long, metadata: MediaMetadata?, extractedAtSeconds: Long) {
         // A row either way, which is the difference between "not yet read" and "read, and this is all there
         // is". Without it the next pass reopens every file that has nothing to say.
-        this.metadata.record(
+        mediaMetadata.record(
             MediaMetadataEntity(
                 mediaStoreId = mediaStoreId,
                 latitude = metadata?.location?.latitude,
@@ -72,16 +72,16 @@ class MediaMetadataRepositoryImpl(
     }
 
     override suspend fun extractionCandidates(limit: Int): List<MetadataCandidate> =
-        metadata.extractionCandidates(limit).map { row ->
+        mediaMetadata.extractionCandidates(limit).map { row ->
             MetadataCandidate(mediaStoreId = row.mediaStoreId, contentUri = row.contentUri)
         }
 
-    override suspend fun pendingExtractionCount(): Int = metadata.pendingExtractionCount()
+    override suspend fun pendingExtractionCount(): Int = mediaMetadata.pendingExtractionCount()
 
     override suspend fun forgetDeleted(mediaStoreIds: Collection<Long>): Int =
-        if (mediaStoreIds.isEmpty()) 0 else metadata.clearFor(mediaStoreIds)
+        if (mediaStoreIds.isEmpty()) 0 else mediaMetadata.clearFor(mediaStoreIds)
 
-    override suspend fun discardUnlocatedReads(): Int = metadata.discardUnlocatedReads()
+    override suspend fun discardUnlocatedReads(): Int = mediaMetadata.discardUnlocatedReads()
 
     private fun MediaMetadataEntity.toMetadata(): MediaMetadata = MediaMetadata(
         // Rebuilt rather than trusted: a row written by an older build, or by a provider that reported a
