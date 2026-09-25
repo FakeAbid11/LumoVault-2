@@ -22,7 +22,7 @@ val telegramApiHash: String = providers.gradleProperty("TELEGRAM_API_HASH")
     .filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
 
 // TDLib's generated Java interface and its native library are build inputs, not sources: CI copies
-// Client.java and TdApi.java into src/main/java/org/drinkless/tdlib/ and libtdjni.so into
+// Client.java and TdApi.java into src/tdlib/java/org/drinkless/tdlib/ and libtdjni.so into
 // src/main/jniLibs/<abi>/ from the pinned build-tdlib.yml run, both verified against a pinned SHA-256.
 // Without them the build fails on unresolved org.drinkless.tdlib references, which is the honest
 // outcome — nothing here can compile against a TDLib that was not actually fetched. See README.
@@ -70,6 +70,17 @@ android {
             // Off-device there is no real Log, and AGP's default is to throw from every android.jar
             // method, which would turn a test of the error mapping into a test of the stub.
             isReturnDefaultValues = true
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            // TDLib's generated Client.java and TdApi.java, dropped here by CI. An absolute path so
+            // there is no question what the directory is relative to. Restricted to the debug variant
+            // deliberately: nothing in Phase 1-4 builds a release, and a source set pointing at a
+            // directory that exists only on the runner would break :assembleRelease with unresolved
+            // references for a reason that has nothing to do with release code.
+            java.directories.add("$projectDir/src/tdlib/java")
         }
     }
 
