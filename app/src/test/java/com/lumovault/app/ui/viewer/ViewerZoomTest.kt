@@ -3,6 +3,7 @@ package com.lumovault.app.ui.viewer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Test
 
 /**
  * The arithmetic behind the pinch.
