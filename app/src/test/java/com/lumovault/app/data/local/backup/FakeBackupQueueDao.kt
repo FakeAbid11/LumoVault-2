@@ -276,6 +276,11 @@ class FakeBackupQueueDao : BackupQueueDao {
 
     override suspend fun countIn(state: String): Int = rows.values.count { it.state == state }
 
+    override suspend fun hashesStillOnDevice(hashes: Collection<String>): List<String> =
+        rows.values
+            .filter { it.contentHash in hashes && it.contentHash.isNotBlank() && it.mediaStoreId in media }
+            .map { it.contentHash }
+
     private fun put(ids: LongArray, type: MediaType) {
         ids.forEach { media[it] = FakeMediaRow(type = type, dateAddedSeconds = it) }
         bump()

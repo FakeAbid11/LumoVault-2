@@ -128,7 +128,11 @@ class AppContainer(context: Context) {
         )
     }
 
-    val localPresenceLookup: LocalPresenceLookup by lazy { LocalPresenceLookup(database.mediaDao()) }
+    val localPresenceLookup: LocalPresenceLookup by lazy {
+        // Two tables because the question has two halves: the media index for what is on the device, and
+        // the backup records for which of those files the channel already holds by content.
+        LocalPresenceLookup(database.mediaDao(), database.backupQueueDao())
+    }
 
     private val telegramCloudRepository: TelegramCloudRepository by lazy {
         TdLibCloudRepository(client = telegramClient)

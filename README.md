@@ -132,6 +132,10 @@ local file → size + mtime unchanged? ──yes→ reuse the hash on record (no
   posting a copy.
 - **Changed media** gets a new identity and loses the old association; the message that holds the earlier
   bytes is left alone in Telegram, because deleting a user's stored photo is not a scan's business.
+- **Local + cloud** on the Cloud screen is now a content match where one exists: a message whose manifest
+  a local backup record claims, and whose media row is still in the index, is the same photo in both
+  libraries. Name-and-size remains the fallback for the messages that carry no manifest, which is the
+  Phase 4 heuristic rather than a new one.
 - **Scale**: the pass only hashes while the remote index holds manifests no local record claims, so a
   settled library of 100,000 items costs zero file reads. It works in stages of 20, yields the moment the
   queue has anything to deliver, and stops at a five-minute budget rather than running into an upload.
