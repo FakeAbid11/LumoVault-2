@@ -184,8 +184,11 @@ internal object TdCloudMapper {
             mimeType = mimeType,
             fileName = document.fileName.orEmpty(),
             sizeBytes = fileSizeOf(document.document),
-            width = document.width,
-            height = document.height,
+            // TDLib's `document` carries no dimensions at all — only `animation`, `video` and
+            // `photoSize` do. Zero rather than a guess, because the Cloud screen renders "unknown
+            // size" for these and an invented number would be indistinguishable from a reported one.
+            width = 0,
+            height = 0,
             durationSeconds = null,
             originalRemoteId = remoteIdOf(document.document),
             previewRemoteId = remoteIdOf(document.thumbnail?.file),
