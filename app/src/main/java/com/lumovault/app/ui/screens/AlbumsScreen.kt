@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.screens
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,12 +12,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlbum
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.PhotoAlbum
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +34,7 @@ import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.screens.albums.AlbumCard
 import com.lumovault.app.ui.screens.albums.AlbumsViewModel
+import com.lumovault.app.ui.screens.albums.AlbumNameDialog
 import com.lumovault.app.ui.screens.albums.icon
 import com.lumovault.app.ui.screens.albums.titleRes
 
@@ -62,7 +62,7 @@ fun AlbumsScreen(
                 .padding(horizontal = SectionPadding, vertical = 8.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.AddPhotoAlbum,
+                imageVector = Icons.Filled.PhotoAlbum,
                 contentDescription = null,
                 modifier = Modifier.padding(end = 8.dp),
             )
@@ -131,57 +131,6 @@ fun AlbumsScreen(
             },
         )
     }
-}
-
-/**
- * The name prompt, shared by create and rename.
- *
- * Confirm stays disabled while the field is blank rather than explaining afterwards why nothing happened:
- * the repository will refuse a blank name anyway, so a dialog that let the user press it would be
- * showing a button that is known not to work.
- */
-@Composable
-fun AlbumNameDialog(
-    title: Int,
-    confirm: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    initial: String = "",
-) {
-    var value by remember { mutableStateOf(initial) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(title)) },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text(stringResource(R.string.album_name_label)) },
-                singleLine = true,
-                isError = value.isBlank(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
-                Text(stringResource(confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.album_cancel)) }
-        },
-    )
-}
-
-@Composable
-private fun SectionHeader(@StringRes label: Int) {
-    Text(
-        text = stringResource(label),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 2.dp),
-    )
 }
 
 private val CardMinSize = 150.dp

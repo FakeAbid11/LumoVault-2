@@ -28,7 +28,9 @@ import com.lumovault.app.data.remote.telegram.TelegramClientInfo
 import com.lumovault.app.data.remote.telegram.TelegramCredentials
 import com.lumovault.app.data.remote.telegram.TelegramStorage
 import com.lumovault.app.data.remote.telegram.DeviceInfo
+import com.lumovault.app.data.repository.AlbumRepositoryImpl
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
+import com.lumovault.app.data.repository.MediaOrganizationRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
 import com.lumovault.app.data.repository.LocalPresenceLookup

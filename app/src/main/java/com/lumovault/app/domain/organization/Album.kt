@@ -25,20 +25,3 @@ data class SystemAlbumCounts(
 ) {
     fun of(album: SystemAlbum): Int = byAlbum[album] ?: 0
 }
-
-/**
- * One item's organisation, as the record stores it.
- *
- * Three separate flags rather than one state, because they are not mutually exclusive and PRD section
- * 21 says so outright: an item can be favourited and archived and in Trash at once, and each of the
- * three still means what it means. Flattening them into one enum is what would make
- * "favourite, archived, and safely backed up" unrepresentable.
- */
-data class MediaOrganization(
-    val mediaStoreId: Long,
-    val favorite: Boolean,
-    val archived: Boolean,
-    val trashedAtSeconds: Long,
-) {
-    val isTrashed: Boolean get() = trashedAtSeconds > 0L
-}

@@ -57,7 +57,7 @@ fun AlbumCard(
 ) {
     Column(
         modifier = modifier
-            .clip(ShapeCorner)
+            .clip(RoundedCornerShape(ShapeCorner))
             .clickable(onClick = onClick),
     ) {
         Box(

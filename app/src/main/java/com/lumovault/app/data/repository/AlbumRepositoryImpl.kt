@@ -25,7 +25,7 @@ class AlbumRepositoryImpl(
 ) : AlbumRepository {
 
     override fun observeAlbums(): Flow<List<Album>> =
-        albums.observeAlbums().map { rows -> rows.map(AlbumListRow::toAlbum) }
+        albums.observeAlbums().map { rows -> rows.map { it.toAlbum() } }
 
     override fun observeAlbum(albumId: Long): Flow<Album?> =
         albums.observeAlbum(albumId).map { row -> row?.toAlbum() }
