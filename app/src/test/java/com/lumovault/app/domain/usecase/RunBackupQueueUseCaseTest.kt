@@ -410,7 +410,7 @@ private class FakeQueue : BackupQueueRepository {
     }
 
     override suspend fun autoBackupCandidates(
-        source: com.lumovault.app.domain.model.BackupSource,
+        source: com.lumovault.app.domain.model.BackupSource?,
         folders: List<String>,
         limit: Int,
     ): List<Long> = emptyList()

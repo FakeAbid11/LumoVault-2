@@ -63,7 +63,7 @@ class FakeBackupQueueDao : BackupQueueDao {
 
     /** Marks items as trashed, which is the one organisation fact the automatic pass has to honour. */
     fun markTrashed(vararg ids: Long) {
-        trashed += ids
+        ids.forEach { trashed.add(it) }
         bump()
     }
 
