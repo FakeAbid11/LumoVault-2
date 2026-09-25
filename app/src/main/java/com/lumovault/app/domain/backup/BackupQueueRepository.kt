@@ -1,5 +1,6 @@
 package com.lumovault.app.domain.backup
 
+import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.Flow
@@ -104,6 +105,15 @@ interface BackupQueueRepository {
      * queue item be sent without hashing it again.
      */
     suspend fun enqueue(mediaStoreIds: Collection<Long>): Int
+
+    /**
+     * The items automatic backup is allowed to take, given what the user selected as their source.
+     *
+     * Returns nothing at all when no source was ever chosen: "not asked" is not "everything", and a pass
+     * that filled the gap with a guess would send folders the user never opted in. A `cancelled` row is
+     * never a candidate either — that is a decision the app already lost an argument about.
+     */
+    suspend fun autoBackupCandidates(source: BackupSource?, folders: List<String>, limit: Int): List<Long>
 
     /**
      * The queue's frontier of items whose content identity is unknown or doubtful.

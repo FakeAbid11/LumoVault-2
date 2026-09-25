@@ -11,6 +11,7 @@ import com.lumovault.app.domain.backup.BackupRequest
 import com.lumovault.app.domain.backup.MediaIdentity
 import com.lumovault.app.domain.backup.UploadState
 import com.lumovault.app.domain.backup.UploadTransitions
+import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.Flow
@@ -129,6 +130,25 @@ class BackupQueueRepositoryImpl(
 
     override suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long? =
         dao.residentBackupFor(remote.chatId, remote.messageId, manifestHash.lowercase())
+
+    override suspend fun autoBackupCandidates(
+        source: BackupSource?,
+        folders: List<String>,
+        limit: Int,
+    ): List<Long> {
+        // `none` and an unanswered question are the same refusal; `selected_folders` with nothing selected
+        // is a third, and it would otherwise read as "everything" through the empty-list branch below.
+        val includeAll = source == BackupSource.AllMedia
+        if (source == null || source == BackupSource.NotNow || (!includeAll && folders.isEmpty())) {
+            return emptyList()
+        }
+        return dao.autoBackupCandidates(
+            openState = UploadState.NotBackedUp.storageKey,
+            includeAll = includeAll,
+            folders = folders,
+            limit = limit.coerceAtMost(MAX_AUTO_CANDIDATES).coerceAtLeast(1),
+        )
+    }
 
     override suspend fun recordRestored(
         mediaStoreId: Long,
@@ -300,6 +320,16 @@ class BackupQueueRepositoryImpl(
          * settle — neither is a scan's to rewrite.
          */
         val REVOCABLE_STATES: List<String> = listOf(UploadState.BackedUp.storageKey)
+
+        /**
+         * How much of a library one pass may take into the queue.
+         *
+         * A user opting in on a phone with 90,000 photos has agreed to back them up, not to have 90,000
+         * rows written in one go — and each queued row is a row the recognition pass then reads. The cap
+         * makes the first pass finite and the next pass real, which is also what lets progress be reported
+         * as something other than "eventually".
+         */
+        const val MAX_AUTO_CANDIDATES = 500
     }
 }
 

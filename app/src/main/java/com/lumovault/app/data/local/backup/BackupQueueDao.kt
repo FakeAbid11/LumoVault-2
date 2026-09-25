@@ -179,6 +179,41 @@ interface BackupQueueDao {
     ): Int
 
     /**
+     * The local items automatic backup may take, oldest-of-the-newest first.
+     *
+     * Three rules are visible in the statement, and each is a refusal the user would otherwise discover by
+     * finding a photo in their channel they had told the app not to send:
+     *
+     * - Only a row that asserts nothing is offered. `not_backed_up` and "no row at all" are the frontier;
+     *   `cancelled` is deliberately excluded, because a cancelled item is a decision, not a backlog.
+     * - Trash is excluded: an item marked for removal is not a backup candidate.
+     * - [includeAll] bypasses the folder list, and [folders] must match `relative_path` exactly — which is
+     *   safe because both sides of that comparison come from the same `SELECT DISTINCT relative_path` the
+     *   source picker shows.
+     *
+     * Bounded by [limit] because a first pass over a library the user just opted in could otherwise enqueue
+     * a hundred thousand uploads in one statement.
+     */
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN backup_queue b ON b.media_store_id = m.media_store_id
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE (b.media_store_id IS NULL OR b.state = :openState)
+          AND COALESCE(o.trashed_at, 0) = 0
+          AND (:includeAll = 1 OR m.relative_path IN (:folders))
+        ORDER BY m.date_added_seconds DESC, m.media_store_id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun autoBackupCandidates(
+        openState: String,
+        includeAll: Boolean,
+        folders: Collection<String>,
+        limit: Int,
+    ): List<Long>
+
+    /**
      * The local item that already *is* this message's content, when one is on the device.
      *
      * Asked before anything is downloaded, because the duplicate worth preventing is the one a restore

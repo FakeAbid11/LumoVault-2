@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.map
 class FakeBackupQueueDao : BackupQueueDao {
     private val rows = LinkedHashMap<Long, BackupQueueEntity>()
     private val media = LinkedHashMap<Long, FakeMediaRow>()
+    private val trashed = mutableSetOf<Long>()
     private val tick = MutableStateFlow(0)
 
     fun withMedia(vararg ids: Long) = put(ids, MediaType.Photo)
@@ -29,6 +30,12 @@ class FakeBackupQueueDao : BackupQueueDao {
     fun withGif(vararg ids: Long) = put(ids, MediaType.Gif)
 
     fun withVideo(vararg ids: Long) = put(ids, MediaType.Video)
+
+    /** Items filed in a given folder, which is the only thing the source picker filters on. */
+    fun withItemsIn(path: String, vararg ids: Long) {
+        ids.forEach { media[it] = FakeMediaRow(type = MediaType.Photo, dateAddedSeconds = it, relativePath = path) }
+        bump()
+    }
 
     /** One item, with the two figures the fast check reads. */
     fun withItem(id: Long, sizeBytes: Long = DEFAULT_SIZE, modifiedSeconds: Long = DEFAULT_MODIFIED) {
@@ -51,6 +58,12 @@ class FakeBackupQueueDao : BackupQueueDao {
 
     fun dropMedia(id: Long) {
         media.remove(id)
+        bump()
+    }
+
+    /** Marks items as trashed, which is the one organisation fact the automatic pass has to honour. */
+    fun markTrashed(vararg ids: Long) {
+        trashed += ids
         bump()
     }
 
@@ -90,6 +103,33 @@ class FakeBackupQueueDao : BackupQueueDao {
 
     override suspend fun countExisting(ids: Collection<Long>): Int =
         rows.values.count { it.mediaStoreId in ids }
+
+    /**
+     * Mirrors the automatic-backup frontier: nothing recorded or a record that asserts nothing, not in
+     * Trash, inside a selected folder or everything, newest-added first and bounded.
+     *
+     * `cancelled` is absent from the open states on purpose. It is reachable only through the caller's
+     * [openState] argument, which is how the fake keeps the real statement's refusal to re-queue a decision
+     * the user already made.
+     */
+    override suspend fun autoBackupCandidates(
+        openState: String,
+        includeAll: Boolean,
+        folders: Collection<String>,
+        limit: Int,
+    ): List<Long> = media.entries
+        .filter { (id, item) ->
+            val record = rows[id]
+            (record == null || record.state == openState) &&
+                id !in trashed &&
+                (includeAll || item.relativePath in folders)
+        }
+        .sortedWith(
+            compareByDescending<Map.Entry<Long, FakeMediaRow>> { it.value.dateAddedSeconds }
+                .thenByDescending { it.key },
+        )
+        .take(limit)
+        .map { it.key }
 
     override suspend fun recordIdentity(
         id: Long,
@@ -416,6 +456,7 @@ data class FakeMediaRow(
     val sizeBytes: Long = FakeBackupQueueDao.DEFAULT_SIZE,
     val modifiedSeconds: Long = FakeBackupQueueDao.DEFAULT_MODIFIED,
     val dateAddedSeconds: Long = FakeBackupQueueDao.DEFAULT_MODIFIED,
+    val relativePath: String = DEFAULT_PATH,
     val width: Int = 4,
     val height: Int = 3,
     val durationMillis: Long? = null,
@@ -436,6 +477,11 @@ data class FakeMediaRow(
         MediaType.Photo -> "IMG_$id.jpg"
         MediaType.Video -> "clip_$id.mp4"
         MediaType.Gif -> "loop_$id.gif"
+    }
+
+    companion object {
+        /** The folder a hand-built row is filed in, which is the value the source picker would return. */
+        const val DEFAULT_PATH = "DCIM/Camera/"
     }
 }
 

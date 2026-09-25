@@ -409,6 +409,12 @@ private class FakeQueue : BackupQueueRepository {
         return true
     }
 
+    override suspend fun autoBackupCandidates(
+        source: com.lumovault.app.domain.model.BackupSource,
+        folders: List<String>,
+        limit: Int,
+    ): List<Long> = emptyList()
+
     override suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long? = null
 
     override suspend fun recordRestored(

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.work.WorkerParameters
+import com.lumovault.app.data.backup.AutomaticBackupWorker
 import com.lumovault.app.data.backup.BackupNotifications
 import com.lumovault.app.data.backup.BackupScheduler
 import com.lumovault.app.data.backup.BackupUploadWorker
@@ -74,12 +75,14 @@ import com.lumovault.app.domain.usecase.ExtractMediaMetadataUseCase
 import com.lumovault.app.domain.usecase.FreeUpSpaceUseCase
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RestoreCloudMediaUseCase
+import com.lumovault.app.domain.usecase.RunAutomaticBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -442,6 +445,50 @@ class AppContainer(context: Context) {
     /** Removes staging copies left by a previous process, before anything can be queued again. */
     fun prepareStagingForBackup() {
         mediaStager.purgeStale()
+    }
+
+    /**
+     * The unattended pass: scan, queue what the settings allow, ask for a send.
+     *
+     * It queues into the same table the Photos selection uses and asks the same worker to drain it — there is
+     * no second upload pipeline here, which is the concrete form of the phase's rule that automatic backup
+     * must not be weaker than manual. Identity, manifest and duplicate rules all sit downstream of `queued`.
+     */
+    val runAutomaticBackup: RunAutomaticBackupUseCase by lazy {
+        RunAutomaticBackupUseCase(
+            media = mediaRepository,
+            queue = backupQueueRepository,
+            onboarding = onboardingRepository,
+            settings = settingsRepository,
+            permissions = permissionRepository,
+            scheduleUpload = {
+                applicationScope.launch {
+                    backupScheduler.startAutomatic(settingsRepository.backupPreferences.first())
+                }
+            },
+        )
+    }
+
+    /** Called by [BackupWorkerFactory] for the periodic scan-and-queue pass. */
+    fun newAutomaticBackupWorker(parameters: WorkerParameters): AutomaticBackupWorker =
+        AutomaticBackupWorker(
+            context = appContext,
+            parameters = parameters,
+            runPass = { runAutomaticBackup.run() },
+        )
+
+    /**
+     * Installs, replaces, or cancels the periodic pass so it matches what the settings now say.
+     *
+     * Called on a settings change and once at start-up. The second is not redundant: constraints live on the
+     * request, so a phone that changed settings while the app was dead — or whose work was dropped by the
+     * system — needs the schedule rebuilt from the stored preferences before anything else can be trusted to
+     * run on its own.
+     */
+    fun refreshAutomaticBackup() {
+        applicationScope.launch {
+            backupScheduler.scheduleAutomaticPasses(settingsRepository.backupPreferences.first())
+        }
     }
 
     private fun telegramStorage(): TelegramStorage =
