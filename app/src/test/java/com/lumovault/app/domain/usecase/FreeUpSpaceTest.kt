@@ -188,7 +188,7 @@ class FreeUpSpaceTest {
 
     @Test
     fun aConfirmedDeletionReconcilesTheLibraryAndLeavesTheCloudAlone() = runBlocking<Unit> {
-        val repository = FakeFreeUpSpace(mapOf(1L to evidence(), 5L to evidence()))
+        val repository = FakeFreeUpSpace(mapOf(1L to evidence(1L), 5L to evidence(5L)))
         val organization = FakeOrganization()
         val media = SpaceLibrary()
         val useCase = FreeUpSpaceUseCase(repository, organization, media)
@@ -209,6 +209,7 @@ class FreeUpSpaceTest {
     }
 
     private fun evidence(
+        id: Long = 1L,
         queueState: UploadState? = UploadState.BackedUp,
         chatId: Long = CHAT,
         messageId: Long = MESSAGE,
@@ -217,8 +218,8 @@ class FreeUpSpaceTest {
         trashed: Boolean = false,
     ) = ItemEvidence(
         candidate = FreeUpSpaceCandidate(
-            mediaStoreId = 1L,
-            contentUri = "content://media/external/images/media/1",
+            mediaStoreId = id,
+            contentUri = "content://media/external/images/media/$id",
             displayName = "IMG_0001.jpg",
             sizeBytes = SIZE,
             mediaType = MediaType.Photo,
