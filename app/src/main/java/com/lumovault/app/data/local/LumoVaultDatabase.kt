@@ -12,6 +12,8 @@ import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.cloud.CloudMediaEntity
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
+import com.lumovault.app.data.local.metadata.MediaMetadataDao
+import com.lumovault.app.data.local.metadata.MediaMetadataEntity
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.AlbumEntity
 import com.lumovault.app.data.local.organization.AlbumMembershipEntity
@@ -35,8 +37,9 @@ import com.lumovault.app.data.local.organization.SystemAlbumDao
         AlbumEntity::class,
         AlbumMembershipEntity::class,
         MediaOrganizationEntity::class,
+        MediaMetadataEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
@@ -48,6 +51,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun albumDao(): AlbumDao
     abstract fun mediaOrganizationDao(): MediaOrganizationDao
     abstract fun systemAlbumDao(): SystemAlbumDao
+    abstract fun mediaMetadataDao(): MediaMetadataDao
 
     companion object {
         /**
@@ -317,6 +321,50 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Mirrors Room's generated DDL for Phase 8: one appended column on `media` and the whole of
+         * [MediaMetadataEntity], column-for-column, in declaration order, with the index named the way Room
+         * names it.
+         *
+         * `date_taken_seconds` is appended last in both the entity and here because `ALTER TABLE` can do
+         * nothing else, and it is nullable with no default: "MediaStore did not record a capture time" is a
+         * different answer from "the capture time is the epoch", and only the first one is true of a file
+         * whose EXIF never said.
+         *
+         * No existing row is rewritten. A Phase 7 install keeps its index, its albums, its favourites, its
+         * Trash and — what matters most — `backup_queue` with its content hashes and its Telegram message ids,
+         * which are the record that a user's photos are safe. The new table starts empty, and empty means
+         * exactly that: no file has been opened for its metadata yet.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `date_taken_seconds` INTEGER")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `media_metadata` (
+                        `media_store_id` INTEGER NOT NULL,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        `altitude_meters` REAL,
+                        `camera_make` TEXT,
+                        `camera_model` TEXT,
+                        `lens_model` TEXT,
+                        `focal_length_mm` REAL,
+                        `aperture_f` REAL,
+                        `iso_speed` INTEGER,
+                        `shutter_seconds` REAL,
+                        `extracted_at` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`media_store_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_metadata_latitude_longitude` " +
+                        "ON `media_metadata` (`latitude`, `longitude`)",
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -324,6 +372,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
     }
 }

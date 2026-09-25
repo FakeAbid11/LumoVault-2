@@ -7,6 +7,7 @@ import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.local.organization.AlbumDao
+import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
@@ -33,6 +34,7 @@ class MediaRepositoryImpl(
     private val source: MediaStoreDataSource,
     private val organization: MediaOrganizationDao,
     private val albums: AlbumDao,
+    private val metadata: MediaMetadataDao,
 ) : MediaRepository {
     override fun observeWindow(limit: Int): Flow<List<Media>> =
         dao.observeWindow(limit).map { rows -> rows.map(MediaEntity::toMedia) }
@@ -58,6 +60,15 @@ class MediaRepositoryImpl(
             val removed = dao.pruneBefore(scanId)
             organization.cleanupOrphans()
             albums.cleanupOrphanMemberships()
+            // EXIF belongs to the file, not to a row that happened to survive a scan. A position read out
+            // of a photograph nobody still has is worth nothing and cannot be re-derived, so it leaves with
+            // the row that described it; without this sweep the map quietly keeps markers for deleted photos
+            // until the next time somebody notices one.
+            metadata.cleanupOrphans()
+            // EXIF belongs to a file, not to a row that happened to survive a scan. When the file is gone
+            // the reading that described it is worth nothing and cannot be re-derived, so it goes with it —
+            // otherwise a library accumulates positions for photographs nobody still has.
+            metadata.cleanupOrphans()
             SyncResult(indexed = scanned.size, removed = removed)
         }
     }

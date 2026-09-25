@@ -7,7 +7,11 @@ import androidx.room.PrimaryKey
 
 /**
  * One indexed media file. The columns are exactly the metadata PRD section 61 asks the local
- * index to carry — nothing speculative.
+ * index to carry — nothing speculative. PRD section 61 names `dateTaken`, which Phase 8 added as
+ * [dateTakenSeconds] because MediaStore can answer it without opening the file, and names
+ * `latitude`/`longitude`, which are pointedly *not* here: those need the file's own bytes, and a value
+ * paid for by reading a file cannot live on a row the scanner rewrites every sync (see
+ * [com.lumovault.app.data.local.metadata.MediaMetadataEntity]).
  *
  * Backup state deliberately does *not* live here. PRD section 61 models it as its own record (hash,
  * Telegram message id, upload state), and Phase 6 put those columns on `backup_queue` rather than on this
@@ -78,4 +82,19 @@ data class MediaEntity(
      */
     @ColumnInfo(name = "last_seen_scan_id", defaultValue = "0")
     val lastSeenScanId: Long = 0,
+
+    /**
+     * When the file was captured, in seconds; null when MediaStore does not know.
+     *
+     * Read from `MediaStore.MediaColumns.DATE_TAKEN`, which MediaProvider derives from the photo's own
+     * EXIF or the video's container metadata — so a capture time costs one projected column in the scan
+     * the app already runs, and no file is opened for it. Declared last because `ALTER TABLE` can only
+     * append, and an upgraded install must agree with a fresh one about column order.
+     *
+     * This is the app's only capture time. EXIF's `DateTimeOriginal` is deliberately not stored beside it:
+     * two columns that both answer "when was this taken" eventually disagree, and the viewer would then
+     * have to choose a winner. What only EXIF can give — GPS and camera — lives in `media_metadata`.
+     */
+    @ColumnInfo(name = "date_taken_seconds")
+    val dateTakenSeconds: Long? = null,
 )

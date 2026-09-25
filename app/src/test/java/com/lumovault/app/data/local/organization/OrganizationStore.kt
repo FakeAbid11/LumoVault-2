@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.media.LocalNameMatch
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.MediaTypeCount
+import com.lumovault.app.data.local.metadata.MediaMetadataEntity
 import com.lumovault.app.domain.model.MediaType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ data class FakeMediaRow(
     val relativePath: String = DEFAULT_PATH,
     val dateAddedSeconds: Long = 1_790_000_000L,
     val dateModifiedSeconds: Long = 1_790_000_000L,
+    val dateTakenSeconds: Long? = null,
     val sizeBytes: Long = 1024L,
 ) {
     fun toEntity() = MediaEntity(
@@ -35,6 +37,7 @@ data class FakeMediaRow(
         height = 3,
         durationMillis = if (type == MediaType.Photo) null else 2_000L,
         lastSeenScanId = SCAN_ID,
+        dateTakenSeconds = dateTakenSeconds,
     )
 
     companion object {
@@ -56,6 +59,13 @@ class OrganizationStore {
     val organization = LinkedHashMap<Long, MediaOrganizationEntity>()
     val albums = LinkedHashMap<Long, AlbumEntity>()
     val members = linkedSetOf<AlbumKey>()
+
+    /**
+     * EXIF, keyed by the same id. A separate map rather than more fields on [media] because that is the
+     * production shape: the scanner replaces media rows wholesale, and a position paid for by opening a file
+     * must survive it.
+     */
+    val metadata = LinkedHashMap<Long, MediaMetadataEntity>()
     val tick = MutableStateFlow(0)
 
     private var nextAlbumId = 1L

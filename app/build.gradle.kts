@@ -140,6 +140,13 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
 
+    // Phase 8 reads a photo's own GPS and camera data out of its EXIF block. The platform's
+    // android.media.ExifInterface is not the same class: it does not parse the HEIF/HEIC and PNG containers
+    // that photos actually arrive in on modern devices, so choosing it would silently drop half a library
+    // from the map to avoid one dependency. AndroidX's version reads a FileDescriptor, which is what keeps
+    // this a header parse rather than a file load — see ExifMediaMetadataReader.
+    implementation(libs.androidx.exifinterface)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

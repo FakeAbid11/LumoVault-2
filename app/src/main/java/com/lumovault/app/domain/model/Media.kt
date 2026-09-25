@@ -26,6 +26,17 @@ data class Media(
     val height: Int,
     /** Milliseconds; null for still images, where MediaStore reports no duration. */
     val durationMillis: Long?,
+    /**
+     * When the file was captured, in seconds, or null when nothing recorded it.
+     *
+     * MediaStore's own `DATE_TAKEN`, which it parses out of the file's EXIF or container metadata — so
+     * this is the capture time the platform is willing to assert, and the viewer shows it as such. Null
+     * is drawn as no date rather than as [dateAddedSeconds]: the day LumoVault first saw a file is not the
+     * day it was taken, and PRD section 28 forbids presenting the two as the same fact. The timeline keeps
+     * grouping by [dateAddedSeconds] unchanged, which is a different question — when this appeared in your
+     * library.
+     */
+    val dateTakenSeconds: Long? = null,
 ) {
     /** Bucket used by backup-source selection and the folder picker. */
     val folder: String

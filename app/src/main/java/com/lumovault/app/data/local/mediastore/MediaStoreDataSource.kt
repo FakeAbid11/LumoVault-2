@@ -17,7 +17,10 @@ import kotlinx.coroutines.withContext
  * Android 10 unified images and videos into one `Files` collection, so a single filtered query
  * returns both instead of two cursors that have to be merged and re-sorted in memory. The
  * projection asks only for the columns the index stores, and nothing here opens a media file:
- * scanning tens of thousands of items must not touch their bytes.
+ * scanning tens of thousands of items must not touch their bytes. That rule still holds after Phase 8
+ * added a capture time — `datetaken` is a MediaStore column it has already parsed out of the file's own
+ * metadata, so it costs a slot in this projection and no I/O. What MediaStore does *not* index (GPS,
+ * camera make and model) is read from the file elsewhere, one bounded pass at a time, and never from here.
  *
  * minSdk is 29, so `RELATIVE_PATH`, `IS_PENDING` and the `Files` collection need no version guard —
  * which is also why this file has no legacy `MediaColumns.DATA` path.
@@ -72,6 +75,12 @@ class MediaStoreDataSource(private val resolver: ContentResolver) {
             height = optionalInt(HEIGHT) ?: 0,
             durationMillis = if (isVideo) optionalLong(DURATION) else null,
             lastSeenScanId = scanId,
+            // MediaStore reports `datetaken` in milliseconds and uses 0 for "not indexed", which is not a
+            // date and must not become one. Read optionally: on a provider that does not expose the
+            // column, the capture time is unknown rather than the scan being wrong.
+            dateTakenSeconds = optionalLong(DATE_TAKEN)
+                ?.takeIf { it > 0L }
+                ?.let { it / MILLIS_PER_SECOND },
         )
     }
 
@@ -110,6 +119,14 @@ class MediaStoreDataSource(private val resolver: ContentResolver) {
         const val RELATIVE_PATH = FileColumns.RELATIVE_PATH
         const val IS_PENDING = FileColumns.IS_PENDING
 
+        /**
+         * Not a `FileColumns` constant — `datetaken` is declared on `MediaColumns`, and there is no
+         * `Files.FileColumns.DATE_TAKEN` to reach for. It is a real column of the `files` table, which is
+         * what this query runs against, so the `Files` collection answers it for images and videos alike.
+         */
+        const val DATE_TAKEN = MediaStore.MediaColumns.DATE_TAKEN
+        const val MILLIS_PER_SECOND = 1000L
+
         val PROJECTION = arrayOf(
             ID,
             DISPLAY_NAME,
@@ -122,6 +139,7 @@ class MediaStoreDataSource(private val resolver: ContentResolver) {
             HEIGHT,
             DURATION,
             RELATIVE_PATH,
+            DATE_TAKEN,
         )
 
         /** Pending rows are mid-write; they arrive on the next scan instead. */

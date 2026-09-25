@@ -60,6 +60,14 @@ class SystemPermissionsRepositoryImpl(context: Context) : PermissionRepository {
         }
     }
 
+    /**
+     * Declared unconditionally: this is a media permission available since API 29, which is the floor this
+     * app supports, and there is no older model to fall back to.
+     */
+    override fun mediaLocationPermissionToRequest(): String = Manifest.permission.ACCESS_MEDIA_LOCATION
+
+    override fun mediaLocationGranted(): Boolean = isGranted(Manifest.permission.ACCESS_MEDIA_LOCATION)
+
     override fun notificationsStatus(): NotificationsStatus {
         if (!atLeast(API_33)) return NotificationsStatus.NotRequired
 

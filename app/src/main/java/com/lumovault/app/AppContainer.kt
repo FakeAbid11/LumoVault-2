@@ -15,10 +15,12 @@ import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.data.local.organization.SystemAlbumDao
+import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.media.ContentResolverMediaHasher
 import com.lumovault.app.data.media.MediaFileStager
 import com.lumovault.app.data.media.MediaStoreLocalDeleter
+import com.lumovault.app.data.metadata.ExifMediaMetadataReader
 import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
 import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
@@ -35,6 +37,7 @@ import com.lumovault.app.data.repository.MediaOrganizationRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
 import com.lumovault.app.data.repository.LocalPresenceLookup
+import com.lumovault.app.data.repository.MediaMetadataRepositoryImpl
 import com.lumovault.app.data.repository.MediaRepositoryImpl
 import com.lumovault.app.data.repository.OnboardingRepositoryImpl
 import com.lumovault.app.data.repository.SettingsRepositoryImpl
@@ -43,10 +46,12 @@ import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.MediaContentHasher
 import com.lumovault.app.domain.backup.MediaSourceStager
 import com.lumovault.app.domain.backup.TelegramUploadRepository
+import com.lumovault.app.domain.metadata.MediaContentMetadataReader
 import com.lumovault.app.domain.organization.AlbumRepository
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.CountryRepository
+import com.lumovault.app.domain.repository.MediaMetadataRepository
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
@@ -55,6 +60,7 @@ import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
+import com.lumovault.app.domain.usecase.ExtractMediaMetadataUseCase
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
@@ -62,6 +68,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Application-scoped dependency graph.
@@ -101,6 +108,7 @@ class AppContainer(context: Context) {
             source = MediaStoreDataSource(appContext.contentResolver),
             organization = mediaOrganizationDao,
             albums = albumDao,
+            metadata = mediaMetadataDao,
         )
     }
 
@@ -143,6 +151,50 @@ class AppContainer(context: Context) {
      */
     val localMediaDeleter: MediaStoreLocalDeleter by lazy {
         MediaStoreLocalDeleter(appContext.contentResolver)
+    }
+
+    private val mediaMetadataDao: MediaMetadataDao by lazy { database.mediaMetadataDao() }
+
+    /** Where and with what a photo was taken — see [MediaMetadataRepository]. */
+    val mediaMetadataRepository: MediaMetadataRepository by lazy {
+        MediaMetadataRepositoryImpl(metadata = mediaMetadataDao)
+    }
+
+    /**
+     * Reads EXIF through the content resolver, asking for the unredacted file only while the media-location
+     * grant is actually held.
+     *
+     * A method reference rather than a stored boolean, because the grant can be revoked from system settings
+     * while LumoVault is backgrounded and a remembered answer would start recording "no coordinates" for
+     * files whose coordinates were simply being withheld.
+     */
+    private val mediaMetadataReader: MediaContentMetadataReader by lazy {
+        ExifMediaMetadataReader(
+            resolver = appContext.contentResolver,
+            locationAccessGranted = permissionRepository::mediaLocationGranted,
+        )
+    }
+
+    /** The bounded EXIF pass behind the map and the details panel. */
+    val extractMediaMetadata: ExtractMediaMetadataUseCase by lazy {
+        ExtractMediaMetadataUseCase(
+            metadata = mediaMetadataRepository,
+            reader = mediaMetadataReader,
+            nowSeconds = ::unixNow,
+        )
+    }
+
+    /**
+     * Starts one metadata pass on the application's own scope, if none is running.
+     *
+     * Called when the map appears rather than from a worker. The work is real I/O against the user's files
+     * and it is worth doing only while something is going to show the result, so it belongs to a screen
+     * being opened and not to a background constraint; the use case already refuses to overlap itself and
+     * stops at its own budget. Application scope rather than a view model's, so a pass that has begun is not
+     * cancelled by tapping a marker and landing in the viewer.
+     */
+    fun startMetadataExtraction() {
+        applicationScope.launch { extractMediaMetadata.run() }
     }
 
     private val telegramCredentials: TelegramCredentials by lazy { TelegramCredentials.fromBuildConfig() }

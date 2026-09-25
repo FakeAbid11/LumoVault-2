@@ -24,4 +24,5 @@ internal fun MediaEntity.toMedia(): Media = Media(
     width = width,
     height = height,
     durationMillis = durationMillis,
+    dateTakenSeconds = dateTakenSeconds,
 )

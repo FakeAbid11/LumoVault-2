@@ -9,10 +9,18 @@
     <!--
         Phase 2 asks for media access per Android's current model (PRD section 38.1): typed media
         permissions from API 33, the user-selected subset from API 34, and the broad read permission
-        only for the API 26-32 devices that still need it. ACCESS_MEDIA_LOCATION is deliberately
-        absent — EXIF/GPS reading is Phase 3+, and asking early would spend trust we have not earned.
-        Battery optimisation is NOT a runtime permission: the setup card opens the system page.
+        only for the API 26-32 devices that still need it. Battery optimisation is NOT a runtime
+        permission: the setup card opens the system page.
+
+        ACCESS_MEDIA_LOCATION is a media permission, not the device-location one, and it is the only way
+        Android will hand over a photo's own GPS coordinates: without it MediaProvider strips them before
+        the file reaches the app. It is declared here because the photo map is a core PRD feature (section
+        29) and cannot exist without it — but it is deliberately NOT part of the onboarding ask, and is
+        requested only from inside the Map screen, once, and only when there is a library to place.
+        ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION remain absent: LumoVault never wants to know where
+        the phone is, only where a photograph says it was taken (PRD section 30).
     -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
