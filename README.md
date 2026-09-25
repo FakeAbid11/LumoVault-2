@@ -163,8 +163,8 @@ confirm, and none of them has been run on one.
 ## Organisation — Phase 7
 
 **Phase 7 — albums and organisation:** complete and CI-verified green (run
-[36160991063](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36160991063),
-260 unit tests across 28 classes, debug APK published).
+[36161483511](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36161483511),
+263 unit tests across 29 classes, debug APK published).
 
 The library can now be arranged without touching the files or the backups in it.
 
