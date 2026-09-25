@@ -25,9 +25,23 @@ interface TelegramClient {
     /**
      * Sends one request and waits for the object answering it.
      *
+     * [timeoutMillis] is a caller-supplied ceiling because "how long is too long" is not one number
+     * across TDLib's requests: reading a page of metadata should not take a minute, while sending a
+     * file of several hundred megabytes legitimately takes as long as the upload does. A request that
+     * is still legitimately working is not a failure, and cutting one off at a metadata-sized timeout
+     * would report a successful backup as lost.
+     *
      * @throws TelegramRequestException when TDLib answers with [TdApi.Error].
      */
-    suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T
+    suspend fun <T : TdApi.Object> request(
+        function: TdApi.Function<T>,
+        timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
+    ): T
+
+    companion object {
+        /** Enough for TDLib's own first-run database setup, and short enough to notice a hang. */
+        const val DEFAULT_TIMEOUT_MILLIS = 120_000L
+    }
 }
 
 /**

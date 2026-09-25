@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -28,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -39,6 +41,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,8 +51,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
+import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.components.PlaceholderScreen
+import com.lumovault.app.ui.screens.photos.BackupOverview
 import com.lumovault.app.ui.screens.photos.PhotosUiState
 import com.lumovault.app.ui.screens.photos.PhotosViewModel
 import com.lumovault.app.util.DayDistance
@@ -70,6 +75,8 @@ fun PhotosScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
+    val selected by viewModel.selected.collectAsStateWithLifecycle()
+    val backup by viewModel.backup.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -119,14 +126,122 @@ fun PhotosScreen(
 
             is PhotosUiState.Content -> Timeline(
                 state = current,
+                backup = backup,
+                selected = selected,
+                onCellClick = viewModel::onCellClick,
+                onCellLongClick = viewModel::onCellLongClick,
                 onLoadMore = viewModel::loadMore,
             )
+        }
+
+        // The selection bar and the queue's progress line are the same strip: a user who has just
+        // chosen items is about to see them queued, and swapping one control for the other in place
+        // means the screen does not jump.
+        BackupBar(
+            selectionSize = selected.size,
+            summary = backup.summary,
+            onBackUp = viewModel::backUpSelected,
+            onClear = viewModel::clearSelection,
+            onCancel = viewModel::cancelPending,
+            onRetryFailed = viewModel::retryFailed,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * Selection actions and queue progress, in one low strip.
+ *
+ * Hidden entirely when there is nothing selected and nothing queued. A permanent "0 items to back up"
+ * bar would be the loudest thing on the screen and would say nothing.
+ */
+@Composable
+private fun BackupBar(
+    selectionSize: Int,
+    summary: BackupQueueSummary,
+    onBackUp: () -> Unit,
+    onClear: () -> Unit,
+    onCancel: () -> Unit,
+    onRetryFailed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (selectionSize == 0 && !summary.isActive && summary.failed == 0) return
+
+    Surface(
+        modifier = modifier.padding(CellSpacing),
+        shape = RoundedCornerShape(CornerShape),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            when {
+                selectionSize > 0 -> {
+                    Text(
+                        text = stringResource(R.string.backup_selected_count, selectionSize),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onClear) {
+                        Text(stringResource(R.string.backup_selection_clear))
+                    }
+                    Button(onClick = onBackUp) {
+                        Text(stringResource(R.string.backup_action))
+                    }
+                }
+
+                summary.isActive -> {
+                    // Counts, not a percentage: the queue knows how many items exist and how many are
+                    // done, and a percentage of a queue that can grow mid-run would be a guess.
+                    Text(
+                        text = stringResource(
+                            R.string.backup_progress_count,
+                            summary.backedUp + summary.failed + 1,
+                            summary.total,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (summary.inFlight > 0) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.backup_cancel))
+                    }
+                }
+
+                else -> {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.backup_failed_count,
+                            summary.failed,
+                            summary.failed,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onRetryFailed) {
+                        Text(stringResource(R.string.backup_retry_failed))
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun Timeline(state: PhotosUiState.Content, onLoadMore: () -> Unit) {
+private fun Timeline(
+    state: PhotosUiState.Content,
+    backup: BackupOverview,
+    selected: Set<Long>,
+    onCellClick: (Long) -> Unit,
+    onCellLongClick: (Long) -> Unit,
+    onLoadMore: () -> Unit,
+) {
     val gridState = rememberLazyGridState()
     val renderedRows = state.days.sumOf { it.items.size } + state.days.size +
         if (state.limitedAccess) 1 else 0
@@ -159,7 +274,13 @@ private fun Timeline(state: PhotosUiState.Content, onLoadMore: () -> Unit) {
                 DayHeader(epochDay = day.epochDay)
             }
             items(items = day.items, key = { media -> media.id }) { media ->
-                MediaCell(media = media)
+                MediaCell(
+                    media = media,
+                    status = backup.statusOf(media.id),
+                    selected = media.id in selected,
+                    onClick = { onCellClick(media.id) },
+                    onLongClick = { onCellLongClick(media.id) },
+                )
             }
         }
     }

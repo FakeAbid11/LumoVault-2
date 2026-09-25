@@ -188,6 +188,52 @@
         <item quantity="one">%1$d item found</item>
         <item quantity="other">%1$d items found</item>
     </plurals>
+    <plurals name="cloud_items_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+
+    <!-- Phase 5: backup. The notification and the in-app progress line read from the same queue
+         counts, so the two can never tell the user different stories about the same upload. -->
+    <string name="backup_channel_name">Backup</string>
+    <string name="backup_channel_description">Shows the backup that is running right now.</string>
+    <string name="backup_progress_title">Backing up</string>
+    <string name="backup_progress_count">%1$d of %2$d</string>
+    <string name="backup_progress_percent">%1$d%%</string>
+    <string name="backup_progress_count_and_percent">%1$d of %2$d · %3$d%%</string>
+    <string name="backup_preparing">Preparing…</string>
+    <string name="backup_uploading">Uploading %1$s</string>
+    <string name="backup_action">Back Up</string>
+    <string name="backup_selected_count">%1$d selected</string>
+    <string name="backup_cell_selected">Selected</string>
+    <string name="backup_selection_clear">Clear</string>
+    <string name="backup_cancel">Cancel</string>
+    <string name="backup_retry_failed">Retry failed</string>
+    <string name="backup_state_backed_up">Backed up</string>
+    <string name="backup_state_uploading">Uploading</string>
+    <string name="backup_state_queued">Queued</string>
+    <string name="backup_state_failed">Failed</string>
+    <string name="backup_done_title">Backup finished</string>
+    <string name="backup_error_no_channel">Set up your Telegram storage channel first.</string>
+    <string name="backup_error_unavailable">Telegram is not available in this build.</string>
+    <string name="backup_error_offline">Waiting for a connection.</string>
+    <plurals name="backup_failed_count">
+        <item quantity="one">%1$d item couldn\'t be backed up</item>
+        <item quantity="other">%1$d items couldn\'t be backed up</item>
+    </plurals>
+
+    <!-- Each one names what the user can act on, and none of them repeats a TDLib error: a raw
+         reason can quote a file name or a chat, and it is kept out of everything a user reads. -->
+    <string name="backup_failure_source_missing">This file is no longer on the device.</string>
+    <string name="backup_failure_source_unreadable">This file could not be read.</string>
+    <string name="backup_failure_insufficient_space">Not enough free space to prepare this file.</string>
+    <string name="backup_failure_channel_unavailable">The backup channel is unavailable.</string>
+    <string name="backup_failure_not_authenticated">Sign in to Telegram to continue.</string>
+    <string name="backup_failure_network">Telegram connection was interrupted.</string>
+    <string name="backup_failure_rate_limited">Telegram asked to pause. It will retry shortly.</string>
+    <string name="backup_failure_rejected">Telegram refused this file.</string>
+    <string name="backup_failure_unknown">Backup couldn\'t finish.</string>
+
     <plurals name="cloud_count_photos">
         <item quantity="one">%1$d photo</item>
         <item quantity="other">%1$d photos</item>

@@ -11,11 +11,15 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -43,6 +47,30 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     private val totalCount = container.mediaRepository.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
+
+    private val selection = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** The ids the user has marked; the action bar and the cell ticks both read this. */
+    val selected: StateFlow<Set<Long>> = selection.asStateFlow()
+
+    /**
+     * Queue state for the items currently on screen, plus the counts for the progress line.
+     *
+     * Scoped to the loaded window rather than to the whole queue: a library can hold tens of thousands
+     * of items and only a few dozen are being drawn, so the app asks Room about what it is about to
+     * show. Reloading on every window change is cheap — one indexed `IN` query — and it is what lets the
+     * glyph on a cell come from the same rows the worker writes.
+     */
+    val backup: StateFlow<BackupOverview> = items
+        .map { media -> media.map { it.id } }
+        .distinctUntilChanged()
+        .flatMapLatest { ids ->
+            combine(
+                container.backupQueueRepository.observeStatesFor(ids),
+                container.backupQueueRepository.observeSummary(),
+            ) { states, summary -> BackupOverview(states, summary) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupOverview())
 
     val uiState: StateFlow<PhotosUiState> = combine(
         access,
@@ -101,6 +129,57 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     fun loadMore() {
         loadedLimit.value = loadedLimit.value + WINDOW_STEP
+    }
+
+    /**
+     * Selection starts on a long press, not on a tap.
+     *
+     * The grid has no other tap action yet — the local viewer is not this phase's to add — and a single
+     * tap that silently started a mode the user did not ask for would make the library feel broken. Once
+     * in the mode, tapping toggles, which is what makes a ten-item selection possible without a
+     * long-press per item.
+     */
+    fun onCellClick(mediaId: Long) {
+        if (selection.value.isNotEmpty()) toggle(mediaId)
+    }
+
+    fun onCellLongClick(mediaId: Long) = toggle(mediaId)
+
+    fun clearSelection() {
+        selection.value = emptySet()
+    }
+
+    /**
+     * Queues the selection and asks for a pass.
+     *
+     * Enqueueing is a database write and starting the work is a separate call, so a process that dies
+     * in between loses nothing: the rows are already there, and the next launch's queue is drained by
+     * whatever schedules it.
+     */
+    fun backUpSelected() {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+
+        viewModelScope.launch {
+            container.backupQueueRepository.enqueue(ids)
+            selection.value = emptySet()
+            container.backupScheduler.start()
+        }
+    }
+
+    /** Withdraws everything still waiting. An upload already in flight is left to finish. */
+    fun cancelPending() {
+        viewModelScope.launch { container.runBackupQueue.cancelPending() }
+    }
+
+    fun retryFailed() {
+        viewModelScope.launch {
+            if (container.runBackupQueue.retryFailed() > 0) container.backupScheduler.start()
+        }
+    }
+
+    private fun toggle(mediaId: Long) {
+        selection.update { current -> if (mediaId in current) current - mediaId else current + mediaId }
     }
 
     private suspend fun syncIfNeeded() {

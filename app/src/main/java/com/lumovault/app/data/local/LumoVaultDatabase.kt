@@ -4,6 +4,8 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.lumovault.app.data.local.backup.BackupQueueDao
+import com.lumovault.app.data.local.backup.BackupQueueEntity
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudChannelEntity
 import com.lumovault.app.data.local.cloud.CloudMediaDao
@@ -23,8 +25,9 @@ import com.lumovault.app.data.local.media.MediaEntity
         MediaEntity::class,
         CloudMediaEntity::class,
         CloudChannelEntity::class,
+        BackupQueueEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
@@ -32,6 +35,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun cloudMediaDao(): CloudMediaDao
     abstract fun cloudChannelDao(): CloudChannelDao
+    abstract fun backupQueueDao(): BackupQueueDao
 
     companion object {
         /**
@@ -159,6 +163,44 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        /**
+         * Mirrors Room's generated DDL for [BackupQueueEntity] column-for-column and in declaration
+         * order. `app/schemas` is written only in the runner's workspace, so nothing here compares
+         * this text against what Room compiles: a column out of order, a nullability flipped or a
+         * default missing surfaces as a validation crash on the first launch of an existing install,
+         * not as a red build.
+         *
+         * It adds a table and touches nothing else. Every row of `media`, `cloud_media`,
+         * `cloud_channel` and `app_settings` survives, which matters more here than in earlier phases:
+         * by now an install has a real Telegram session, an adopted channel and a library the user may
+         * have already backed up. `message_id` is the record that a photo is safe to consider stored,
+         * and a migration that lost it would make the app forget the user's own backups.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `backup_queue` (
+                        `media_store_id` INTEGER NOT NULL,
+                        `state` TEXT NOT NULL DEFAULT 'queued',
+                        `chat_id` INTEGER NOT NULL DEFAULT 0,
+                        `message_id` INTEGER NOT NULL DEFAULT 0,
+                        `attempts` INTEGER NOT NULL DEFAULT 0,
+                        `failure` TEXT NOT NULL DEFAULT '',
+                        `staged_path` TEXT NOT NULL DEFAULT '',
+                        `queued_at` INTEGER NOT NULL DEFAULT 0,
+                        `updated_at` INTEGER NOT NULL DEFAULT 0,
+                        `uploaded_at` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`media_store_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_backup_queue_state_queued_at` ON `backup_queue` (`state`, `queued_at`)",
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

@@ -109,6 +109,12 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
 
+    // The backup queue has to survive the screen being closed and the process being killed, which is
+    // exactly the job WorkManager exists for. It is the only background mechanism used: no AlarmManager
+    // schedule, no hand-rolled service, and no periodic poll — Phase 5 needs a queue that resumes, not
+    // a timer that wakes.
+    implementation(libs.androidx.work.runtime)
+
     // Offline country metadata: calling codes, example numbers, and E.164 normalisation. Hand-rolling
     // a ~240-row table that must agree with the parser is the worse trade; see CountryRepositoryImpl.
     implementation(libs.libphonenumber)

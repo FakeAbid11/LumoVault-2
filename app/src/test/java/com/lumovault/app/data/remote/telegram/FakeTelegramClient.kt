@@ -35,7 +35,10 @@ internal class FakeTelegramClient(
         started += 1
     }
 
-    override suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T {
+    override suspend fun <T : TdApi.Object> request(
+        function: TdApi.Function<T>,
+        timeoutMillis: Long,
+    ): T {
         check(usable) { "TDLib is not configured in this build" }
         sent += function
 

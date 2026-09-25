@@ -2,20 +2,28 @@ package com.lumovault.app
 
 import android.content.Context
 import androidx.room.Room
+import androidx.work.WorkerParameters
+import com.lumovault.app.data.backup.BackupNotifications
+import com.lumovault.app.data.backup.BackupScheduler
+import com.lumovault.app.data.backup.BackupUploadWorker
 import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.data.local.LumoVaultDatabase
+import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
+import com.lumovault.app.data.media.MediaFileStager
 import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
 import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
+import com.lumovault.app.data.remote.telegram.TdLibUploadRepository
 import com.lumovault.app.data.remote.telegram.TelegramAuthRepositoryImpl
 import com.lumovault.app.data.remote.telegram.TelegramClient
 import com.lumovault.app.data.remote.telegram.TelegramClientInfo
 import com.lumovault.app.data.remote.telegram.TelegramCredentials
 import com.lumovault.app.data.remote.telegram.TelegramStorage
 import com.lumovault.app.data.remote.telegram.DeviceInfo
+import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
 import com.lumovault.app.data.repository.LocalPresenceLookup
@@ -23,6 +31,9 @@ import com.lumovault.app.data.repository.MediaRepositoryImpl
 import com.lumovault.app.data.repository.OnboardingRepositoryImpl
 import com.lumovault.app.data.repository.SettingsRepositoryImpl
 import com.lumovault.app.data.repository.SystemPermissionsRepositoryImpl
+import com.lumovault.app.domain.backup.BackupQueueRepository
+import com.lumovault.app.domain.backup.MediaSourceStager
+import com.lumovault.app.domain.backup.TelegramUploadRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.CountryRepository
 import com.lumovault.app.domain.repository.MediaRepository
@@ -33,7 +44,9 @@ import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
+import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -126,7 +139,12 @@ class AppContainer(context: Context) {
         TdLibPreviewRepository(client = telegramClient)
     }
 
-    /** The cloud start-up state machine; the Cloud screen renders its [CloudInitState] directly. */
+    /**
+     * The cloud start-up state machine; the Cloud screen renders its [CloudInitState] directly.
+     *
+     * `isAuthenticated` reads a live value rather than a remembered one, because a session can be
+     * revoked outside the app and a check that consults it is the only honest kind.
+     */
     val cloudSync: SynchronizeCloudUseCase by lazy {
         SynchronizeCloudUseCase(
             telegram = telegramCloudRepository,
@@ -134,8 +152,73 @@ class AppContainer(context: Context) {
             isAuthenticated = {
                 telegramAuthRepository.state.value is TelegramAuthState.Authenticated
             },
-            nowSeconds = { System.currentTimeMillis() / 1000 },
+            nowSeconds = ::unixNow,
         )
+    }
+
+    private val backupQueueDao: BackupQueueDao by lazy { database.backupQueueDao() }
+
+    /**
+     * The queue's policy lives with the repository, not with the worker: how many attempts an item
+     * gets and what counts as retryable are properties of the queue, and a second caller would
+     * otherwise have to agree with the first by coincidence.
+     */
+    val backupQueueRepository: BackupQueueRepository by lazy {
+        BackupQueueRepositoryImpl(dao = backupQueueDao, nowSeconds = ::unixNow)
+    }
+
+    /**
+     * Staging copies live in the cache directory on purpose: it is excluded from backup and from
+     * device transfer by definition, and a staged original is a temporary copy of a file the user
+     * still has. If the system evicts one mid-upload, the copy fails, the item is re-queued, and
+     * nothing pretends the file was lost.
+     */
+    private val mediaStager: MediaSourceStager by lazy {
+        MediaFileStager(
+            resolver = appContext.contentResolver,
+            directory = File(appContext.cacheDir, "backup_staging").apply { mkdirs() },
+        )
+    }
+
+    private val telegramUploadRepository: TelegramUploadRepository by lazy {
+        // The same single client as authentication and the cloud scanner — TDLib permits one per
+        // process, and an upload is a `sendMessage` like any other request.
+        TdLibUploadRepository(client = telegramClient)
+    }
+
+    val backupNotifications: BackupNotifications by lazy { BackupNotifications(appContext) }
+
+    /**
+     * The backup queue, wired to the channel the cloud flow adopted.
+     *
+     * The channel is resolved per pass rather than captured once: the association can change between
+     * passes — a rediscovery after a deletion, or a different account signing in — and a queue holding
+     * on to a stale chat id would either fail or, worse, find a channel that is not the one it was
+     * meant to use.
+     */
+    val runBackupQueue: RunBackupQueueUseCase by lazy {
+        RunBackupQueueUseCase(
+            queue = backupQueueRepository,
+            upload = telegramUploadRepository,
+            stager = mediaStager,
+            resolveChannel = { cloudIndexRepository.association()?.chatId ?: NO_CHANNEL },
+        )
+    }
+
+    val backupScheduler: BackupScheduler by lazy { BackupScheduler(appContext) }
+
+    /** Called by [BackupWorkerFactory]; WorkManager cannot construct a worker with dependencies. */
+    fun newBackupUploadWorker(parameters: WorkerParameters): BackupUploadWorker = BackupUploadWorker(
+        context = appContext,
+        parameters = parameters,
+        queue = backupQueueRepository,
+        runner = runBackupQueue,
+        notifications = backupNotifications,
+    )
+
+    /** Removes staging copies left by a previous process, before anything can be queued again. */
+    fun prepareStagingForBackup() {
+        mediaStager.purgeStale()
     }
 
     private fun telegramStorage(): TelegramStorage =
@@ -143,4 +226,11 @@ class AppContainer(context: Context) {
             databaseDirectory = appContext.getDir("tdlib_database", Context.MODE_PRIVATE),
             filesDirectory = appContext.getDir("tdlib_files", Context.MODE_PRIVATE),
         ).ensureCreated()
+
+    private fun unixNow(): Long = System.currentTimeMillis() / 1000
+
+    private companion object {
+        /** TDLib reserves 0 for "no identifier", so it also means "no channel adopted yet". */
+        const val NO_CHANNEL = 0L
+    }
 }

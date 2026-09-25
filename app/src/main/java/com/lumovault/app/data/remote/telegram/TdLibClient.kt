@@ -57,7 +57,10 @@ class TdLibClient(
         )
     }
 
-    override suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T {
+    override suspend fun <T : TdApi.Object> request(
+        function: TdApi.Function<T>,
+        timeoutMillis: Long,
+    ): T {
         val target = client ?: throw IllegalStateException("TDLib client has not been started")
         val response = CompletableDeferred<TdApi.Object>()
 
@@ -68,7 +71,7 @@ class TdLibClient(
             target.send(function, Client.ResultHandler { result -> response.complete(result) })
         }
 
-        val answered = withTimeoutOrNull(REQUEST_TIMEOUT_MILLIS) { response.await() }
+        val answered = withTimeoutOrNull(timeoutMillis) { response.await() }
             ?: throw TelegramRequestException(code = 0, reason = TIMED_OUT)
 
         if (answered is TdApi.Error) {
@@ -85,9 +88,6 @@ class TdLibClient(
 
     private companion object {
         const val TAG = "LumoVaultTelegram"
-
-        /** TDLib's first run opens and unpacks its database, which is slower than a normal call. */
-        const val REQUEST_TIMEOUT_MILLIS = 120_000L
 
         /** Not a TDLib token: no response arrived at all, so nothing can be mapped from it. */
         const val TIMED_OUT = "TDLIB_TIMED_OUT"
