@@ -197,7 +197,7 @@ class MediaMetadataRepositoryTest {
         val read = requireNotNull(repository.observe(1L).first())
 
         assertEquals(MediaLocation(52.5, 13.4), read.location)
-        assertEquals("iPhone 15 Pro", read.cameraLabel)
+        assertEquals("Apple iPhone 15 Pro", read.cameraLabel)
         assertEquals(34.0, requireNotNull(read.altitudeMeters), 0.0)
         assertEquals(0.004, requireNotNull(read.shutterSeconds), 0.0)
         assertEquals(7L, requireNotNull(store.metadata[1L]).extractedAt)

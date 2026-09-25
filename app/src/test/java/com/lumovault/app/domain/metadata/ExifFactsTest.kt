@@ -89,9 +89,19 @@ class ExifFactsTest {
     }
 
     @Test
-    fun aModelThatAlreadyNamesItsMakeIsNotPrefixedAgain() {
-        val apple = requireNotNull(ExifFacts(make = "Apple", model = "iPhone 15 Pro").toMediaMetadata())
-        assertEquals("iPhone 15 Pro", apple.cameraLabel)
+    fun aModelThatAlreadyNamesItsMakeIsNotPrefixedTwice() {
+        // Some cameras write the make into both fields, and "Samsung Samsung Galaxy S24" is what a plain
+        // join produces. Only that case is folded; a model that does not repeat its make keeps both halves,
+        // because "Apple iPhone 15 Pro" is a better label than guessing that Apple is implied.
+        val repeated = requireNotNull(
+            ExifFacts(make = "Samsung", model = "Samsung Galaxy S24").toMediaMetadata(),
+        )
+        assertEquals("Samsung Galaxy S24", repeated.cameraLabel)
+
+        val separate = requireNotNull(
+            ExifFacts(make = "Apple", model = "iPhone 15 Pro").toMediaMetadata(),
+        )
+        assertEquals("Apple iPhone 15 Pro", separate.cameraLabel)
 
         val sameTwice = requireNotNull(ExifFacts(make = "Google", model = "Google").toMediaMetadata())
         assertEquals("Google", sameTwice.cameraLabel)
