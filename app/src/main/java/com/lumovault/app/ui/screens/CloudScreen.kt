@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,7 +59,9 @@ import coil3.compose.SubcomposeAsyncImage
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.ui.components.PlaceholderScreen
+import com.lumovault.app.ui.screens.cloud.RestoreAction
 import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.CloudViewModel
 import com.lumovault.app.util.DayDistance
@@ -81,6 +84,8 @@ fun CloudScreen(
     viewModel: CloudViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val restoreJobs by viewModel.restoreJobs.collectAsStateWithLifecycle()
+    val restoreJob by viewModel.restoreJob.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var selected by remember { mutableStateOf<CloudMedia?>(null) }
 
@@ -140,8 +145,12 @@ fun CloudScreen(
             is CloudUiState.Library -> CloudTimeline(
                 state = current,
                 onLoadMore = viewModel::loadMore,
-                onSelect = { selected = it },
+                onSelect = { item ->
+                    selected = item
+                    viewModel.focusing(item)
+                },
                 previewPathFor = viewModel::previewPath,
+                restoreJobs = restoreJobs,
             )
         }
     }
@@ -151,7 +160,13 @@ fun CloudScreen(
             item = item,
             onDevice = (state as? CloudUiState.Library)?.localMatches?.contains(item.messageId) == true,
             previewPathFor = viewModel::previewPath,
-            onDismiss = { selected = null },
+            job = restoreJob?.takeIf { it.messageId == item.messageId },
+            onDownload = { viewModel.restore(item) },
+            onCancel = { viewModel.cancelRestore(item) },
+            onDismiss = {
+                selected = null
+                viewModel.focusing(null)
+            },
         )
     }
 }
@@ -162,6 +177,7 @@ private fun CloudTimeline(
     onLoadMore: () -> Unit,
     onSelect: (CloudMedia) -> Unit,
     previewPathFor: suspend (CloudMedia) -> String?,
+    restoreJobs: Map<Long, RestoreJob>,
 ) {
     val gridState = rememberLazyGridState()
     val renderedRows = state.days.sumOf { it.items.size } + state.days.size + 1
@@ -195,6 +211,7 @@ private fun CloudTimeline(
                     onDevice = item.messageId in state.localMatches,
                     onClick = { onSelect(item) },
                     previewPathFor = previewPathFor,
+                    restoring = restoreJobs[item.messageId]?.state?.isLive == true,
                 )
             }
         }
@@ -266,6 +283,7 @@ private fun CloudMediaCell(
     onDevice: Boolean,
     onClick: () -> Unit,
     previewPathFor: suspend (CloudMedia) -> String?,
+    restoring: Boolean,
 ) {
     var previewPath by remember(item.messageId, item.previewRemoteFileId) { mutableStateOf<String?>(null) }
 
@@ -292,6 +310,15 @@ private fun CloudMediaCell(
                 contentScale = ContentScale.Crop,
                 loading = { CloudCellPlaceholder(broken = false) },
                 error = { CloudCellPlaceholder(broken = true) },
+            )
+        }
+
+        // A restore in flight is drawn on the cell as well as in the sheet, because the sheet closes and
+        // the download does not: the user needs to see which of these pictures is still arriving.
+        if (restoring) {
+            LinearProgressIndicator(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                color = OnMediaScrim,
             )
         }
 
@@ -368,6 +395,9 @@ private fun CloudViewer(
     item: CloudMedia,
     onDevice: Boolean,
     previewPathFor: suspend (CloudMedia) -> String?,
+    job: RestoreJob?,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var previewPath by remember(item.messageId) { mutableStateOf<String?>(null) }
@@ -449,14 +479,16 @@ private fun CloudViewer(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                Button(onClick = onDismiss, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.cloud_download_action))
-                }
+                RestoreAction(
+                    job = job,
+                    onDownload = onDownload,
+                    onCancel = onCancel,
+                )
 
                 Text(
-                    text = stringResource(R.string.cloud_download_unavailable),
+                    text = stringResource(R.string.restore_cloud_remains),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {

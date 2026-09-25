@@ -382,4 +382,102 @@
         <item quantity="other">%1$d items moved</item>
     </plurals>
 
+
+    <!-- Phase 9: restore, free up space, automatic backup, health and diagnostics. No apostrophes: AAPT2
+         reports an unescaped one as an invalid unicode escape, which sends the reader hunting for a
+         backslash that is not there. -->
+    <string name="backup_entry">Backup &amp; storage</string>
+    <string name="backup_hub_title">Backup &amp; storage</string>
+    <string name="backup_hub_section_backup">Backup</string>
+    <string name="backup_hub_section_status">Status</string>
+    <string name="backup_hub_section_storage">Storage</string>
+    <string name="backup_automatic">Automatic backup</string>
+    <string name="backup_automatic_note">New photos and videos are queued on their own. Nothing is sent before you choose a folder to back up.</string>
+    <string name="backup_wifi_only">Wi-Fi only</string>
+    <string name="backup_wifi_only_note">Unattended uploads wait for an unmetered network. A backup you start by hand does not.</string>
+    <string name="backup_charging_only">Charging only</string>
+    <string name="backup_charging_only_note">Unattended uploads also wait for a charger.</string>
+
+    <string name="health_all_backed_up">%1$s items backed up. Nothing is waiting.</string>
+    <string name="health_backed_up">%1$s of %2$s backed up</string>
+    <string name="health_waiting">%1$s waiting</string>
+    <string name="health_failed">%1$s failed</string>
+    <string name="health_cloud_only">%1$s in the cloud only</string>
+    <string name="health_not_backed_up">%1$s local items are not proven to be stored yet.</string>
+    <string name="health_last_backup">Last backup: %1$s</string>
+    <string name="health_last_scan">Last scan: %1$s</string>
+    <string name="health_never">not yet</string>
+    <string name="health_view_issues">View details</string>
+    <string name="health_title">Backup health</string>
+    <string name="health_reclaimable">%1$s items, about %2$s, can be freed from this device.</string>
+    <string name="health_no_scan">Backup has not scanned this library yet.</string>
+    <string name="health_no_backup">Backup has not finished an item yet.</string>
+    <string name="action_back">Back</string>
+
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_entry_note">The numbers behind the backup, for when it does not move.</string>
+    <string name="diagnostics_secrets_note">This panel shows counts, settings and version numbers. It never shows a phone number, code, password or session value.</string>
+    <string name="diag_local_media">Local media</string>
+    <string name="diag_backed_up">Backed up</string>
+    <string name="diag_cloud_only">Cloud only</string>
+    <string name="diag_waiting">Waiting</string>
+    <string name="diag_uploading">Uploading now</string>
+    <string name="diag_failed">Failed</string>
+    <string name="diag_last_backup">Last successful backup</string>
+    <string name="diag_last_scan">Last scan</string>
+    <string name="diag_telegram">Telegram</string>
+    <string name="diag_telegram_connected">Connected</string>
+    <string name="diag_telegram_waiting">Not signed in</string>
+    <string name="diag_telegram_not_configured">Not configured in this build</string>
+    <string name="diag_telegram_unavailable">Connection unavailable</string>
+    <string name="diag_channel">LumoVault Backup channel</string>
+    <string name="diag_channel_available">Available</string>
+    <string name="diag_channel_missing">Not found yet</string>
+    <string name="diag_automatic">Automatic backup</string>
+    <string name="diag_constraints">Waiting for</string>
+    <string name="diag_constraints_wifi_charging">Wi-Fi and a charger</string>
+    <string name="diag_constraints_wifi">Wi-Fi</string>
+    <string name="diag_constraints_charging">A charger</string>
+    <string name="diag_constraints_any">A connection</string>
+    <string name="diag_database_version">Database version</string>
+    <string name="diag_staging_space">Free space for staging</string>
+    <string name="state_enabled">Enabled</string>
+    <string name="state_disabled">Disabled</string>
+
+    <string name="free_space_title">Free up space</string>
+    <string name="free_space_entry_note">Remove local copies that are proven to be stored in your channel.</string>
+    <string name="free_space_header">%1$s can be freed. %2$s photos and videos are safely backed up.</string>
+    <string name="free_space_none">No safely backed-up items are ready to remove.</string>
+    <string name="free_space_remains">Your cloud copies stay in LumoVault, and anything removed here can be downloaded again.</string>
+    <string name="free_space_selected">%1$s selected · %2$s</string>
+    <string name="free_space_action">Free up space</string>
+    <string name="free_space_review_refresh">Check again</string>
+    <string name="free_space_confirm_title">Remove these from this device?</string>
+    <string name="free_space_confirm_body">%1$s items, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</string>
+    <string name="free_space_confirm_action">Ask Android</string>
+    <string name="free_space_done">Removed %1$s items and freed about %2$s.</string>
+    <string name="free_space_nothing_left">Nothing was removed. These items changed before the deletion could happen.</string>
+    <string name="free_space_declined">Cancelled. Nothing was removed.</string>
+    <string name="free_space_unavailable">This Android version will not let LumoVault ask. Remove the files in the device's own gallery app.</string>
+    <string name="free_space_failed">Android did not allow the deletion. Nothing was removed.</string>
+    <string name="action_dismiss">Dismiss</string>
+
+    <string name="restore_again_action">Download again</string>
+    <string name="restore_preparing">Preparing…</string>
+    <string name="restore_downloading">%1$s of %2$s</string>
+    <string name="restore_downloading_unknown">Getting the file…</string>
+    <string name="restore_verifying">Checking the file…</string>
+    <string name="restore_saving">Saving to this device…</string>
+    <string name="restore_completed">Saved on this device.</string>
+    <string name="restore_cancel_action">Cancel</string>
+    <string name="restore_cloud_remains">The copy in LumoVault stays either way.</string>
+    <string name="restore_reason_gone">That file is no longer in your LumoVault channel.</string>
+    <string name="restore_reason_auth">Sign in to Telegram again to download it.</string>
+    <string name="restore_reason_network">Telegram connection was interrupted. Try again.</string>
+    <string name="restore_reason_rate">Telegram asked us to wait a moment. Try again shortly.</string>
+    <string name="restore_reason_space">Not enough free space on this device for this file.</string>
+    <string name="restore_reason_incomplete">The download did not finish intact. Try again.</string>
+    <string name="restore_reason_save">Android would not accept the file. Try again.</string>
+    <string name="restore_reason_cancelled">Download cancelled.</string>
+    <string name="restore_reason_unknown">Could not restore this item. Try again.</string>
 </resources>

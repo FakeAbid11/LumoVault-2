@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.lumovault.app.data.local.backup.BackupHealthDao
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.backup.BackupQueueEntity
 import com.lumovault.app.data.local.backup.FreeUpSpaceDao
@@ -63,6 +64,9 @@ abstract class LumoVaultDatabase : RoomDatabase() {
      * schema step. The database version stays at 9 for that reason.
      */
     abstract fun freeUpSpaceDao(): FreeUpSpaceDao
+
+    /** Query-only, like [FreeUpSpaceDao]: Backup Health and Diagnostics read five tables and own none. */
+    abstract fun backupHealthDao(): BackupHealthDao
 
     companion object {
         /**

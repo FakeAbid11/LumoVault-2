@@ -35,5 +35,15 @@ class LumoVaultApplication : Application(), Configuration.Provider {
         // Staged copies belong to whichever process made them. Anything found now is left over from a
         // previous one, and holding a duplicate of a photo the user still has is a cost with no benefit.
         container.prepareStagingForBackup()
+
+        // A restore that was in flight when this process died left a file in TDLib's cache and a row saying
+        // so. Settled before anything can draw a progress bar, so the first frame is honest about what is
+        // downloading.
+        container.reconcileRestores()
+
+        // The periodic pass has to exist after a reboot or an update, not only after somebody opens a
+        // screen: WorkManager remembers the schedule, and what it cannot remember is which constraints were
+        // current when this build last looked at the settings.
+        container.refreshAutomaticBackup()
     }
 }

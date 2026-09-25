@@ -8,6 +8,7 @@ import com.lumovault.app.data.local.media.toMedia
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.metadata.MediaMetadataDao
+import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
@@ -35,6 +36,8 @@ class MediaRepositoryImpl(
     private val organization: MediaOrganizationDao,
     private val albums: AlbumDao,
     private val metadata: MediaMetadataDao,
+    private val settings: AppSettingsStore,
+    private val nowSeconds: () -> Long = System::currentTimeMillis,
 ) : MediaRepository {
     override fun observeWindow(limit: Int): Flow<List<Media>> =
         dao.observeWindow(limit).map { rows -> rows.map(MediaEntity::toMedia) }
@@ -65,6 +68,10 @@ class MediaRepositoryImpl(
             // the row that described it; without this sweep the map quietly keeps markers for deleted photos
             // until the next time somebody notices one.
             metadata.cleanupOrphans()
+            // Stamped inside the same transaction as the prune, so "last scan" cannot name a scan whose
+            // rows never landed. Diagnostics asks this question, and a timestamp written a moment later by a
+            // second statement could be true while the index it describes was not.
+            settings.update { current -> current.copy(lastScanSeconds = nowSeconds()) }
             SyncResult(indexed = scanned.size, removed = removed)
         }
     }

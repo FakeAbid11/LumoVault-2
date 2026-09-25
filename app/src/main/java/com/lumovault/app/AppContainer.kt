@@ -36,6 +36,7 @@ import com.lumovault.app.data.remote.telegram.TelegramClientInfo
 import com.lumovault.app.data.remote.telegram.TelegramCredentials
 import com.lumovault.app.data.remote.telegram.TelegramStorage
 import com.lumovault.app.data.repository.AlbumRepositoryImpl
+import com.lumovault.app.data.repository.BackupHealthRepositoryImpl
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
@@ -56,6 +57,7 @@ import com.lumovault.app.domain.map.MapFocus
 import com.lumovault.app.domain.metadata.MediaContentMetadataReader
 import com.lumovault.app.domain.organization.AlbumRepository
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
+import com.lumovault.app.domain.repository.BackupHealthRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.CountryRepository
 import com.lumovault.app.domain.repository.FreeUpSpaceRepository
@@ -123,6 +125,8 @@ class AppContainer(context: Context) {
             source = MediaStoreDataSource(appContext.contentResolver),
             organization = mediaOrganizationDao,
             albums = albumDao,
+            settings = settingsStore,
+            nowSeconds = ::unixNow,
             metadata = mediaMetadataDao,
         )
     }
@@ -374,6 +378,17 @@ class AppContainer(context: Context) {
         FreeUpSpaceRepositoryImpl(dao = database.freeUpSpaceDao())
     }
 
+    /** The one read behind Backup Health and Diagnostics. See [BackupHealthRepository]. */
+    val backupHealthRepository: BackupHealthRepository by lazy {
+        BackupHealthRepositoryImpl(
+            media = database.mediaDao(),
+            queue = backupQueueDao,
+            freeUpSpace = database.freeUpSpaceDao(),
+            health = database.backupHealthDao(),
+            settings = settingsStore,
+        )
+    }
+
     val freeUpSpace: FreeUpSpaceUseCase by lazy {
         FreeUpSpaceUseCase(
             freeUpSpace = freeUpSpaceRepository,
@@ -485,6 +500,12 @@ class AppContainer(context: Context) {
      * system — needs the schedule rebuilt from the stored preferences before anything else can be trusted to
      * run on its own.
      */
+    /** Room's declared schema version, which is the number a failed migration is reported against. */
+    val databaseVersion: Int get() = database.version
+
+    /** Free space where staging would happen: the figure the upload path itself refuses to work under. */
+    fun backupFreeSpaceBytes(): Long = File(appContext.cacheDir, "backup_staging").usableSpace
+
     fun refreshAutomaticBackup() {
         applicationScope.launch {
             backupScheduler.scheduleAutomaticPasses(settingsRepository.backupPreferences.first())

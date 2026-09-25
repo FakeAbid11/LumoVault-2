@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,6 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.R
 import com.lumovault.app.ui.navigation.AlbumRoutes
+import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
 import com.lumovault.app.ui.navigation.viewerRouteActive
@@ -42,7 +44,8 @@ fun LumoVaultApp(
     val currentDestination = LumoVaultDestination.forRoute(route)
     // An album screen is a child of the Albums tab rather than a fifth tab, so the bar keeps Albums
     // highlighted and only the back arrow changes.
-    val isNested = route?.startsWith(AlbumRoutes.DETAIL_PREFIX) == true
+    val isNested = route?.startsWith(AlbumRoutes.DETAIL_PREFIX) == true ||
+        route?.startsWith(BackupRoutes.PREFIX) == true
     // A photograph is the screen, so the bar it would otherwise sit under is not drawn at all rather than
     // drawn over it: a translucent nav bar on top of a dark image is a second, dimmer copy of the same black.
     val isViewer = viewerRouteActive(route)
@@ -56,6 +59,7 @@ fun LumoVaultApp(
                     onCycleThemeMode = onCycleThemeMode,
                     onNavigateUp = { if (isNested) navController.navigateUp() },
                     showNavigateUp = isNested,
+                    onOpenBackup = { navController.navigate(BackupRoutes.HUB) },
                 )
             }
         },
@@ -91,6 +95,7 @@ fun LumoVaultApp(
 private fun TopBar(
     destination: LumoVaultDestination,
     onCycleThemeMode: () -> Unit,
+    onOpenBackup: () -> Unit,
     onNavigateUp: () -> Unit,
     showNavigateUp: Boolean,
 ) {
@@ -115,6 +120,15 @@ private fun TopBar(
                 Icon(
                     imageVector = Icons.Filled.Palette,
                     contentDescription = stringResource(R.string.theme_toggle),
+                )
+            }
+            // PRD section 42 puts Settings in this corner. It opens the backup and storage screen, which is
+            // where Phase 9's decisions live; the rest of section 43 stays Phase 10's, and an entry that
+            // promised them now would be a screen of placeholders.
+            IconButton(onClick = onOpenBackup) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.backup_entry),
                 )
             }
         },

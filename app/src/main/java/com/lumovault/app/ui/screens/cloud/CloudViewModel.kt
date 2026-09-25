@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.model.CloudMedia
+import com.lumovault.app.domain.restore.CloudRestoreTarget
+import com.lumovault.app.domain.restore.RestoreJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -70,6 +73,33 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
 
+    /**
+     * The one message the item sheet is open on, which is what the job row below is keyed by.
+     *
+     * A `MutableStateFlow` rather than a parameter on the composable because the sheet can be closed by a
+     * back gesture, a tap outside, or the process going away, and each of those must stop the observation
+     * rather than leave a flow collecting for a screen that is gone.
+     */
+    private val restoreTarget = MutableStateFlow<CloudMedia?>(null)
+
+    /** Live and finished restores for the loaded window, keyed by message id, for a badge on a cell. */
+    val restoreJobs: StateFlow<Map<Long, RestoreJob>> = items
+        .flatMapLatest { media ->
+            val chatId = media.firstOrNull()?.chatId ?: 0L
+            val ids = media.map { it.messageId }
+            // Empty ids would reach Room as `IN ()`, which is not SQL; "nothing loaded" is not a question.
+            if (chatId == 0L || ids.isEmpty()) flowOf(emptyMap())
+            else container.restoreRepository.observeForMessages(chatId, ids)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyMap())
+
+    /** The sheet's own view of one download, so its bar and its buttons read the row, not a memory. */
+    val restoreJob: StateFlow<RestoreJob?> = restoreTarget
+        .flatMapLatest { item ->
+            if (item == null) flowOf(null) else container.restoreRepository.observeJob(item.chatId, item.messageId)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
     init {
         // Which of these remote items also live on the device: one batched query over the loaded
         // window, never a MediaStore or database round-trip per cell.
@@ -91,6 +121,30 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadMore() {
         loadedLimit.value = loadedLimit.value + WINDOW_STEP
+    }
+
+    /** The sheet opened on one record; null when it closed. See [restoreTarget]. */
+    fun focusing(item: CloudMedia?) {
+        restoreTarget.value = item
+    }
+
+    /**
+     * Asks for the original. PRD section 25's rule survives: this is reached only from a tap on Download,
+     * never while the grid renders, and the download engine is Phase 9's — nothing here re-implements it.
+     */
+    fun restore(item: CloudMedia) {
+        container.restoreCloudMedia.start(CloudRestoreTarget.from(item))
+    }
+
+    /**
+     * Stops a transfer the user started.
+     *
+     * Refusing silently when there is nothing running is deliberate: after a restart the row reads as
+     * interrupted and the button offers a retry, so a cancel that had no job would otherwise claim to have
+     * stopped something that had already stopped on its own.
+     */
+    fun cancelRestore(item: CloudMedia) {
+        container.restoreCloudMedia.cancel(item.chatId, item.messageId)
     }
 
     /**

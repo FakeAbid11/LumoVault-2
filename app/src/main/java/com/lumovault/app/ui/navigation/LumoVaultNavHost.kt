@@ -8,6 +8,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.backup.BackupHubScreen
+import com.lumovault.app.ui.backup.DiagnosticsScreen
+import com.lumovault.app.ui.backup.FreeUpSpaceScreen
 import com.lumovault.app.ui.screens.AlbumsScreen
 import com.lumovault.app.ui.screens.CloudScreen
 import com.lumovault.app.ui.map.MapScreen
@@ -22,6 +25,20 @@ import com.lumovault.app.ui.viewer.MediaViewerScreen
  * so it survives process death with the back stack — the album id or name is what comes back, and the
  * screen reloads the rest from Room.
  */
+/**
+ * The Phase 9 screens, all under one prefix so the shell can tell a nested route from a tab.
+ *
+ * They hang off the top bar rather than the bottom bar: PRD section 42 gives the four tabs to the library,
+ * and backup is something you do to the library rather than a fifth place to look at it.
+ */
+object BackupRoutes {
+    const val PREFIX = "backup/"
+    const val HUB = PREFIX + "hub"
+    const val HEALTH = PREFIX + "health"
+    const val DIAGNOSTICS = PREFIX + "diagnostics"
+    const val FREE_SPACE = PREFIX + "free-space"
+}
+
 @Composable
 fun LumoVaultNavHost(
     navController: NavHostController,
@@ -86,6 +103,24 @@ fun LumoVaultNavHost(
         }
 
         composable(LumoVaultDestination.Cloud.route) { CloudScreen() }
+
+        composable(BackupRoutes.HUB) {
+            BackupHubScreen(
+                onNavigateUp = navController::navigateUp,
+                onOpenFreeUpSpace = { navController.navigate(BackupRoutes.FREE_SPACE) },
+                onOpenHealth = { navController.navigate(BackupRoutes.HEALTH) },
+                onOpenDiagnostics = { navController.navigate(BackupRoutes.DIAGNOSTICS) },
+            )
+        }
+        composable(BackupRoutes.HEALTH) {
+            BackupHealthScreen(onNavigateUp = navController::navigateUp)
+        }
+        composable(BackupRoutes.DIAGNOSTICS) {
+            DiagnosticsScreen(onNavigateUp = navController::navigateUp)
+        }
+        composable(BackupRoutes.FREE_SPACE) {
+            FreeUpSpaceScreen(onNavigateUp = navController::navigateUp)
+        }
         composable(LumoVaultDestination.Map.route) {
             MapScreen(
                 onOpenMedia = { mediaId ->
