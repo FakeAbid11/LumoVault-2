@@ -50,10 +50,29 @@ Rules that have already caused a mistake here:
   every sync — an album that vanishes after a pull-to-refresh is this, not a bug in the album code. New
   relations to media are therefore keyed by id and joined, with the cleanup written as an explicit sweep
   that runs once per scan (`… WHERE media_store_id NOT IN (SELECT media_store_id FROM media)`, never a
-  `NOT IN (:ids)` list a large library would blow past SQLite's parameter limit).
+  `NOT IN (:ids)` list a large library would blow past SQLite's parameter limit). `media_metadata`
+  (Phase 8's EXIF) follows the same rule: an extracted read survives a scan and is swept after a prune.
+- **EXIF coordinates are read, never inferred, and a null is a fact with a shelf life.** `media` is
+  rewritten by every scan, so GPS goes in `media_metadata`, not a `media` column. Reading it needs the
+  runtime `ACCESS_MEDIA_LOCATION` permission — without it MediaProvider serves a *redacted* file whose GPS
+  block is simply absent, and `MediaStore.setRequireOriginal` throws `UnsupportedOperationException` when
+  the uri is opened. So: only record what a read actually found, and when the grant arrives, discard the
+  stored "nothing there" reads (`DELETE … WHERE latitude IS NULL`), or the map stays empty forever.
+  `Images.ImageColumns.LATITUDE/LONGITUDE` are deprecated since 29 and always null — do not "fix" the
+  reader by reaching for them.
 - **A `@Test` must be public and must return void.** JUnit reports a private or non-void test as
   `initializationError` for the *whole class*, so thirteen tests can vanish behind one `= runBlocking {`
   whose last expression is an `assertThrows` (it returns the throwable). Write `runBlocking<Unit>`.
+- **A `strings.xml` apostrophe has to be escaped, and AAPT2 blames something else.** `\'` — an unescaped
+  one is reported as `Invalid unicode escape sequence in string`, which sends you looking for a `\u` that
+  is not there. Same file, same class of miss: `…` is fine, `%` is not (it becomes a format specifier).
+- **Kotlin's overload errors concentrate in the two places a script decides.** In `app/build.gradle.kts`:
+  `const val` is illegal at script top level, and `String.filter { s -> s.contains("{z}") }` binds `s` to a
+  **Char**, so the predicate body fails to resolve on a value that is obviously a string — use
+  `takeIf`/`let` over the whole value. In generic stdlib selectors, a bound `Map<Long, Long>::get` is
+  `(Long) -> Long?` and does **not** satisfy `maxOfOrNull(selector: (T) -> R)` where `R : Comparable<R>`;
+  write `{ id -> map[id] ?: 0L }`. Both are compile errors that no static check catches locally.
+
 - **A red CI test has to explain itself.** `app/build.gradle.kts` sets `exceptionFormat = FULL` on failed
   tests, because GitHub Actions is the only place anything runs: Gradle's default one-line summary prints
   neither the assertion message nor the values, so without it each failure costs a whole build cycle.
@@ -83,7 +102,9 @@ message, a file path or a TDLib object.
 | Kotlin / KSP | 2.3.21 / 2.3.12 | KSP has no 2.4.x release; do not advance Kotlin past it |
 | Compose BOM | 2026.09.00 | Material 3 1.4.0, ui 1.12.1 |
 | Room | 2.8.5 | KSP processor; schema export on |
-| Coil | 3.6.3 | `coil-compose` + `coil-video`, no network artifact |
+| Coil | 3.6.3 | `coil-compose` + `coil-video` + `coil-gif`; no network artifact. **Without `coil-gif` an animated GIF does not animate** — it registers `AnimatedImageDecoder` through ServiceLoader, so no ImageLoader setup is needed |
+| androidx.exifinterface | 1.4.2 | NOT `android.media.ExifInterface`: the platform class does not parse HEIF/HEIC or PNG containers. `ExifInterface(FileDescriptor)` reads a header, not a file |
+| osmdroid | 6.1.20 | `org.osmdroid:osmdroid-android`; its POM declares **no** dependencies. No clustering anywhere in the library, so pins are clustered in `domain/map/MapClustering.kt` |
 | libphonenumber | 9.0.40 | country codes + E.164 |
 | WorkManager | 2.12.0 | `work-runtime`; CoroutineWorker + ForegroundInfo for the backup queue |
 | compileSdk / targetSdk / **minSdk** | 37 / 37 / **29** | see below |
