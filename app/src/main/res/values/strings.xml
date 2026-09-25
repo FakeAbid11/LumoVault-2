@@ -245,8 +245,8 @@
     <string name="viewer_gone_title">This item is no longer here</string>
     <string name="viewer_gone_body">The photo or video was removed from this device. Your backups are unaffected.</string>
     <string name="viewer_gone_body_empty">This album is empty now. The photos themselves are untouched.</string>
-    <string name="viewer_image_unreadable">This file couldn't be displayed.</string>
-    <string name="viewer_video_unavailable">This device can't play this clip. Your backup of it is unaffected.</string>
+    <string name="viewer_image_unreadable">This file couldn\'t be displayed.</string>
+    <string name="viewer_video_unavailable">This device can\'t play this clip. Your backup of it is unaffected.</string>
     <string name="viewer_play">Play</string>
     <string name="viewer_pause">Pause</string>
 
@@ -257,7 +257,7 @@
 
     <string name="viewer_add_to_album">Add to album</string>
     <string name="viewer_trash_title">Move to Trash?</string>
-    <string name="viewer_trash_body">It leaves your library and stays here on this device. Your backup isn't deleted.</string>
+    <string name="viewer_trash_body">It leaves your library and stays here on this device. Your backup isn\'t deleted.</string>
 
     <string name="viewer_field_taken">Taken</string>
     <string name="viewer_field_added">Added on this device</string>
