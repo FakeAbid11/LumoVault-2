@@ -66,6 +66,9 @@ import com.lumovault.app.util.DayDistance
 import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.formatDay
 import java.time.LocalDate
+import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.GroupCardCorner
 
 /**
  * The local library. It reads one value — [PhotosUiState] — and draws that, so a combination the
@@ -189,8 +192,8 @@ private fun BackupBar(
     if (selectionSize == 0 && !summary.isActive && summary.failed == 0) return
 
     Surface(
-        modifier = modifier.padding(CellSpacing),
-        shape = RoundedCornerShape(CornerShape),
+        modifier = modifier.padding(GridSpacing),
+        shape = RoundedCornerShape(GroupCardCorner),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -282,11 +285,11 @@ private fun Timeline(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = CellMinSize),
+        columns = GridCells.Adaptive(minSize = GridCellMinSize),
         state = gridState,
-        contentPadding = PaddingValues(CellSpacing),
-        horizontalArrangement = Arrangement.spacedBy(CellSpacing),
-        verticalArrangement = Arrangement.spacedBy(CellSpacing),
+        contentPadding = PaddingValues(GridSpacing),
+        horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+        verticalArrangement = Arrangement.spacedBy(GridSpacing),
         modifier = Modifier.fillMaxSize(),
     ) {
         if (state.limitedAccess) {
@@ -324,10 +327,10 @@ private fun LimitedAccessNotice() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = CellSpacing, vertical = 6.dp)
+            .padding(horizontal = GridSpacing, vertical = 6.dp)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(CornerShape),
+                RoundedCornerShape(GroupCardCorner),
             )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -371,7 +374,7 @@ private fun DayHeader(epochDay: Long) {
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = CellSpacing, vertical = 10.dp),
+            .padding(horizontal = GridSpacing, vertical = 10.dp),
     )
 }
 
@@ -471,9 +474,6 @@ private fun ActionIcon(icon: ImageVector, @StringRes label: Int, onClick: () -> 
     }
 }
 
-private val CellMinSize = 110.dp
-private val CellSpacing = 2.dp
-private val CornerShape = 8.dp
 
 /** Rows of cells fetched ahead of the viewport edge, so scrolling does not hit a blank tail. */
 private const val LOAD_AHEAD = 24

@@ -61,6 +61,10 @@ import com.lumovault.app.ui.navigation.ViewerTarget
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.distinctUntilChanged
+import com.lumovault.app.ui.theme.MediaBadgeScrim
+import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.FavoriteAccent
+import com.lumovault.app.ui.theme.BackedUpAccent
 
 /**
  * The full-screen viewer: one item, the list it came from, and what can be done to it.
@@ -313,7 +317,7 @@ private fun ViewerTopBar(
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = stringResource(R.string.viewer_close),
-                tint = Color.White,
+                tint = OnMedia,
             )
         }
 
@@ -325,7 +329,7 @@ private fun ViewerTopBar(
                     ?: media.displayName
             }.orEmpty(),
             style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
+            color = OnMedia,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
@@ -337,7 +341,7 @@ private fun ViewerTopBar(
             Text(
                 text = pluralStringResource(R.plurals.viewer_position, position, position, total),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
+                color = OnMedia,
                 modifier = Modifier.padding(end = 4.dp),
             )
         }
@@ -347,7 +351,7 @@ private fun ViewerTopBar(
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
                     contentDescription = stringResource(R.string.viewer_more_actions),
-                    tint = Color.White,
+                    tint = OnMedia,
                 )
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -407,7 +411,7 @@ private fun ViewerActionBar(
             .fillMaxWidth()
             .padding(10.dp),
         shape = RoundedCornerShape(16.dp),
-        color = Scrim,
+        color = MediaBadgeScrim,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -420,7 +424,7 @@ private fun ViewerActionBar(
                         if (isFavorite) R.string.organization_unfavorite_action
                         else R.string.organization_favorite_action,
                     ),
-                    tint = if (isFavorite) FavoriteTint else Color.White,
+                    tint = if (isFavorite) FavoriteAccent else OnMedia,
                 )
             }
 
@@ -433,13 +437,13 @@ private fun ViewerActionBar(
                 Icon(
                     imageVector = ViewerFormatting.backupIcon(status),
                     contentDescription = null,
-                    tint = if (status == ViewerBackupStatus.BackedUp) BackedUpTint else Color.White,
+                    tint = if (status == ViewerBackupStatus.BackedUp) BackedUpAccent else OnMedia,
                 )
             }
             Text(
                 text = stringResource(ViewerFormatting.backupLabel(status)),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
+                color = OnMedia,
             )
 
             Box(modifier = Modifier.weight(1f))
@@ -448,7 +452,7 @@ private fun ViewerActionBar(
                 Icon(
                     imageVector = Icons.Filled.Info,
                     contentDescription = stringResource(R.string.viewer_info),
-                    tint = Color.White,
+                    tint = OnMedia,
                 )
             }
         }
@@ -595,6 +599,3 @@ private fun showSystemBars(window: Window?) {
 /** Pages still to load before the pager would reach the end of what Room has handed over. */
 private const val LOAD_AHEAD = 6
 
-private val Scrim = Color(0xB3000000)
-private val FavoriteTint = Color(0xFFFF5A6E)
-private val BackedUpTint = Color(0xFF7DE3A0)

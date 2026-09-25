@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -33,6 +32,7 @@ import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Size
 import com.lumovault.app.R
+import com.lumovault.app.ui.theme.OnMedia
 
 /**
  * One image, at the size it was taken, under the user's fingers.
@@ -142,7 +142,7 @@ fun ZoomableImage(
                 Text(
                     text = stringResource(R.string.viewer_image_unreadable),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
+                    color = OnMedia,
                     modifier = Modifier.padding(24.dp),
                 )
             },

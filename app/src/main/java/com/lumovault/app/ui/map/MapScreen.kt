@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -66,6 +65,8 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
+import com.lumovault.app.ui.theme.MapNoticeScrim
+import com.lumovault.app.ui.theme.OnMedia
 
 /**
  * The photo map: every placed photograph in the rectangle the user is looking at.
@@ -290,10 +291,10 @@ fun MapScreen(
             Text(
                 text = viewModel.attribution,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = OnMedia,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .background(Color(0x99000000))
+                    .background(MapNoticeScrim)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }

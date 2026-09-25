@@ -40,6 +40,14 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.ui.screens.photos.BackupCellStatus
 import com.lumovault.app.util.formatDuration
+import com.lumovault.app.ui.theme.MediaBadgeScrim
+import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.FavoriteAccent
+import com.lumovault.app.ui.theme.MediaBadgeCorner
+import com.lumovault.app.ui.theme.MediaBadgeIconSize
+import com.lumovault.app.ui.theme.MediaBadgeInset
+import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaThumbCorner
 
 /**
  * A single grid cell. Reused by the later Albums, Archive, Trash and Cloud screens, which is why
@@ -73,7 +81,7 @@ fun MediaCell(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(ShapeCorner))
+            .clip(RoundedCornerShape(MediaThumbCorner))
             .then(
                 // The modifiers are built conditionally rather than passing null lambdas: a
                 // `combinedClickable` with a null long-press still swallows the tap.
@@ -86,7 +94,7 @@ fun MediaCell(
             .border(
                 width = if (selected) SelectionRing else 0.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(ShapeCorner),
+                shape = RoundedCornerShape(MediaThumbCorner),
             ),
     ) {
         SubcomposeAsyncImage(
@@ -107,8 +115,8 @@ fun MediaCell(
                 contentDescription = stringResource(R.string.backup_cell_selected),
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(ShapeInset)
-                    .size(IconSize),
+                    .padding(MediaBadgeInset)
+                    .size(MediaBadgeIconSize),
                 tint = MaterialTheme.colorScheme.primary,
             )
         } else {
@@ -116,8 +124,8 @@ fun MediaCell(
                 status = status,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(ShapeInset)
-                    .size(IconSize),
+                    .padding(MediaBadgeInset)
+                    .size(MediaBadgeIconSize),
             )
         }
 
@@ -128,23 +136,23 @@ fun MediaCell(
                     contentDescription = null,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(ShapeInset)
-                        .size(IconSize),
-                    tint = OnMediaScrim,
+                        .padding(MediaBadgeInset)
+                        .size(MediaBadgeIconSize),
+                    tint = OnMedia,
                 )
                 if (media.durationMillis != null) {
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(ShapeInset),
-                        shape = RoundedCornerShape(SmallCorner),
-                        color = BadgeScrim,
-                        contentColor = OnMediaScrim,
+                            .padding(MediaBadgeInset),
+                        shape = RoundedCornerShape(MediaBadgeCorner),
+                        color = MediaBadgeScrim,
+                        contentColor = OnMedia,
                     ) {
                         Text(
                             text = formatDuration(media.durationMillis),
                             style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = BadgePadding, vertical = 1.dp),
+                            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
                             textAlign = TextAlign.End,
                         )
                     }
@@ -156,15 +164,15 @@ fun MediaCell(
                     // Bottom edge, because the favourite mark owns the top-right corner: a GIF that is
                     // also a favourite has to show both, and the type badge has nowhere else to crowd.
                     .align(Alignment.BottomEnd)
-                    .padding(ShapeInset),
-                shape = RoundedCornerShape(SmallCorner),
-                color = BadgeScrim,
-                contentColor = OnMediaScrim,
+                    .padding(MediaBadgeInset),
+                shape = RoundedCornerShape(MediaBadgeCorner),
+                color = MediaBadgeScrim,
+                contentColor = OnMedia,
             ) {
                 Text(
                     text = stringResource(R.string.media_badge_gif),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = BadgePadding, vertical = 1.dp),
+                    modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
                 )
             }
 
@@ -177,9 +185,9 @@ fun MediaCell(
                 contentDescription = stringResource(R.string.organization_favorite_marked),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(ShapeInset)
-                    .size(IconSize),
-                tint = FavoriteTint,
+                    .padding(MediaBadgeInset)
+                    .size(MediaBadgeIconSize),
+                tint = FavoriteAccent,
             )
         }
     }
@@ -207,14 +215,14 @@ private fun BackupStatusBadge(status: BackupCellStatus, modifier: Modifier = Mod
     // A scrim behind the glyph, as the duration badge uses: a thumbnail is arbitrary content and a
     // thin white icon vanishes against a bright sky.
     Box(
-        modifier = modifier.background(BadgeScrim, CircleShape),
+        modifier = modifier.background(MediaBadgeScrim, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = stringResource(label),
             modifier = Modifier.padding(2.dp),
-            tint = OnMediaScrim,
+            tint = OnMedia,
         )
     }
 }
@@ -231,21 +239,11 @@ private fun ThumbnailPlaceholder(icon: androidx.compose.ui.graphics.vector.Image
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(IconSize),
+                modifier = Modifier.size(MediaBadgeIconSize),
                 tint = MaterialTheme.colorScheme.outline,
             )
         }
     }
 }
 
-private val ShapeCorner = 4.dp
-private val ShapeInset = 6.dp
-private val SmallCorner = 3.dp
-private val IconSize = 18.dp
-private val BadgePadding = 4.dp
 private val SelectionRing = 2.dp
-private val BadgeScrim = Color(0xB3000000)
-private val OnMediaScrim = Color(0xFFFFFFFF)
-
-/** Not the theme's primary: a heart in the accent colour would compete with the selection ring for "this one is special". */
-private val FavoriteTint = Color(0xFFFF5A6E)

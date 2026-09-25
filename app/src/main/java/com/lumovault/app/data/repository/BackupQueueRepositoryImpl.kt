@@ -1,7 +1,6 @@
 package com.lumovault.app.data.repository
 
 import com.lumovault.app.data.local.backup.BackupQueueDao
-import com.lumovault.app.data.local.backup.ClaimedBackupRow
 import com.lumovault.app.domain.backup.BackupFailure
 import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.BackupIdentityCandidate

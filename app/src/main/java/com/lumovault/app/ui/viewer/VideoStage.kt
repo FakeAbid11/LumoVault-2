@@ -40,6 +40,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.lumovault.app.R
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
+import com.lumovault.app.ui.theme.OnMedia
 
 /**
  * A clip, played.
@@ -144,7 +145,7 @@ fun VideoStage(
             Text(
                 text = stringResource(R.string.viewer_video_unavailable),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
+                color = OnMedia,
                 modifier = Modifier.padding(24.dp),
             )
         }
@@ -174,7 +175,7 @@ fun VideoStage(
             if (!prepared) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(34.dp),
-                    color = Color.White,
+                    color = OnMedia,
                 )
             }
         }
@@ -202,7 +203,7 @@ fun VideoStage(
                     contentDescription = stringResource(
                         if (playing) R.string.viewer_pause else R.string.viewer_play,
                     ),
-                    tint = Color.White,
+                    tint = OnMedia,
                 )
             }
 
@@ -225,7 +226,7 @@ fun VideoStage(
             Text(
                 text = formatDuration(positionMs) + " / " + formatDuration(durationMs),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = OnMedia,
                 modifier = Modifier.padding(start = 8.dp, end = 4.dp),
             )
         }

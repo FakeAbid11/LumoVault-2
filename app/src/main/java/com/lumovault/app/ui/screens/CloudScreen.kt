@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,7 +42,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -70,6 +68,16 @@ import com.lumovault.app.util.toByteText
 import com.lumovault.app.util.formatDay
 import com.lumovault.app.util.formatDuration
 import java.time.LocalDate
+import com.lumovault.app.ui.theme.MediaBadgeScrim
+import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.FullScreenScrim
+import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.MediaBadgeCorner
+import com.lumovault.app.ui.theme.MediaBadgeIconSize
+import com.lumovault.app.ui.theme.MediaBadgeInset
+import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaThumbCorner
 
 /**
  * The cloud library (PRD section 24), drawn from the local cloud index rather than from a message
@@ -191,11 +199,11 @@ private fun CloudTimeline(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = CellMinSize),
+        columns = GridCells.Adaptive(minSize = GridCellMinSize),
         state = gridState,
-        contentPadding = PaddingValues(CellSpacing),
-        horizontalArrangement = Arrangement.spacedBy(CellSpacing),
-        verticalArrangement = Arrangement.spacedBy(CellSpacing),
+        contentPadding = PaddingValues(GridSpacing),
+        horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+        verticalArrangement = Arrangement.spacedBy(GridSpacing),
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "cloud-header", span = { GridItemSpan(maxLineSpan) }) {
@@ -231,7 +239,7 @@ private fun CloudHeader(state: CloudUiState.Library) {
         .ifBlank { resources.getQuantityString(R.plurals.cloud_items_found, state.totalCount, state.totalCount) }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = CellSpacing, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = GridSpacing, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
@@ -270,7 +278,7 @@ private fun CloudDayHeader(epochDay: Long) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = CellSpacing, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = GridSpacing, vertical = 10.dp),
     )
 }
 
@@ -295,7 +303,7 @@ private fun CloudMediaCell(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(CellCorner))
+            .clip(RoundedCornerShape(MediaThumbCorner))
             .clickable(onClick = onClick),
     ) {
         val path = previewPath
@@ -319,7 +327,7 @@ private fun CloudMediaCell(
         if (restoring) {
             LinearProgressIndicator(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                color = OnMediaScrim,
+                color = OnMedia,
             )
         }
 
@@ -327,8 +335,8 @@ private fun CloudMediaCell(
             Icon(
                 imageVector = Icons.Filled.PlayArrow,
                 contentDescription = null,
-                modifier = Modifier.align(Alignment.BottomStart).padding(BadgeInset).size(BadgeIconSize),
-                tint = OnMediaScrim,
+                modifier = Modifier.align(Alignment.BottomStart).padding(MediaBadgeInset).size(MediaBadgeIconSize),
+                tint = OnMedia,
             )
         }
 
@@ -356,15 +364,15 @@ private fun CloudMediaCell(
 @Composable
 private fun Badge(text: String, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.padding(BadgeInset),
-        shape = RoundedCornerShape(SmallCorner),
-        color = BadgeScrim,
-        contentColor = OnMediaScrim,
+        modifier = modifier.padding(MediaBadgeInset),
+        shape = RoundedCornerShape(MediaBadgeCorner),
+        color = MediaBadgeScrim,
+        contentColor = OnMedia,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = BadgePadding, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
         )
     }
 }
@@ -378,7 +386,7 @@ private fun CloudCellPlaceholder(broken: Boolean) {
         Icon(
             imageVector = if (broken) Icons.Filled.BrokenImage else Icons.Filled.Cloud,
             contentDescription = null,
-            modifier = Modifier.size(BadgeIconSize),
+            modifier = Modifier.size(MediaBadgeIconSize),
             tint = MaterialTheme.colorScheme.outline,
         )
     }
@@ -408,13 +416,13 @@ private fun CloudViewer(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ViewerScrim)
+            .background(FullScreenScrim)
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth().padding(24.dp),
-            shape = RoundedCornerShape(CellCorner),
+            shape = RoundedCornerShape(MediaThumbCorner),
             tonalElevation = 3.dp,
         ) {
             Column(
@@ -425,7 +433,7 @@ private fun CloudViewer(
                 if (path.isNullOrBlank()) {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(ViewerPreviewHeight)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(SmallCorner)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(MediaBadgeCorner)),
                         contentAlignment = Alignment.Center,
                     ) {
                         CloudCellPlaceholder(broken = item.hasPreview)
@@ -435,7 +443,7 @@ private fun CloudViewer(
                         model = Uri.parse("file://$path"),
                         contentDescription = stringResource(item.type.kindRes()),
                         modifier = Modifier.fillMaxWidth().height(ViewerPreviewHeight)
-                            .clip(RoundedCornerShape(SmallCorner)),
+                            .clip(RoundedCornerShape(MediaBadgeCorner)),
                         contentScale = ContentScale.Fit,
                         loading = { CloudCellPlaceholder(broken = false) },
                         error = { CloudCellPlaceholder(broken = true) },
@@ -561,17 +569,7 @@ private fun CloudUiState.Preparing.Step.labelRes(): Int = when (this) {
     CloudUiState.Preparing.Step.Creating -> R.string.cloud_step_creating
 }
 
-private val CellMinSize = 110.dp
-private val CellSpacing = 2.dp
-private val CellCorner = 4.dp
-private val SmallCorner = 3.dp
-private val BadgeInset = 6.dp
-private val BadgeIconSize = 18.dp
-private val BadgePadding = 4.dp
 private val ViewerPreviewHeight = 260.dp
-private val BadgeScrim = Color(0xB3000000)
-private val OnMediaScrim = Color(0xFFFFFFFF)
-private val ViewerScrim = Color(0xCC000000)
 
 private const val MILLIS_PER_SECOND = 1000L
 

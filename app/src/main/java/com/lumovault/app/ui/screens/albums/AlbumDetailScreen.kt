@@ -56,6 +56,9 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.navigation.AlbumTarget
+import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.GroupCardCorner
 
 /**
  * One album: its items, and the organisation actions over the ones the user selects.
@@ -320,11 +323,11 @@ private fun MediaGrid(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = CellMinSize),
+        columns = GridCells.Adaptive(minSize = GridCellMinSize),
         state = gridState,
-        contentPadding = PaddingValues(CellSpacing),
-        horizontalArrangement = Arrangement.spacedBy(CellSpacing),
-        verticalArrangement = Arrangement.spacedBy(CellSpacing),
+        contentPadding = PaddingValues(GridSpacing),
+        horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+        verticalArrangement = Arrangement.spacedBy(GridSpacing),
         modifier = modifier.fillMaxSize(),
     ) {
         itemsIndexed(items, key = { _, media -> media.id }) { _, media ->
@@ -363,8 +366,8 @@ private fun AlbumActionBar(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(CellSpacing),
-        shape = RoundedCornerShape(CornerShape),
+            .padding(GridSpacing),
+        shape = RoundedCornerShape(GroupCardCorner),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -457,10 +460,10 @@ private fun AddMediaSheet(
                     )
                 }
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = CellMinSize),
+                    columns = GridCells.Adaptive(minSize = GridCellMinSize),
                     contentPadding = PaddingValues(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(CellSpacing),
-                    verticalArrangement = Arrangement.spacedBy(CellSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+                    verticalArrangement = Arrangement.spacedBy(GridSpacing),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -500,8 +503,8 @@ private fun NoticeBanner(text: String) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = CellSpacing, vertical = 4.dp),
-        shape = RoundedCornerShape(CornerShape),
+            .padding(horizontal = GridSpacing, vertical = 4.dp),
+        shape = RoundedCornerShape(GroupCardCorner),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Text(
@@ -513,9 +516,6 @@ private fun NoticeBanner(text: String) {
     }
 }
 
-private val CellMinSize = 110.dp
-private val CellSpacing = 2.dp
-private val CornerShape = 8.dp
 
 /** Rows fetched ahead of the viewport edge, so scrolling never reaches a blank tail. */
 private const val LOAD_AHEAD = 24
