@@ -417,8 +417,8 @@ AAPT2 reported as an invalid unicode escape.
 ## Hardening and polish — Phase 10
 
 **Phase 10 — polish, hardening, testing and the final debug APK:** complete from the implementation and CI
-side (run 36201397850 at `c652f27`: **411 tests, 0 failed, 0 errors, 0 skipped across 44 classes**, debug APK
-published at 39,501,791 bytes, `libtdjni.so` verified present for both `arm64-v8a` and `armeabi-v7a`). This
+side (run 36201745573 at `43bff96`: **411 tests, 0 failed, 0 errors, 0 skipped across 44 classes**, debug APK
+published at 39,501,790 bytes, `libtdjni.so` verified present for both `arm64-v8a` and `armeabi-v7a`). This
 phase added no feature and removed no earlier one: three tests went in, none came out, and no assertion was
 weakened.
 
