@@ -30,10 +30,10 @@ import org.junit.Test
  * something, and they would be unreachable from a unit test if they lived inside a query.
  */
 class BackupQueueRepositoryTest {
-    private var clock = 1L
-    private val dao = FakeBackupQueueDao { clock }
+    private val clock = QueueClock()
+    private val dao = FakeBackupQueueDao()
     private val repository: BackupQueueRepository =
-        BackupQueueRepositoryImpl(dao, { clock }, attemptCap = 3)
+        BackupQueueRepositoryImpl(dao, clock::now, attemptCap = 3)
 
     @Test
     fun enqueueAddsOnlyKnownItemsAndOnlyOnce() = runBlocking {
@@ -47,9 +47,9 @@ class BackupQueueRepositoryTest {
     @Test
     fun claimTakesTheOldestWaitingItemAndRecordsWhereItIsGoing() = runBlocking {
         dao.withMedia(1L, 2L)
-        clock = 10
+        clock.nowValue = 10
         repository.enqueue(listOf(2L))
-        clock = 20
+        clock.nowValue = 20
         repository.enqueue(listOf(1L))
 
         val claimed = repository.claimNext(chatId = 777L)
@@ -217,8 +217,19 @@ class BackupQueueRepositoryTest {
         repository.enqueue(listOf(1L))
         return repository.claimNext(chatId = 5L)
     }
+}
 
-    private fun String.asState(): UploadState = UploadState.fromStorageKey(this)
+fun String.asState(): UploadState = UploadState.fromStorageKey(this)
+
+/** Movable so a test can make two items queue at different times without sleeping. */
+class QueueClock {
+    var nowValue = 1L
+
+    fun now(): Long = nowValue
+
+    fun advance(by: Long) {
+        nowValue += by
+    }
 }
 
 /**
@@ -228,7 +239,7 @@ class BackupQueueRepositoryTest {
  * return a row with no media behind it, and grouping for the summary. Anything the repository can do to
  * a row is applied here so the two cannot drift into agreeing by accident.
  */
-private class FakeBackupQueueDao(private val clock: () -> Long) : BackupQueueDao {
+private class FakeBackupQueueDao : BackupQueueDao {
     private val rows = LinkedHashMap<Long, BackupQueueEntity>()
     private val media = LinkedHashMap<Long, FakeMedia>()
     private val tick = MutableStateFlow(0)

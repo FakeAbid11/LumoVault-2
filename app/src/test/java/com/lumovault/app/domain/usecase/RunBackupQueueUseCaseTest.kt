@@ -47,7 +47,11 @@ class RunBackupQueueUseCaseTest {
         val outcome = useCase().run()
 
         assertEquals(QueueRun.Done(sent = 1, failed = 0, deferred = false), outcome)
-        assertEquals(listOf(UploadState.Preparing, UploadState.Uploading), queue.statesOf(1L))
+        assertEquals(
+            "the row walked the whole path, not just its last value",
+            listOf(UploadState.Preparing, UploadState.Uploading, UploadState.BackedUp),
+            queue.statesOf(1L),
+        )
         assertEquals(listOf(CHANNEL to 9001L), queue.backedUp)
         assertEquals("the copy is removed once it has been sent", listOf("staged-1"), stager.discarded)
     }
