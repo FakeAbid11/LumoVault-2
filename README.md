@@ -67,11 +67,39 @@ number, code, password or session value is committed, hardcoded, or logged. The 
 filtered to hex before it reaches generated source, so a stray quote cannot break the build and a
 value cannot inject code.
 
-To build a signed-in-capable APK once the binary lands:
+To build an APK that can sign in, locally:
 
 ```
 -PPTELEGRAM_API_ID=... -PTELEGRAM_API_HASH=...
 ```
+
+On CI the same two values are read from repository secrets when they exist. They are not secrets in
+any meaningful sense once compiled in — anything distributed inside an APK can be lifted out of it —
+so a debug artifact built with them set is a build of a client that is shareable, and
+`build.yml` states on each run whether they were present.
+
+## Backup status — Phase 5
+
+Manual backup is implemented: select in Photos, a persistent queue in Room, one item at a time on a
+WorkManager foreground worker, and the original sent as the message type it already is — photo, video
+or animation — with the bytes staged unmodified rather than re-encoded.
+
+What that means precisely, because the phrase "original quality" is easy to over-claim: LumoVault
+performs no resizing, recompression or transcoding of its own, and hands TDLib the file as staged.
+Telegram's own photo and video containers are the server's to encode, and an animation may be shown as
+a looping video. Whether the bytes that come back match the bytes that went in is what Phase 6's
+content hash will establish; nothing claims it today.
+
+States are `QUEUED → PREPARING → UPLOADING → BACKED_UP`, with `FAILED` and `CANCELLED`, persisted in
+`backup_queue` keyed by `media_store_id`. PRD section 48's `HASHING` and `VERIFYING` are deliberately
+absent — Phase 5 can enter neither honestly, and a state nothing can leave is a claim rather than a
+placeholder. Likewise there is no hash column, no remote manifest and no duplicate detection: those are
+Phase 6, and this table is where they will be added.
+
+**Run on a device, backup has not been verified by me.** The queue, the worker, the foreground
+promotion, offline waiting and a real upload into Telegram are all unexercised — unit tests stop at the
+`TelegramClient` boundary and never call JNI. See the next section for what was and was not confirmed
+on a phone.
 
 ## Telegram status — what is real and what is deferred
 
@@ -87,14 +115,17 @@ that decide which screen appears. The fakes build real `TdApi` objects, because 
 until a request is actually sent — so the mapping is tested against the same classes production uses,
 not against a stand-in grammar.
 
-**The remaining seam is the native binary.** `libtdjni.so` and the generated `Client.java` /
-`TdApi.java` come from [`build-tdlib.yml`](.github/workflows/build-tdlib.yml), which runs TDLib's own
-`example/android` Docker build at a pinned revision; [`build.yml`](.github/workflows/build.yml)
-downloads them and verifies each file against a pinned SHA-256 before it assembles. Until that
-workflow has produced a run this build can point at, `isUsable` is false, authentication is honestly
-reported as unavailable, and **Phase 2's acceptance criterion "Telegram authentication works" is not
-met by this commit**. The Ready screen shows Telegram as *Unavailable* rather than ticking it, and no
-screen pretends otherwise.
+**The native binary is no longer the seam.** [`build-tdlib.yml`](.github/workflows/build-tdlib.yml)
+produced `libtdjni.so` for arm64-v8a and armeabi-v7a plus the generated `Client.java` and `TdApi.java`
+from TDLib `ea97bcd`, and [`build.yml`](.github/workflows/build.yml) downloads them by pinned run id,
+checks each file against a pinned SHA-256 and asserts the ELF class and machine per ABI. `isUsable` is
+still the honest guard: an APK built without those artifacts, or without the api credentials, reports
+Telegram as unavailable rather than crashing or pretending.
+
+On 2026-09-25 the developer confirmed on a real Android device that the APK installs, TDLib's Java
+interface loads, Telegram sign-in works and LumoVault creates the "LumoVault Backup" channel. That is
+their observation, not a measurement this repository can reproduce — nothing here has a device, and no
+automated test has ever loaded the native library.
 
 Because the API is generated from TDLib's scheme, every request and field name here was read out of
 `td/generate/scheme/td_api.tl` at the pinned revision `ea97bcd`, and the generated Java's naming came

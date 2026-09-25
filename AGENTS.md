@@ -36,6 +36,14 @@ Rules that have already caused a mistake here:
 - **Report live state, not remembered state.** Permissions can be revoked outside the app; read them
   from the system each time the screen is shown.
 - **Never fake a success state in UI.** If a capability is unavailable in a build, it must say so.
+- **Room gives an `INSERT` no row count.** An `@Query` insert that returns `Int` fails KSP with
+  "INSERT query functions must either return void or long"; count rows on either side of the statement
+  instead. `UPDATE`/`DELETE` may return `Int`.
+- **A `@Test` must be public and must return void.** JUnit reports a private or non-void test as
+  `initializationError` for the *whole class*, so thirteen tests can vanish behind one `= runBlocking {`
+  whose last expression is an `assertThrows` (it returns the throwable). Write `runBlocking<Unit>`.
+- **`<provider>`, `<service>` and `<activity>` go inside `<application>`.** As a direct child of
+  `<manifest>` AAPT rejects the build with "unexpected element".
 
 ## Secrets and sensitive data
 
@@ -57,6 +65,7 @@ message, a file path or a TDLib object.
 | Room | 2.8.5 | KSP processor; schema export on |
 | Coil | 3.6.3 | `coil-compose` + `coil-video`, no network artifact |
 | libphonenumber | 9.0.40 | country codes + E.164 |
+| WorkManager | 2.12.0 | `work-runtime`; CoroutineWorker + ForegroundInfo for the backup queue |
 | compileSdk / targetSdk / **minSdk** | 37 / 37 / **29** | see below |
 
 **minSdk is 29 on purpose.** `MediaStore.Files`, `RELATIVE_PATH` and `IS_PENDING` all begin at API
