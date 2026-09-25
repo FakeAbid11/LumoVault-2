@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.map
  * showed everything.
  */
 class FakeMediaDao(private val store: OrganizationStore) : MediaDao {
+    /** One index row by id — the lookup a restore makes after its scan, and Free Up Space before a delete. */
+    override suspend fun rowFor(id: Long): MediaEntity? = store.media[id]
+
     override fun observeWindow(limit: Int): Flow<List<MediaEntity>> = store.tick.map {
         store.media.values.filter { row -> store.visible(row.mediaStoreId) }
             .sortedWith(

@@ -62,7 +62,7 @@ class RestoreCloudMediaUseCaseTest {
     private val restores = FakeRestores()
     private val downloads = FakeDownloads()
     private val writer = FakeWriter()
-    private val media = FakeMedia()
+    private val media = RestoredLibrary()
     private val hasher = FakeHasher()
 
     private fun useCase(scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)) =
@@ -532,7 +532,7 @@ private class FakeHasher : MediaContentHasher {
  * The scanner as the restore sees it: [sync] is a counter and [local] is one row, because the only things
  * under test are whether a scan was asked for and whether the index had caught up afterwards.
  */
-private class FakeMedia : MediaRepository {
+private class RestoredLibrary : MediaRepository {
     var indexed: Media? = null
     var syncs = 0
 
@@ -547,7 +547,7 @@ private class FakeMedia : MediaRepository {
         indexed = null
     }
 
-    override fun observeWindow(limit: Int): Flow<List<Media>> = flowOf(indexed?.let { listOf(it) } ?: emptyList())
+    override fun observeWindow(limit: Int): Flow<List<Media>> = flowOf(indexed?.let(::listOf) ?: emptyList())
 
     override fun observeCount(): Flow<Int> = flowOf(if (indexed == null) 0 else 1)
 

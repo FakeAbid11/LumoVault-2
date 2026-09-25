@@ -152,7 +152,7 @@ class FreeUpSpaceTest {
                 3L to evidence(cloudMessagePresent = false),
             ),
         )
-        val useCase = FreeUpSpaceUseCase(repository, FakeOrganization(), FakeMedia())
+        val useCase = FreeUpSpaceUseCase(repository, FakeOrganization(), SpaceLibrary())
 
         val prepared = useCase.prepare(listOf(1L, 2L, 3L, 4L))
 
@@ -175,7 +175,7 @@ class FreeUpSpaceTest {
     fun aConfirmationThatLeftNothingEligibleAsksTheSystemForNothing() = runBlocking<Unit> {
         val repository = FakeFreeUpSpace(mapOf(2L to evidence(hasContentHash = false)))
         val organization = FakeOrganization()
-        val media = FakeMedia()
+        val media = SpaceLibrary()
 
         val useCase = FreeUpSpaceUseCase(repository, organization, media)
         val prepared = useCase.prepare(listOf(2L))
@@ -190,7 +190,7 @@ class FreeUpSpaceTest {
     fun aConfirmedDeletionReconcilesTheLibraryAndLeavesTheCloudAlone() = runBlocking<Unit> {
         val repository = FakeFreeUpSpace(mapOf(1L to evidence(), 5L to evidence()))
         val organization = FakeOrganization()
-        val media = FakeMedia()
+        val media = SpaceLibrary()
         val useCase = FreeUpSpaceUseCase(repository, organization, media)
         val prepared = useCase.prepare(listOf(1L, 5L))
         val deleted = useCase.complete(prepared)
@@ -231,12 +231,11 @@ class FreeUpSpaceTest {
         trashed = trashed,
     )
 
-    private companion object {
-        const val CHAT = 7L
-        const val MESSAGE = 42L
-        const val SIZE = 4_096L
-    }
 }
+
+private const val CHAT = 7L
+private const val MESSAGE = 42L
+private const val SIZE = 4_096L
 
 private class FakeFreeUpSpace(private val rows: Map<Long, ItemEvidence>) : FreeUpSpaceRepository {
     var cleared = false
@@ -280,7 +279,7 @@ private class FakeOrganization : MediaOrganizationRepository {
     override suspend fun trashedCount(): Int = 0
 }
 
-private class FakeMedia : MediaRepository {
+private class SpaceLibrary : MediaRepository {
     var syncs = 0
 
     override suspend fun local(mediaStoreId: Long): Media? = null
