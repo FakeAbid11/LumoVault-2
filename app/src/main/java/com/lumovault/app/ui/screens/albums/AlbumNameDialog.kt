@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.screens.albums
 
+import androidx.annotation.StringRes
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,8 +22,8 @@ import com.lumovault.app.R
  */
 @Composable
 fun AlbumNameDialog(
-    title: Int,
-    confirm: Int,
+    @StringRes title: Int,
+    @StringRes confirm: Int,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     initial: String = "",
@@ -49,16 +50,5 @@ fun AlbumNameDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.album_cancel)) }
         },
-    )
-}
-
-@Composable
-private fun SectionHeader(@StringRes label: Int) {
-    Text(
-        text = stringResource(label),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 2.dp),
     )
 }

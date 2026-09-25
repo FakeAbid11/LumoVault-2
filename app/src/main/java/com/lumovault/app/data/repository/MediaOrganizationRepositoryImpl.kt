@@ -1,7 +1,5 @@
 package com.lumovault.app.data.repository
 
-import androidx.room.withTransaction
-import com.lumovault.app.data.local.LumoVaultDatabase
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
@@ -28,12 +26,17 @@ import kotlinx.coroutines.flow.map
  * cannot be the reason a mark disappeared.
  */
 class MediaOrganizationRepositoryImpl(
-    private val database: LumoVaultDatabase,
     private val organization: MediaOrganizationDao,
     private val systemAlbums: SystemAlbumDao,
     private val media: MediaDao,
     private val albums: AlbumDao,
     private val nowSeconds: () -> Long,
+    /**
+     * Runs [forgetDeletedLocally]'s three writes as one statement group. Supplied rather than reached for
+     * because the alternative was a database handle in a class whose decisions are testable without one;
+     * the container wires it to `RoomDatabase.withTransaction`.
+     */
+    private val inTransaction: suspend (suspend () -> Unit) -> Unit,
     private val recentlyAddedWindowSeconds: Long = RECENTLY_ADDED_WINDOW_SECONDS,
 ) : MediaOrganizationRepository {
 
@@ -115,7 +118,7 @@ class MediaOrganizationRepositoryImpl(
      */
     override suspend fun forgetDeletedLocally(mediaStoreIds: Collection<Long>) {
         if (mediaStoreIds.isEmpty()) return
-        database.withTransaction {
+        inTransaction {
             organization.clearFor(mediaStoreIds)
             albums.removeFromEveryAlbum(mediaStoreIds)
             media.deleteByIds(mediaStoreIds)

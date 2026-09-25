@@ -98,12 +98,18 @@ fun AlbumsScreen(
 
             if (state.userAlbums.isEmpty()) {
                 item(key = "user-empty", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = stringResource(R.string.albums_empty_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
+                    Column {
+                        Text(
+                            text = stringResource(R.string.albums_empty_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.albums_empty_body),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                        )
+                    }
                 }
             }
 
@@ -131,6 +137,17 @@ fun AlbumsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun SectionHeader(@StringRes label: Int) {
+    Text(
+        text = stringResource(label),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 2.dp),
+    )
 }
 
 private val CardMinSize = 150.dp

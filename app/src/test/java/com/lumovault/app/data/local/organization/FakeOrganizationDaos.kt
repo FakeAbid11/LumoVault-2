@@ -100,6 +100,13 @@ class FakeMediaOrganizationDao(private val store: OrganizationStore) : MediaOrga
         return matching
     }
 
+    override suspend fun cleanupOrphans(): Int {
+        val orphans = store.organization.keys.filterNot { store.media.containsKey(it) }
+        orphans.forEach { store.organization.remove(it) }
+        store.bump()
+        return orphans.size
+    }
+
     override suspend fun trashedCount(): Int = store.organization.values.count { it.trashedAt > 0L }
 
     override suspend fun trashedIds(): List<Long> =
@@ -174,8 +181,22 @@ class FakeAlbumDao(private val store: OrganizationStore) : AlbumDao {
     override suspend fun membersWithin(albumId: Long, ids: Collection<Long>): List<Long> =
         ids.filter { AlbumKey(albumId, it) in store.members }
 
+    override suspend fun cleanupOrphanMemberships(): Int {
+        val orphans = store.members.filterNot { store.media.containsKey(it.mediaStoreId) }.toSet()
+        store.members.removeAll(orphans)
+        store.bump()
+        return orphans.size
+    }
+
     override suspend fun albumsContaining(mediaStoreId: Long): List<Long> =
-        store.members.filter { it.mediaStoreId == mediaStoreId }.map { it.albumId }
+        store.members.filter { it.mediaStoreId == mediaStoreId }
+            // The join orders by the album's own recency, not by when the row was added — so the sheet
+            // that ticks "already in" lists albums in the order the Albums screen shows them.
+            .map { it.albumId }
+            .sortedWith(
+                compareByDescending<Long> { store.albums[it]?.createdAt ?: 0L }
+                    .thenByDescending { it },
+            )
 
     override fun observeAlbums(): Flow<List<AlbumListRow>> = store.tick.map {
         store.albums.values

@@ -103,6 +103,7 @@ fun AlbumDetailScreen(
             isUserAlbum = state.isUserAlbum,
             explainer = when (state.systemAlbum) {
                 SystemAlbum.Trash -> stringResource(R.string.trash_explainer)
+                SystemAlbum.Archive -> stringResource(R.string.organization_archive_hint)
                 SystemAlbum.RecentlyAdded -> stringResource(R.string.recently_added_explainer)
                 is SystemAlbum -> stringResource(R.string.system_album_readonly)
                 null -> null
@@ -148,6 +149,7 @@ fun AlbumDetailScreen(
 
     if (adding) {
         AddMediaSheet(
+            albumName = state.userAlbum?.name.orEmpty(),
             items = libraryItems,
             alreadyMemberOf = state.memberIds,
             onDismiss = { adding = false },
@@ -422,6 +424,7 @@ private fun ConfirmDialog(title: Int, body: Int, action: Int, onDismiss: () -> U
  */
 @Composable
 private fun AddMediaSheet(
+    albumName: String,
     items: List<Media>,
     alreadyMemberOf: Set<Long>,
     onDismiss: () -> Unit,
@@ -431,9 +434,18 @@ private fun AddMediaSheet(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.albums_create_action)) },
+        title = { Text(stringResource(R.string.album_add_sheet_title, albumName)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Said out loud because those rows are ticked and cannot be unticked: without the line, a
+                // member that stays selected after a tap looks like a control that does not work.
+                if (alreadyMemberOf.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.album_already_in_album),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (items.isEmpty()) {
                     Text(
                         text = stringResource(R.string.album_library_empty),

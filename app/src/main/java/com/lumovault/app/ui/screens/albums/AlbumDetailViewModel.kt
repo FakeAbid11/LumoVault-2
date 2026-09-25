@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -199,19 +200,34 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
-    /** The same request over every trashed id, for the Trash screen's one action. */
+    /**
+     * The same request over everything in Trash.
+     *
+     * Reads the whole Trash rather than the scrolled window: an item this request cannot name is an item
+     * the user is about to lose without Android ever showing it in the consent dialog, and the dialog is
+     * the one part of this path that is not LumoVault's promise to keep.
+     */
     fun emptyTrash(launch: (IntentSenderRequest) -> Unit, onUnsupported: () -> Unit) {
         viewModelScope.launch {
-            val ids = container.mediaOrganizationRepository.trashedMediaIds().toSet()
-            if (ids.isEmpty()) return@launch
-            val uris = urisForIds(items.value, ids)
-            if (uris.isEmpty()) {
-                // Already gone from the device — a deletion made in the gallery, say. Only the rows
-                // remain, and dropping them is bookkeeping rather than deletion.
-                container.mediaOrganizationRepository.forgetDeletedLocally(ids)
+            val count = container.mediaOrganizationRepository.trashedCount()
+            if (count == 0) return@launch
+            val trashed = container.mediaOrganizationRepository
+                .observeContents(SystemAlbum.Trash, count)
+                .first()
+            if (trashed.isEmpty()) {
+                // Organisation rows for files the index no longer holds. Nothing to ask the device about,
+                // so this is bookkeeping rather than deletion.
+                container.mediaOrganizationRepository.forgetDeletedLocally(
+                    container.mediaOrganizationRepository.trashedMediaIds(),
+                )
                 return@launch
             }
-            requestDeletion(ids = ids, uris = uris, launch = launch, onUnsupported = onUnsupported)
+            requestDeletion(
+                ids = trashed.map { it.id }.toSet(),
+                uris = trashed.map { it.contentUri },
+                launch = launch,
+                onUnsupported = onUnsupported,
+            )
         }
     }
 

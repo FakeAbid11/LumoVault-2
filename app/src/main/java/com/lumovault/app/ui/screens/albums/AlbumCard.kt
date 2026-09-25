@@ -104,7 +104,16 @@ fun AlbumCard(
 
 @Composable
 private fun AlbumFallback(icon: ImageVector?) {
-    if (icon == null) return
+    if (icon == null) {
+        // A user album with nothing in it has no thumbnail to draw. Named rather than left blank, because
+        // an empty tile is indistinguishable from a picture that failed to load.
+        Text(
+            text = stringResource(R.string.album_cover_unavailable),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         icon.Badge()
     }

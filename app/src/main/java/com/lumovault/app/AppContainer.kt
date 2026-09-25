@@ -2,6 +2,7 @@ package com.lumovault.app
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.work.WorkerParameters
 import com.lumovault.app.data.backup.BackupNotifications
 import com.lumovault.app.data.backup.BackupScheduler
@@ -123,12 +124,12 @@ class AppContainer(context: Context) {
     /** Favourite, archive and Trash — organisation that never enqueues an upload by construction. */
     val mediaOrganizationRepository: MediaOrganizationRepository by lazy {
         MediaOrganizationRepositoryImpl(
-            database = database,
             organization = mediaOrganizationDao,
             systemAlbums = systemAlbumDao,
             media = database.mediaDao(),
             albums = albumDao,
             nowSeconds = ::unixNow,
+            inTransaction = { block -> database.withTransaction(block) },
         )
     }
 
