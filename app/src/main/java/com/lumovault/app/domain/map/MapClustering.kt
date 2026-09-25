@@ -180,7 +180,7 @@ object MapClustering {
             // capture breaks ties so a pan does not reorder pins under the finger, and the id breaks the rest
             // because it is the only remaining tie that is stable.
             compareBy<MapPin> { it.count }
-                .thenByDescending { pin -> pin.mediaStoreIds.maxOfOrNull(newest::get) ?: 0L }
+                .thenByDescending { pin -> pin.mediaStoreIds.maxOfOrNull { id -> newest[id] ?: 0L } ?: 0L }
                 .thenBy { pin -> pin.mediaStoreIds.minOrNull() ?: 0L },
         )
     }
