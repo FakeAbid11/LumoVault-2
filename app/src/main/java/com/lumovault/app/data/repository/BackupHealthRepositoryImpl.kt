@@ -1,6 +1,5 @@
 package com.lumovault.app.data.repository
 
-import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.data.local.backup.BackupHealthDao
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.backup.FreeUpSpaceDao
@@ -28,7 +27,11 @@ class BackupHealthRepositoryImpl(
     private val queue: BackupQueueDao,
     private val freeUpSpace: FreeUpSpaceDao,
     private val health: BackupHealthDao,
-    private val settings: AppSettingsStore,
+    /**
+     * The scan stamp as a flow rather than the settings store, because that store can only be built on top
+     * of a real database — and the one number it contributes here is worth being testable.
+     */
+    private val lastScanSeconds: Flow<Long?>,
 ) : BackupHealthRepository {
 
     override fun observe(): Flow<BackupHealth> {
@@ -46,13 +49,13 @@ class BackupHealthRepositoryImpl(
         val remote = combine(
             freeUpSpace.observeTotals(UploadState.BackedUp.storageKey),
             health.observeLastBackupSeconds(UploadState.BackedUp.storageKey),
-            settings.changes,
-        ) { reclaimable, lastBackup, appSettings ->
+            lastScanSeconds,
+        ) { reclaimable, lastBackup, scan ->
             RemoteState(
                 reclaimableCount = reclaimable.itemCount,
                 reclaimableBytes = reclaimable.totalBytes,
                 lastBackupSeconds = lastBackup,
-                lastScanSeconds = appSettings?.lastScanSeconds,
+                lastScanSeconds = scan,
             )
         }
 

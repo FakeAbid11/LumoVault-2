@@ -84,6 +84,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -385,7 +386,7 @@ class AppContainer(context: Context) {
             queue = backupQueueDao,
             freeUpSpace = database.freeUpSpaceDao(),
             health = database.backupHealthDao(),
-            settings = settingsStore,
+            lastScanSeconds = settingsStore.changes.map { current -> current?.lastScanSeconds },
         )
     }
 
