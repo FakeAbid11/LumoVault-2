@@ -64,8 +64,8 @@ class BackupNotifications(private val context: Context) {
             .setContentText(text)
             .setProgress(total, done, false)
             .setOngoing(true)
-            .setSilent(true)
-            // Re-issuing this notification must not buzz again; it updates as the queue moves.
+            // Re-issuing this notification must not buzz again; it updates as the queue moves. The
+            // channel's LOW importance is what keeps it silent, so no per-notification silence call.
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_PROGRESS)
             .setContentIntent(openAppIntent())

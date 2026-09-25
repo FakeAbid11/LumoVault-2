@@ -94,7 +94,7 @@ class TdLibUploadRepository(
                 photo.addedStickerFileIds = IntArray(0)
                 photo.width = request.width
                 photo.height = request.height
-                TdApi.InputMessagePhoto().apply { this.photo = photo }
+                TdApi.InputMessagePhoto().apply { this.photo = photo; caption = emptyCaption() }
             }
 
             MediaType.Video -> {
@@ -109,7 +109,7 @@ class TdLibUploadRepository(
                 video.height = request.height
                 // Asks Telegram to present it as streamable. It changes no byte of what is sent.
                 video.supportsStreaming = true
-                TdApi.InputMessageVideo().apply { this.video = video }
+                TdApi.InputMessageVideo().apply { this.video = video; caption = emptyCaption() }
             }
 
             MediaType.Gif -> {
@@ -120,11 +120,9 @@ class TdLibUploadRepository(
                 animation.duration = request.durationSeconds
                 animation.width = request.width
                 animation.height = request.height
-                TdApi.InputMessageAnimation().apply { this.animation = animation }
+                TdApi.InputMessageAnimation().apply { this.animation = animation; caption = emptyCaption() }
             }
         }
-
-        content.caption = emptyCaption()
 
         // Topic, reply, options and markup are each documented as "pass null" when they do not apply:
         // a backup is a plain media post.
@@ -138,7 +136,13 @@ class TdLibUploadRepository(
         return send
     }
 
-    /** An empty [TdApi.FormattedText] rather than a null one: `entities` is a vector TDLib iterates. */
+    /**
+     * An empty [TdApi.FormattedText] rather than a null one: `entities` is a vector TDLib iterates.
+     *
+     * A caption is deliberately not carried over from the local file — Telegram keeps no place for it
+     * on an ordinary media message from another account, and Phase 6's manifest will travel in a
+     * message of its own rather than in a field nothing reads today.
+     */
     private fun emptyCaption(): TdApi.FormattedText {
         val caption = TdApi.FormattedText()
         caption.text = ""
@@ -146,7 +150,7 @@ class TdLibUploadRepository(
         return caption
     }
 
-    private fun TdApi.File.fractionFor(stagedPath: String): Float? = uploadFractionOf(stagedPath)
+    private fun TdApi.File.fractionFor(stagedPath: String): Float? = uploadFractionOf(this, stagedPath)
 
     private companion object {
         /**

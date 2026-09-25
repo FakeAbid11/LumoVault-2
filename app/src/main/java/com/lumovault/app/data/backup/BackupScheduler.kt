@@ -1,7 +1,7 @@
 package com.lumovault.app.data.backup
 
 import android.content.Context
-import androidx.work.BackoffCriteria
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
@@ -39,7 +39,7 @@ class BackupScheduler(private val context: Context) {
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
             )
-            .setBackoffCriteria(BackoffCriteria.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(WORK_TAG)
             .build()
 

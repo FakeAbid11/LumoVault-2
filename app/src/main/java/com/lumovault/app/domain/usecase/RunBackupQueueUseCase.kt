@@ -9,9 +9,10 @@ import com.lumovault.app.domain.backup.StagedSource
 import com.lumovault.app.domain.backup.TelegramUploadRepository
 import com.lumovault.app.domain.backup.UploadEvent
 import com.lumovault.app.domain.backup.UploadRequest
-import kotlin.coroutines.currentCoroutineContext
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.transform
 
 /** What is happening to the item being sent right now, for whoever is showing progress. */
@@ -73,7 +74,7 @@ class RunBackupQueueUseCase(
         val deferred = mutableSetOf<Long>()
 
         while (true) {
-            currentCoroutineContext().ensureActive()
+            coroutineContext.ensureActive()
             val request = queue.claimNext(chatId) ?: break
 
             if (request.mediaStoreId in deferred) {
@@ -104,7 +105,10 @@ class RunBackupQueueUseCase(
     ): Boolean {
         val staged = stager.stage(request.contentUri, request.displayName)
 
-        if (staged is StagedSource.Unavailable) {
+        // Tested as "is it ready" rather than "is it unavailable" so the branch below sees a
+        // StagedSource.Ready without a cast: the sealed type has exactly two cases, and this is the
+        // spelling the compiler refines reliably.
+        if (staged !is StagedSource.Ready) {
             queue.release(request, staged.failure)
             return false
         }
