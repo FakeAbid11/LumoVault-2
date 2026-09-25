@@ -121,7 +121,17 @@ fun MapScreen(
                 // is normal navigation — without this the second visit would be a map with no overlays and no
                 // listeners at all.
                 setDestroyMode(false)
-                MapTileProvider.tileSource()?.let { source -> setTileSource(source) }
+                val source = MapTileProvider.tileSource()
+                if (source == null) {
+                    // osmdroid's own default tile source is Mapnik — https://tile.openstreetmap.org/ — so a
+                    // build that was handed no provider would otherwise fetch from the public servers whose
+                    // usage policy the header comment of MapTileProvider describes. With the data connection
+                    // off, nothing is requested for a tile: the map plots every photo on a blank canvas and the
+                    // notice below says that this is a build without a provider, not a feature that is missing.
+                    setUseDataConnection(false)
+                } else {
+                    setTileSource(source)
+                }
                 setMultiTouchControls(true)
                 setZoomLevel(MapClustering.DEFAULT_ZOOM.toDouble())
             }

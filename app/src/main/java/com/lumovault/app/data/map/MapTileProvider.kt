@@ -21,7 +21,9 @@ import org.osmdroid.util.MapTileIndex
  * With no template, [tileSource] is null and the map still draws its markers on a plain canvas — every photo
  * position, the clusters, the strip and the whole viewer hand-off work without a single tile. That is the
  * difference between a build that cannot show tiles and a feature that does not exist, and the screen says
- * which one it is showing.
+ * which one it is showing. The caller must then turn osmdroid's data connection off: its *own* default source
+ * is Mapnik at tile.openstreetmap.org, so leaving the tile source unset would fetch from the public servers
+ * rather than from nothing. See MapScreen's factory.
  *
  * osmdroid's own configuration is global and read when the first `MapView` is constructed, which is why
  * [configure] is idempotent and must run before that: setting a user agent afterwards is a value the library
