@@ -1,3 +1,7 @@
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -88,6 +92,16 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    // GitHub Actions is the only thing that compiles and runs this project, so a red test has to arrive
+    // already explained: Gradle's default one-line summary hides both the assertion message and the
+    // line, which turns a single failure into a round trip of guesses.
+    testLogging {
+        events(TestLogEvent.FAILED)
+        exceptionFormat = TestExceptionFormat.FULL
     }
 }
 

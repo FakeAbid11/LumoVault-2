@@ -260,7 +260,11 @@ class TdCloudMappingTest {
             7,
         )
 
-        assertEquals("", withCaption(23, "LUMOVAULT_META v1 h=$DIGEST")?.contentHash)
+        assertEquals(
+            "the hash is the mandatory field, so a manifest carrying nothing else still identifies content",
+            DIGEST,
+            withCaption(23, "LUMOVAULT_META v1 h=$DIGEST")?.contentHash,
+        )
         assertEquals("", withCaption(24, "LUMOVAULT_META v2 h=$DIGEST s=10")?.contentHash)
         assertEquals("", withCaption(25, "LUMOVAULT_META v1 h=${DIGEST.dropLast(1)}")?.contentHash)
         assertEquals(

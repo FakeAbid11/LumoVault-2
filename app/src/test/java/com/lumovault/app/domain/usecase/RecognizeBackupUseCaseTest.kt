@@ -283,23 +283,24 @@ class RecognizeBackupUseCaseTest {
     }
 
     @Test
-    fun aQueuedItemWithNoRemoteMatchIsStillQueuedAfterAPass() = runBlocking {
+    fun aFailedItemIsReidentifiedWithoutBeingPutBackInTheQueue() = runBlocking {
         dao.withMedia(1L)
         queue.enqueue(listOf(1L))
-        // Unrecognized remote manifests are zero, so this is the change-detection frontier: only items
-        // the app already has a record for. The queued one needs a hash before it can be sent, and reading
-        // that file must not take it out of line.
+        // The worker refused it, and nothing was ever measured about it. Recognition's change-detection
+        // frontier covers exactly this: the item has a record whose hash is missing.
+        dao.forceState(1L, UploadState.Failed)
         cloud.unrecognized = 0
         hasher.digest = HASH_A
 
-        recognizer().run()
+        val run = recognizer().run()
 
+        assertEquals(1, run.hashed)
+        assertEquals(HASH_A, dao.row(1L).contentHash)
         assertEquals(
-            "reading a queued file for its hash must not withdraw it from the queue",
-            UploadState.Queued,
+            "recognition measures content; only the retry affordance decides to send it again",
+            UploadState.Failed,
             stateOf(1L),
         )
-        assertEquals(HASH_A, dao.row(1L).contentHash)
     }
 
     private fun stateOf(id: Long): UploadState = UploadState.fromStorageKey(dao.row(id).state)
