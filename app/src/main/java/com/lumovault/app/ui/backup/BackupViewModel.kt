@@ -31,8 +31,14 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     val preferences: StateFlow<BackupPreferences> = container.settingsRepository.backupPreferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupPreferences.Default)
 
-    val diagnostics: StateFlow<BackupDiagnostics> = diagnosticsFlow(container)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_DIAGNOSTICS)
+    /**
+     * Null until the first read has come back.
+     *
+     * Not a cosmetic choice: a seeded [BackupDiagnostics] would show `Database version 0` and `0 B` free on
+     * a screen whose whole job is reporting facts, and there is no version-0 database to report.
+     */
+    val diagnostics: StateFlow<BackupDiagnostics?> = diagnosticsFlow(container)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     fun setAutomatic(enabled: Boolean) {
         viewModelScope.launch {
@@ -63,15 +69,6 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         val EMPTY = BackupHealth(0, 0, 0, 0, 0, 0, 0, 0L, null, null)
-
-        val EMPTY_DIAGNOSTICS = BackupDiagnostics(
-            health = EMPTY,
-            preferences = BackupPreferences.Default,
-            telegram = TelegramWord.Unavailable,
-            channelAvailable = false,
-            databaseVersion = 0,
-            stagingSpaceFreeBytes = 0L,
-        )
     }
 }
 

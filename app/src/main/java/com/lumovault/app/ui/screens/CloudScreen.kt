@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -163,6 +164,10 @@ fun CloudScreen(
             )
         }
     }
+
+    // The sheet already dismisses on a tap anywhere outside the picture, but the system back gesture was
+    // not one of them — and a full-screen overlay that swallows back feels stuck rather than focused.
+    BackHandler(enabled = selected != null) { selected = null }
 
     selected?.let { item ->
         CloudViewer(

@@ -7,7 +7,6 @@
     <string name="nav_cloud">Cloud</string>
     <string name="nav_map">Map</string>
 
-    <string name="cloud_placeholder">Cloud library will appear here.</string>
 
     <!-- Photos library (Phase 3) -->
     <string name="photos_empty_title">No photos yet</string>
@@ -180,7 +179,6 @@
     <string name="cloud_viewer_preview_shown">Showing Telegram\'s preview. The original is still in your channel.</string>
     <string name="cloud_viewer_no_preview">No preview available for this item.</string>
     <string name="cloud_download_action">Download to device</string>
-    <string name="cloud_download_unavailable">Downloads open with the backup release and are not available in this build.</string>
     <string name="cloud_viewer_close">Close</string>
     <plurals name="cloud_items_found">
         <item quantity="one">%1$d item found</item>
@@ -452,6 +450,9 @@
     <string name="free_space_selected">%1$s selected · %2$s</string>
     <string name="free_space_action">Free up space</string>
     <string name="free_space_review_refresh">Check again</string>
+    <string name="free_space_review_empty">Nothing safely backed up is ready to remove right now. Check again after a backup finishes.</string>
+    <string name="free_space_select_all">Select all</string>
+    <string name="free_space_clear_selection">Clear</string>
     <string name="free_space_confirm_title">Remove these from this device?</string>
     <string name="free_space_confirm_body">%1$s items, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</string>
     <string name="free_space_confirm_action">Ask Android</string>

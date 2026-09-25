@@ -243,7 +243,7 @@ fun BackupHealthScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            HealthSummary(health = health, onOpenDetails = onNavigateUp)
+            HealthSummary(health = health, onOpenDetails = onOpenDiagnostics)
             if (health.reclaimableCount > 0) {
                 Text(
                     text = stringResource(
@@ -280,7 +280,6 @@ fun DiagnosticsScreen(
     viewModel: BackupViewModel = viewModel(),
 ) {
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    val current = diagnostics
 
     Scaffold(
         modifier = modifier,
@@ -300,6 +299,13 @@ fun DiagnosticsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            val current = diagnostics
+            if (current == null) {
+                // Every row below is a fact about the device, and none of it has been read yet. Zeros would
+                // read as a database at version 0 and a full disk, which is inventing both.
+                item { CircularProgressIndicator(modifier = Modifier.padding(top = 24.dp)) }
+                return@LazyColumn
+            }
             item { Row(R.string.diag_local_media, current.health.localTotal.toString()) }
             item { Row(R.string.diag_backed_up, current.health.backedUp.toString()) }
             item { Row(R.string.diag_cloud_only, current.health.cloudOnly.toString()) }
@@ -414,7 +420,17 @@ fun FreeUpSpaceScreen(
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         viewModel.consentConsumed()
-        if (result.resultCode == android.app.Activity.RESULT_OK) viewModel.onDeleted() else viewModel.onDeclined()
+        when (result.resultCode) {
+            android.app.Activity.RESULT_OK -> viewModel.onDeleted()
+
+            // The user backing out of Android's own dialog is the only cancellation that is a choice.
+            // Every other code — including `RESULT_CANCELED`'s neighbours, which is what the framework
+            // returns when it refuses the request outright — is the device saying no, and reporting that
+            // as "you declined" tells the person something happened they did not do.
+            android.app.Activity.RESULT_CANCELED -> viewModel.onDeclined()
+
+            else -> viewModel.onFailure()
+        }
     }
 
     consent?.let { sender ->
@@ -494,8 +510,38 @@ fun FreeUpSpaceScreen(
                 }
             }
 
-            if (state.candidates.isEmpty() && !state.nothingEligible) {
+            // Three cases, not two. A review that is still running and a review that came back with
+            // nothing are different facts, and drawing a spinner for both leaves the screen promising an
+            // answer that never arrives while its own header quotes real totals over zero rows.
+            if (state.loading) {
                 item { CircularProgressIndicator(modifier = Modifier.padding(top = 24.dp)) }
+            } else if (state.candidates.isEmpty() && !state.nothingEligible) {
+                item {
+                    Text(
+                        text = stringResource(R.string.free_space_review_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (state.candidates.isNotEmpty()) {
+                // A review can list four hundred rows, and ticking them one at a time is not how a person
+                // empties a phone. The row is the list's own control, not a mode the screen can get stuck in.
+                item {
+                    TextButton(
+                        onClick = {
+                            if (state.allSelected) viewModel.clearSelection() else viewModel.selectAll()
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (state.allSelected) R.string.free_space_clear_selection
+                                else R.string.free_space_select_all,
+                            ),
+                        )
+                    }
+                }
             }
 
             items(state.candidates, key = { it.mediaStoreId }) { candidate ->

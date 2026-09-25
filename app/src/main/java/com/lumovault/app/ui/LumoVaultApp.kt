@@ -49,17 +49,27 @@ fun LumoVaultApp(
     // A photograph is the screen, so the bar it would otherwise sit under is not drawn at all rather than
     // drawn over it: a translucent nav bar on top of a dark image is a second, dimmer copy of the same black.
     val isViewer = viewerRouteActive(route)
+    // The backup and storage screens each draw their own bar, because each has a title that is not a tab's
+    // name and a back arrow that is not a tab change. A screen that owns its chrome gets one bar, not two —
+    // and the one that would be added here is the one that cannot name them.
+    val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            if (!isViewer) {
+            if (!isViewer && !ownsItsBar) {
                 TopBar(
                     destination = currentDestination,
                     onCycleThemeMode = onCycleThemeMode,
                     onNavigateUp = { if (isNested) navController.navigateUp() },
                     showNavigateUp = isNested,
-                    onOpenBackup = { navController.navigate(BackupRoutes.HUB) },
+                    onOpenBackup = {
+                        navController.navigate(BackupRoutes.HUB) {
+                            // The gear stays in the bar on every tab, so a double tap on the way past the
+                            // backup screen would otherwise leave two of them, and back would retrace one.
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
         },
@@ -114,8 +124,7 @@ private fun TopBar(
             }
         },
         actions = {
-            // Stand-in for the Settings entry point (PRD section 43); it becomes a real
-            // destination in Phase 2, when there is a connected account to show.
+
             IconButton(onClick = onCycleThemeMode) {
                 Icon(
                     imageVector = Icons.Filled.Palette,
@@ -135,10 +144,3 @@ private fun TopBar(
     )
 }
 
-private fun NavHostController.navigateToTab(destination: LumoVaultDestination) {
-    navigate(destination.route) {
-        popUpTo(LumoVaultDestination.Start.route) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
-    }
-}

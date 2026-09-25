@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.lumovault.app.R
+import androidx.navigation.NavHostController
 
 /**
  * The four primary destinations from PRD section 42. Routes live here so no screen declares
@@ -42,6 +43,20 @@ enum class LumoVaultDestination(val route: String) {
             route?.startsWith(BackupRoutes.PREFIX) == true -> Cloud
             else -> Start
         }
+    }
+}
+
+/**
+ * How a bottom-bar destination is opened: one copy on the stack, and the state the user left behind.
+ *
+ * Reused by the screens that link between tabs — a photograph's "show on the map" is the same
+ * destination as the map tab, and navigating to it by hand would stack a second map.
+ */
+internal fun NavHostController.navigateToTab(destination: LumoVaultDestination) {
+    navigate(destination.route) {
+        popUpTo(LumoVaultDestination.Start.route) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 

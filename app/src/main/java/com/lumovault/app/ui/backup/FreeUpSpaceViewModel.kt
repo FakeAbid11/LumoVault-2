@@ -49,16 +49,20 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
     /** The request awaiting an answer, kept only so the screen can hand the same list back after consent. */
     private val pending = MutableStateFlow<PreparedDeletion?>(null)
 
+    /** True while the review has never come back, so the screen can say "loading" rather than guess. */
+    private val loading = MutableStateFlow(true)
+
     private val plan = container.freeUpSpace.plan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), FreeUpSpacePlan(0, 0L))
 
     val state: StateFlow<FreeUpSpaceState> =
-        combine(plan, review, selected, outcome) { offered, listed, chosen, last ->
+        combine(plan, review, selected, outcome, loading) { offered, listed, chosen, last, busy ->
             FreeUpSpaceState(
                 plan = offered,
                 candidates = listed,
                 selected = chosen,
                 outcome = last,
+                loading = busy,
                 selectedBytes = listed.filter { it.mediaStoreId in chosen }.sumOf { it.sizeBytes },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), FreeUpSpaceState())
@@ -71,8 +75,10 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun loadReview() {
         viewModelScope.launch {
+            loading.value = true
             val listed = container.freeUpSpace.review(REVIEW_LIMIT)
             review.value = listed
+            loading.value = false
             // Selection is clamped to what is still offered. An id the user ticked that is no longer on the
             // list would ride into the confirmation only to be refused there, and a refusal the user never
             // saw is a surprise rather than a safety net.
@@ -182,6 +188,7 @@ data class FreeUpSpaceState(
     val selected: Set<Long> = emptySet(),
     val outcome: DeletionOutcome = DeletionOutcome.None,
     val selectedBytes: Long = 0L,
+    val loading: Boolean = false,
 ) {
     val nothingEligible: Boolean
         get() = plan.eligibleCount == 0
