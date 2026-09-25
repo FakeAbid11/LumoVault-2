@@ -409,6 +409,18 @@ private class FakeQueue : BackupQueueRepository {
         return true
     }
 
+    override suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long? = null
+
+    override suspend fun recordRestored(
+        mediaStoreId: Long,
+        remote: RemoteBackup,
+        identity: MediaIdentity,
+    ): Boolean {
+        write(mediaStoreId, UploadState.BackedUp)
+        backedUp += remote.chatId to remote.messageId
+        return true
+    }
+
     override suspend fun revokeAssociation(mediaStoreId: Long): Boolean {
         write(mediaStoreId, UploadState.NotBackedUp)
         return true

@@ -171,6 +171,69 @@ class FakeBackupQueueDao : BackupQueueDao {
         return 1
     }
 
+    /**
+     * Mirrors the restore-side join: an id the index no longer holds cannot answer "already on device",
+     * because the whole point of the check is that a file exists to be found.
+     */
+    override suspend fun residentBackupFor(chatId: Long, messageId: Long, hash: String): Long? =
+        rows.values
+            .filter { it.mediaStoreId in media }
+            .filter { record ->
+                (chatId != 0L && record.chatId == chatId && record.messageId == messageId) ||
+                    (hash.isNotBlank() && record.contentHash.equals(hash, ignoreCase = true))
+            }
+            .minByOrNull { it.mediaStoreId }
+            ?.mediaStoreId
+
+    /**
+     * The restore write, guarded the way the SQL is: a row a worker owns is not settled by a download, and
+     * a row that does not exist yet is created already complete — never as `queued`, which is the state a
+     * worker could claim between the file landing and this statement running.
+     */
+    override suspend fun recordRestored(
+        id: Long,
+        chatId: Long,
+        messageId: Long,
+        hash: String,
+        sizeBytes: Long,
+        modifiedSeconds: Long,
+        backedUpState: String,
+        settleableStates: Collection<String>,
+        now: Long,
+    ) {
+        val existing = rows[id]
+        if (existing == null) {
+            rows[id] = BackupQueueEntity(
+                mediaStoreId = id,
+                state = backedUpState,
+                chatId = chatId,
+                messageId = messageId,
+                contentHash = hash,
+                contentSizeBytes = sizeBytes,
+                contentModifiedSeconds = modifiedSeconds,
+                hashedAt = now,
+                queuedAt = now,
+                uploadedAt = now,
+                updatedAt = now,
+            )
+        } else if (existing.state in settleableStates) {
+            rows[id] = existing.copy(
+                state = backedUpState,
+                chatId = chatId,
+                messageId = messageId,
+                contentHash = hash,
+                contentSizeBytes = sizeBytes,
+                contentModifiedSeconds = modifiedSeconds,
+                hashedAt = now,
+                uploadedAt = now,
+                updatedAt = now,
+                failure = "",
+                stagedPath = "",
+            )
+        }
+        bump()
+    }
+
     override suspend fun promoteRecognized(
         ids: Collection<Long>,
         queuedState: String,
