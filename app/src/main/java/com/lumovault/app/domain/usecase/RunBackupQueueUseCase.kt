@@ -103,14 +103,16 @@ class RunBackupQueueUseCase(
         request: BackupRequest,
         onProgress: suspend (BackupProgress) -> Unit,
     ): Boolean {
-        val staged = stager.stage(request.contentUri, request.displayName)
+        // A `when` over the sealed cases rather than an `if (x !is Ready)` guard: the exhaustive form is
+        // the one whose branch types the compiler refines, and the unavailable branch is `Nothing`, so
+        // the expression's type is the ready one with no cast.
+        val staged = when (val source = stager.stage(request.contentUri, request.displayName)) {
+            is StagedSource.Unavailable -> {
+                queue.release(request, source.failure)
+                return false
+            }
 
-        // Tested as "is it ready" rather than "is it unavailable" so the branch below sees a
-        // StagedSource.Ready without a cast: the sealed type has exactly two cases, and this is the
-        // spelling the compiler refines reliably.
-        if (staged !is StagedSource.Ready) {
-            queue.release(request, staged.failure)
-            return false
+            is StagedSource.Ready -> source
         }
 
         queue.markStaged(request.mediaStoreId, staged.path)
@@ -154,10 +156,10 @@ class RunBackupQueueUseCase(
                 false
             }
 
-            // No terminal event means the upload answered nothing at all. That is a broken
-            // collaborator rather than a Telegram condition, so the bounded retry is the honest
-            // response — and the row must not be left claiming it is still uploading.
-            null -> {
+            // Nothing terminal came back — either the flow ended silently or it stopped on a progress
+            // event. Either way the row must not be left claiming it is still uploading, and "unknown"
+            // is the honest answer rather than a failure invented on its behalf.
+            null, is UploadEvent.Progress -> {
                 queue.release(request, BackupFailure(BackupFailureKind.Unknown))
                 false
             }
