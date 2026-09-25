@@ -19,3 +19,8 @@ local.properties
 captures/
 *.apk
 *.aab
+
+# TDLib's binaries are fetched by CI from pinned, SHA-256-verified release assets and installed
+# here. Committing them would put an unreviewed native library on the path that holds the user's
+# Telegram session, which is what the project's supply-chain rule exists to prevent.
+app/src/main/jniLibs/

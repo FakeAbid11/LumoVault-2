@@ -47,8 +47,101 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      # TDLib ships no Android binaries, and compiling it from source here cost ~25 minutes per ABI.
+      # These are immutable release assets, each checked against a pinned SHA-256 before use, so the
+      # build can never drift to "latest" TDLib: the JSON API changes between minor versions.
+      # Version 1.8.67 is upstream commit bc9c263e2bfee06aaab41e82db51a103376030bc, and every method
+      # and field LumoVault's Telegram layer sends was re-read from td_api.tl at that exact commit.
+      - name: Install pinned TDLib binaries
+        env:
+          TDLIB_TAG: v1.8.67
+          TDLIB_SHA_ARM64_V8A: 69fe49e169c56aefc5d75bae64e03a20e7e3e84a67bb561e322008c99016d642
+          TDLIB_SHA_X86_64: 3e377bbec2561193a012ad0900e52f234fa21da167fb11a224de12ef273885d9
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/FallenProjects/tdlib-build/releases/download/$TDLIB_TAG"
+
+          install_tdlib() {
+            abi="$1"; asset="$2"; want="$3"
+            mkdir -p "app/src/main/jniLibs/$abi"
+            curl -sSL --fail --retry 3 -o "/tmp/$asset" "$BASE/$asset"
+            echo "$want  /tmp/$asset" | sha256sum --check --status \
+              || { echo "checksum mismatch for $asset"; exit 1; }
+            tar xzf "/tmp/$asset" -C "app/src/main/jniLibs/$abi"
+            test -f "app/src/main/jniLibs/$abi/libtdjson.so"
+          }
+
+          # No armeabi-v7a: this publisher builds Android aarch64 and x86_64 only, and prd.md names no
+          # ABI requirement, so 32-bit ARM is deliberately absent rather than quietly substituted.
+          install_tdlib arm64-v8a TDLib-tdjson-android-aarch64-shared.tar.gz "$TDLIB_SHA_ARM64_V8A"
+          install_tdlib x86_64  TDLib-tdjson-android-x86_64-shared.tar.gz   "$TDLIB_SHA_X86_64"
+
+      - name: Verify TDLib binaries and build the JNI forwarder
+        env:
+          # tdlib/lumo_tdlib_jni.c declares these as extern, so a binary that no longer exports them
+          # must fail here rather than at runtime on a phone.
+          TDLIB_SYMBOLS: td_create_client_id td_send td_receive
+        run: |
+          set -euo pipefail
+
+          for abi in arm64-v8a x86_64; do
+            so="app/src/main/jniLibs/$abi/libtdjson.so"
+            for symbol in $TDLIB_SYMBOLS; do
+              nm -D --defined-only "$so" | grep -qE "[[:space:]]$symbol\$" \
+                || { echo "$abi: libtdjson.so does not export $symbol"; exit 1; }
+            done
+            readelf -h "$so" | grep -E "Machine:"
+            readelf -d "$so" | grep NEEDED || true
+            # The archives ship only libtdjson.so, so a shared-STL or OpenSSL dependency would be an
+            # unsatisfied loader requirement on device.
+            if readelf -d "$so" | grep -qE 'libc\+\+_shared\.so|libcrypto\.so|libssl\.so'; then
+              echo "$abi: libtdjson.so needs a library this build does not package"; exit 1
+            fi
+          done
+
+          NDK_DIR="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+          if [ -z "$NDK_DIR" ] || [ ! -d "$NDK_DIR" ]; then
+            NDK_DIR="$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -n1 || true)"
+          fi
+          if [ -z "$NDK_DIR" ] || [ ! -d "$NDK_DIR" ]; then
+            echo "No NDK on the runner" >&2; exit 1
+          fi
+          echo "Using NDK: $NDK_DIR"
+          HOST_BIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          # LumoVault's own four-function shim, not TDLib: this is a single small C file, so the
+          # normal build still compiles no TDLib code.
+          compile_shim() {
+            abi="$1"; triple="$2"
+            "$HOST_BIN/$triple-clang" -shared -fPIC -O2 -Wall \
+              -I "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
+              -o "app/src/main/jniLibs/$abi/liblumo_tdlib.so" \
+              tdlib/lumo_tdlib_jni.c \
+              -L "app/src/main/jniLibs/$abi" -ltdjson
+            readelf -d "app/src/main/jniLibs/$abi/liblumo_tdlib.so" | grep NEEDED
+            nm -D --defined-only "app/src/main/jniLibs/$abi/liblumo_tdlib.so" \
+              | grep -c "Java_com_lumovault_app_data_remote_telegram_JniTdLibNative_native"
+          }
+          compile_shim arm64-v8a aarch64-linux-android29
+          compile_shim x86_64 x86_64-linux-android29
+
       - name: Build debug APK and run unit tests
         run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
+
+      # The APK, not the download, is the evidence that native libraries are integrated.
+      - name: Verify APK contains the native libraries
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          unzip -l "$APK" | grep -E 'lib/.*/lib(tdjson|lumo_tdlib)\.so' || true
+          for entry in \
+            lib/arm64-v8a/libtdjson.so \
+            lib/arm64-v8a/liblumo_tdlib.so \
+            lib/x86_64/libtdjson.so \
+            lib/x86_64/liblumo_tdlib.so
+          do
+            unzip -l "$APK" | grep -qE " $entry\$" || { echo "APK is missing $entry"; exit 1; }
+          done
 
       - name: Report artifact to the run summary
         run: |
