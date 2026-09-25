@@ -38,6 +38,7 @@ import com.lumovault.app.data.repository.AlbumRepositoryImpl
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
 import com.lumovault.app.data.repository.CloudIndexRepositoryImpl
 import com.lumovault.app.data.repository.CountryRepositoryImpl
+import com.lumovault.app.data.repository.FreeUpSpaceRepositoryImpl
 import com.lumovault.app.data.repository.LocalPresenceLookup
 import com.lumovault.app.data.repository.MediaMetadataRepositoryImpl
 import com.lumovault.app.data.repository.MediaOrganizationRepositoryImpl
@@ -56,12 +57,13 @@ import com.lumovault.app.domain.organization.AlbumRepository
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.CountryRepository
+import com.lumovault.app.domain.repository.FreeUpSpaceRepository
 import com.lumovault.app.domain.repository.MediaMetadataRepository
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
-import com.lumovault.app.domain.restore.RestoreRepository
 import com.lumovault.app.domain.repository.SettingsRepository
+import com.lumovault.app.domain.restore.RestoreRepository
 import com.lumovault.app.domain.restore.RestoredMediaWriter
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
@@ -69,6 +71,7 @@ import com.lumovault.app.domain.telegram.TelegramCloudRepository
 import com.lumovault.app.domain.telegram.TelegramOriginalRepository
 import com.lumovault.app.domain.telegram.TelegramPreviewRepository
 import com.lumovault.app.domain.usecase.ExtractMediaMetadataUseCase
+import com.lumovault.app.domain.usecase.FreeUpSpaceUseCase
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RestoreCloudMediaUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
@@ -361,6 +364,19 @@ class AppContainer(context: Context) {
      */
     fun reconcileRestores() {
         applicationScope.launch { restoreCloudMedia.reconcileAfterStart() }
+    }
+
+    /** What may be removed from this device because it is verifiably stored elsewhere. */
+    val freeUpSpaceRepository: FreeUpSpaceRepository by lazy {
+        FreeUpSpaceRepositoryImpl(dao = database.freeUpSpaceDao())
+    }
+
+    val freeUpSpace: FreeUpSpaceUseCase by lazy {
+        FreeUpSpaceUseCase(
+            freeUpSpace = freeUpSpaceRepository,
+            organization = mediaOrganizationRepository,
+            media = mediaRepository,
+        )
     }
 
     /**

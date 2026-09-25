@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.backup.BackupQueueEntity
+import com.lumovault.app.data.local.backup.FreeUpSpaceDao
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudChannelEntity
 import com.lumovault.app.data.local.cloud.CloudMediaDao
@@ -56,6 +57,12 @@ abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun systemAlbumDao(): SystemAlbumDao
     abstract fun mediaMetadataDao(): MediaMetadataDao
     abstract fun mediaRestoreDao(): MediaRestoreDao
+
+    /**
+     * Query-only: Free Up Space reads five tables and owns none, so it adds no entity and no
+     * schema step. The database version stays at 9 for that reason.
+     */
+    abstract fun freeUpSpaceDao(): FreeUpSpaceDao
 
     companion object {
         /**
