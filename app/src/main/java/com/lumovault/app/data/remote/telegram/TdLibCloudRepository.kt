@@ -53,7 +53,7 @@ class TdLibCloudRepository(
      */
     override suspend fun validateChannel(chatId: Long): CloudChannelVerdict {
         val chat = try {
-            client.request(TdApi.GetChat().apply { this.chatId = chatId })
+            client.request(getChat(chatId))
         } catch (error: TelegramRequestException) {
             return if (error.isMissingChat()) CloudChannelVerdict.NotFound else CloudChannelVerdict.NotAChannel
         } catch (error: Exception) {
@@ -67,8 +67,7 @@ class TdLibCloudRepository(
 
         val supergroupId = TdCloudMapper.supergroupIdOf(chat) ?: return CloudChannelVerdict.NotAChannel
 
-        val supergroup = requestOrNull(TdApi.GetSupergroup().apply { this.supergroupId = supergroupId })
-            ?: return CloudChannelVerdict.NotFound
+        val supergroup = requestOrNull(getSupergroup(supergroupId)) ?: return CloudChannelVerdict.NotFound
         if (!TdCloudMapper.isOwnedByMe(supergroup)) return CloudChannelVerdict.NotOwned
 
         val version = markerVersion(chatId, supergroupId)
@@ -105,43 +104,12 @@ class TdLibCloudRepository(
             throw CloudFailureException(CloudFailure(CloudFailure.Kind.ChannelCreationFailed))
         }
 
-        request(
-            TdApi.SendMessage().apply {
-                this.chatId = chatId
-                // Topic, reply, options and markup are all documented as "pass null" when they do not
-                // apply, which is the typed form of what the channel marker needs: a plain text post.
-                topicId = null
-                replyTo = null
-                options = null
-                replyMarkup = null
-                inputMessageContent = TdApi.InputMessageText().apply {
-                    text = TdApi.FormattedText().apply {
-                        this.text = LumoVaultStorageProtocol.markerText()
-                        entities = emptyArray()
-                    }
-                    linkPreviewOptions = null
-                    clearDraft = false
-                }
-            },
-        )
+        request(sendMarker(chatId))
         return chatId
     }
 
     override suspend fun loadHistoryPage(chatId: Long, fromMessageId: Long, limit: Int): CloudHistoryPage {
-        val response = request(
-            TdApi.GetChatHistory().apply {
-                this.chatId = chatId
-                this.fromMessageId = fromMessageId
-                // 0, never negative: a negative offset asks TDLib for *newer* messages as well, and
-                // the walk wants the next hundred going backwards.
-                offset = 0
-                // TDLib caps a page at 100 and returns fewer when it decides so; asking for more is
-                // not an error, it just is not honoured.
-                this.limit = limit.coerceIn(1, MAX_PAGE)
-                // false: the whole point is to discover what is remote.
-                onlyLocal = false
-            },
-        )
+        val response = request(chatHistory(chatId, fromMessageId, limit.coerceIn(1, MAX_PAGE)))
 
         val messages = response.messages.asList()
         val oldest = messages.mapNotNull { it.id.takeIf { id -> id != NO_ID } }.minOrNull()
@@ -163,7 +131,7 @@ class TdLibCloudRepository(
      * depend on message ids being dense.
      */
     private suspend fun markerVersion(chatId: Long, supergroupId: Long): Int? {
-        val fullInfo = requestOrNull(TdApi.GetSupergroupFullInfo().apply { this.supergroupId = supergroupId })
+        val fullInfo = requestOrNull(supergroupFullInfo(supergroupId))
         if (fullInfo != null) {
             TdCloudMapper.markerVersionInDescription(TdCloudMapper.descriptionOf(fullInfo))?.let { return it }
         }
@@ -171,15 +139,7 @@ class TdLibCloudRepository(
     }
 
     private suspend fun probeHistory(chatId: Long): Int? = try {
-        val response = client.request(
-            TdApi.GetChatHistory().apply {
-                this.chatId = chatId
-                fromMessageId = EARLIEST_PROBE_ID
-                offset = 0
-                limit = MAX_PAGE
-                onlyLocal = false
-            },
-        )
+        val response = client.request(chatHistory(chatId, EARLIEST_PROBE_ID, MAX_PAGE))
         TdCloudMapper.markerVersionIn(response.messages.asList())
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -187,6 +147,70 @@ class TdLibCloudRepository(
         null
     } catch (error: Exception) {
         throw CloudFailureException(CloudFailure(CloudFailure.Kind.RequestFailed), error)
+    }
+
+    /**
+     * Request builders below assign field by field rather than through `apply`.
+     *
+     * TDLib's generated field names are the same words this class uses for its own parameters —
+     * `chatId`, `fromMessageId`, `supergroupId` — and inside an `apply` block both are in scope for the
+     * right-hand side. A statement with an explicit receiver cannot quietly read the field it is
+     * writing, which is the only kind of mistake here that would compile, pass, and scan the wrong
+     * page forever.
+     */
+    private fun getChat(chatId: Long): TdApi.GetChat {
+        val request = TdApi.GetChat()
+        request.chatId = chatId
+        return request
+    }
+
+    private fun getSupergroup(supergroupId: Long): TdApi.GetSupergroup {
+        val request = TdApi.GetSupergroup()
+        request.supergroupId = supergroupId
+        return request
+    }
+
+    private fun supergroupFullInfo(supergroupId: Long): TdApi.GetSupergroupFullInfo {
+        val request = TdApi.GetSupergroupFullInfo()
+        request.supergroupId = supergroupId
+        return request
+    }
+
+    private fun chatHistory(chatId: Long, fromMessageId: Long, limit: Int): TdApi.GetChatHistory {
+        val request = TdApi.GetChatHistory()
+        request.chatId = chatId
+        request.fromMessageId = fromMessageId
+        // 0, never negative: a negative offset asks TDLib for *newer* messages as well, and the walk
+        // wants the next hundred going backwards.
+        request.offset = 0
+        // TDLib caps a page at 100 and returns fewer when it decides so; asking for more is not an
+        // error, it just is not honoured.
+        request.limit = limit
+        // false: the whole point is to discover what is remote.
+        request.onlyLocal = false
+        return request
+    }
+
+    private fun sendMarker(chatId: Long): TdApi.SendMessage {
+        val text = TdApi.FormattedText()
+        text.text = LumoVaultStorageProtocol.markerText()
+        text.entities = emptyArray()
+
+        val content = TdApi.InputMessageText()
+        content.text = text
+        content.linkPreviewOptions = null
+        content.clearDraft = false
+
+        val request = TdApi.SendMessage()
+        request.chatId = chatId
+        // Topic, reply, options and markup are all documented as "pass null" when they do not apply,
+        // which is the typed form of what the channel marker needs: a plain text post.
+        request.topicId = null
+        request.replyTo = null
+        request.options = null
+        request.replyMarkup = null
+        request.inputMessageContent = content
+        return request
     }
 
     /** A failed informational request means an absent field, not a failed validation. */

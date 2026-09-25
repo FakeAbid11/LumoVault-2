@@ -54,6 +54,9 @@ class TelegramAuthRepositoryImpl(
                 _state.value = TelegramAuthState.Initializing
                 client.start()
                 launch { client.updates.collect { response -> publish(response) } }
+                // Read the state before asking for anything, so a session that survived on disk is
+                // reported rather than the phone prompt. It also answers TDLib's first request — it
+                // wants its parameters before it will talk about phone numbers at all.
                 refresh()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -85,7 +88,9 @@ class TelegramAuthRepositoryImpl(
     }
 
     override suspend fun submitCode(code: String) = guard(TelegramAuthState.VerifyingCode) {
-        client.request(TdApi.CheckAuthenticationCode().apply { this.code = code })
+        val request = TdApi.CheckAuthenticationCode()
+        request.code = code
+        client.request(request)
     }
 
     override suspend fun resendCode() = guard(TelegramAuthState.SendingCode) {
@@ -99,7 +104,9 @@ class TelegramAuthRepositoryImpl(
     }
 
     override suspend fun submitPassword(password: String) = guard(TelegramAuthState.Authenticating) {
-        client.request(TdApi.CheckAuthenticationPassword().apply { this.password = password })
+        val request = TdApi.CheckAuthenticationPassword()
+        request.password = password
+        client.request(request)
     }
 
     override fun cancelPendingRequest() {

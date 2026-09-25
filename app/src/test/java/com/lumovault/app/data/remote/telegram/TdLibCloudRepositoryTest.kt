@@ -29,10 +29,11 @@ class TdLibCloudRepositoryTest {
 
     private val repository = TdLibCloudRepository(client)
 
-    private fun photoMessage(id: Long, remoteId: String) = TdApi.Message().apply {
-        this.id = id
-        date = 1758768000
-        content = TdApi.MessagePhoto().apply {
+    private fun photoMessage(id: Long, remoteId: String): TdApi.Message {
+        val message = TdApi.Message()
+        message.id = id
+        message.date = 1758768000
+        message.content = TdApi.MessagePhoto().apply {
             photo = TdApi.Photo().apply {
                 sizes = arrayOf(
                     TdApi.PhotoSize().apply {
@@ -50,6 +51,7 @@ class TdLibCloudRepositoryTest {
                 )
             }
         }
+        return message
     }
 
     @Test
@@ -120,10 +122,12 @@ class TdLibCloudRepositoryTest {
         ) = runBlocking {
             client.answer = { function ->
                 when {
-                    function is TdApi.GetChat -> TdApi.Chat().apply {
-                        id = chatId
-                        title = LumoVaultStorageProtocol.CHANNEL_TITLE
-                        this.type = type
+                    function is TdApi.GetChat -> {
+                        val chat = TdApi.Chat()
+                        chat.id = chatId
+                        chat.title = LumoVaultStorageProtocol.CHANNEL_TITLE
+                        chat.type = type
+                        chat
                     }
 
                     function is TdApi.GetSupergroup && supergroup != null -> supergroup
@@ -139,9 +143,6 @@ class TdLibCloudRepositoryTest {
             }
             repository.validateChannel(chatId)
         }
-
-        fun supergroupOwnedBy(status: TdApi.ChatMemberStatus) =
-            TdApi.Supergroup().apply { this.status = status }
 
         val channelType = TdApi.ChatTypeSupergroup().apply {
             supergroupId = 9

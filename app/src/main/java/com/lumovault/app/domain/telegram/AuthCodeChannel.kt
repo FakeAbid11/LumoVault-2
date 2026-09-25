@@ -6,7 +6,7 @@ package com.lumovault.app.domain.telegram
  * name specifically arrives as [Unknown] rather than being forced into the nearest label.
  *
  * The translation from a TDLib code type to one of these lives in the data layer, with the TDLib
- * types — this enum is what the UI renders, and it carries no `org.drinkless.tdlib` import.
+ * types — this enum is what the UI renders, and it names nothing from the client library.
  */
 enum class AuthCodeChannel {
     Sms,

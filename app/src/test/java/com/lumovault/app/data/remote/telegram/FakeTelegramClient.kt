@@ -57,21 +57,42 @@ internal fun fakeClientInfo() = TelegramClientInfo(
     systemLanguageCode = "en",
 )
 
+/**
+ * Builders for the TDLib fixtures.
+ *
+ * Fields are assigned through an explicit receiver rather than inside `apply`, because TDLib's
+ * generated field names are the same words these helpers name their parameters — inside an `apply`
+ * block `id = id` could read the field it is writing, which is a fixture that silently says nothing.
+ */
 internal fun chat(
     id: Long,
     title: String,
     supergroupId: Long,
     isChannel: Boolean = true,
-): TdApi.Chat = TdApi.Chat().apply {
-    this.id = id
-    this.title = title
-    type = TdApi.ChatTypeSupergroup().apply {
-        this.supergroupId = supergroupId
-        this.isChannel = isChannel
-    }
+): TdApi.Chat {
+    val type = TdApi.ChatTypeSupergroup()
+    type.supergroupId = supergroupId
+    type.isChannel = isChannel
+
+    val chat = TdApi.Chat()
+    chat.id = id
+    chat.title = title
+    chat.type = type
+    return chat
 }
 
-internal fun remoteFile(id: String, size: Long = 0): TdApi.File = TdApi.File().apply {
-    this.size = size
-    remote = TdApi.RemoteFile().apply { this.id = id }
+internal fun remoteFile(id: String, size: Long = 0): TdApi.File {
+    val remote = TdApi.RemoteFile()
+    remote.id = id
+
+    val file = TdApi.File()
+    file.size = size
+    file.remote = remote
+    return file
+}
+
+internal fun supergroupOwnedBy(status: TdApi.ChatMemberStatus): TdApi.Supergroup {
+    val supergroup = TdApi.Supergroup()
+    supergroup.status = status
+    return supergroup
 }

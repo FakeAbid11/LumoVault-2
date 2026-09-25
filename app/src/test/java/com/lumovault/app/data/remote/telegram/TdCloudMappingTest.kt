@@ -19,25 +19,32 @@ import org.junit.Test
  * "we guessed a field name" into a compile error instead of a mapper that quietly returns null.
  */
 class TdCloudMappingTest {
-    private fun message(id: Long, date: Int = 1, content: TdApi.MessageContent) =
-        TdApi.Message().apply {
-            this.id = id
-            this.date = date
-            this.content = content
-        }
-
-    private fun tdFile(remoteId: String, size: Long = 0) = TdApi.File().apply {
-        this.size = size
-        remote = TdApi.RemoteFile().apply { id = remoteId }
+    private fun message(id: Long, date: Int = 1, content: TdApi.MessageContent): TdApi.Message {
+        val message = TdApi.Message()
+        message.id = id
+        message.date = date
+        message.content = content
+        return message
     }
 
-    private fun photoSize(type: String, width: Int, height: Int, remoteId: String) =
-        TdApi.PhotoSize().apply {
-            this.type = type
-            this.width = width
-            this.height = height
-            photo = tdFile(remoteId)
-        }
+    private fun tdFile(remoteId: String, size: Long = 0): TdApi.File {
+        val remote = TdApi.RemoteFile()
+        remote.id = remoteId
+
+        val file = TdApi.File()
+        file.size = size
+        file.remote = remote
+        return file
+    }
+
+    private fun photoSize(type: String, width: Int, height: Int, remoteId: String): TdApi.PhotoSize {
+        val size = TdApi.PhotoSize()
+        size.type = type
+        size.width = width
+        size.height = height
+        size.photo = tdFile(remoteId)
+        return size
+    }
 
     @Test
     fun markerParsesFromMessageAndFromFlattenedDescription() {
@@ -242,7 +249,7 @@ class TdCloudMappingTest {
         assertNull(TdCloudMapper.supergroupIdOf(asPrivate))
 
         fun ownedBy(status: TdApi.ChatMemberStatus) =
-            TdCloudMapper.isOwnedByMe(TdApi.Supergroup().apply { this.status = status })
+            TdCloudMapper.isOwnedByMe(supergroupOwnedBy(status))
 
         assertTrue(ownedBy(TdApi.ChatMemberStatusCreator()))
         assertTrue(ownedBy(TdApi.ChatMemberStatusAdministrator()))

@@ -27,25 +27,24 @@ class TdLibPreviewRepository(
         if (remoteFileId.isBlank() || !client.isUsable) return null
 
         return try {
-            val resolved = client.request(
-                TdApi.GetRemoteFile().apply {
-                    this.remoteFileId = remoteFileId
-                    fileType = TdApi.FileTypeThumbnail()
-                },
-            ).id.takeIf { it > 0 } ?: return null
+            // A remote id string is not a file handle: the request below turns it into a File with an
+            // integer id, and only that id is ever passed on.
+            val lookup = TdApi.GetRemoteFile()
+            lookup.remoteFileId = remoteFileId
+            lookup.fileType = TdApi.FileTypeThumbnail()
 
-            client.request(
-                TdApi.DownloadFile().apply {
-                    fileId = resolved
-                    // Low priority: a grid scrolls, and a cell that left the viewport should not be
-                    // competing with the item the user stopped on.
-                    priority = PRIORITY
-                    offset = 0
-                    // 0 means "to the end of the file" for this request.
-                    limit = 0
-                    synchronous = false
-                },
-            )
+            val resolved = client.request(lookup).id.takeIf { it > 0 } ?: return null
+
+            val download = TdApi.DownloadFile()
+            download.fileId = resolved
+            // Low priority: a grid scrolls, and a cell that left the viewport should not be competing
+            // with the item the user stopped on.
+            download.priority = PRIORITY
+            download.offset = 0
+            // 0 means "to the end of the file" for this request.
+            download.limit = 0
+            download.synchronous = false
+            client.request(download)
 
             awaitLocalPath(resolved)
         } catch (cancelled: CancellationException) {
@@ -62,7 +61,9 @@ class TdLibPreviewRepository(
      */
     private suspend fun awaitLocalPath(fileId: Int): String? {
         repeat(MAX_ATTEMPTS) {
-            val local = client.request(TdApi.GetFile().apply { this.fileId = fileId }).local
+            val lookup = TdApi.GetFile()
+            lookup.fileId = fileId
+            val local = client.request(lookup).local
             if (local?.isDownloadingCompleted == true) {
                 return local.path?.takeIf { it.isNotBlank() }
             }
