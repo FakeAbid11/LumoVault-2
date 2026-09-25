@@ -221,6 +221,8 @@ private fun CountLine(@androidx.annotation.StringRes label: Int, count: Int) {
 @Composable
 fun BackupHealthScreen(
     onNavigateUp: () -> Unit,
+    /** The counts on this screen are only half an answer; the other half is which items and why. */
+    onOpenDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BackupViewModel = viewModel(),
 ) {

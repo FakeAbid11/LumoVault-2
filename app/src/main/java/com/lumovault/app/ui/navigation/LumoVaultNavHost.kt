@@ -114,7 +114,10 @@ fun LumoVaultNavHost(
             )
         }
         composable(BackupRoutes.HEALTH) {
-            BackupHealthScreen(onNavigateUp = navController::navigateUp)
+            BackupHealthScreen(
+                onNavigateUp = navController::navigateUp,
+                onOpenDiagnostics = { navController.navigate(BackupRoutes.DIAGNOSTICS) },
+            )
         }
         composable(BackupRoutes.DIAGNOSTICS) {
             DiagnosticsScreen(onNavigateUp = navController::navigateUp)

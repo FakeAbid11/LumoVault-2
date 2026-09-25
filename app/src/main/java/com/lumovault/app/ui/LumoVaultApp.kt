@@ -24,6 +24,7 @@ import com.lumovault.app.R
 import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
+import com.lumovault.app.ui.navigation.navigateToTab
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
 import com.lumovault.app.ui.navigation.viewerRouteActive
 import com.lumovault.app.ui.navigation.icon
