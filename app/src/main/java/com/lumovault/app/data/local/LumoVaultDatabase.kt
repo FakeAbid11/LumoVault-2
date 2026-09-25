@@ -413,7 +413,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
                         `failure` TEXT NOT NULL DEFAULT '',
                         `media_store_id` INTEGER NOT NULL DEFAULT 0,
                         `content_hash` TEXT NOT NULL DEFAULT '',
-                        `temp_path` TEXT NOT NULL DEFAULT '',
+                        `tdlib_file_id` INTEGER NOT NULL DEFAULT 0,
                         `requested_at` INTEGER NOT NULL DEFAULT 0,
                         `updated_at` INTEGER NOT NULL DEFAULT 0,
                         PRIMARY KEY(`chat_id`, `message_id`)

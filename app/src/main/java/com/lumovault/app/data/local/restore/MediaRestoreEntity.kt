@@ -83,14 +83,16 @@ data class MediaRestoreEntity(
     val contentHash: String = "",
 
     /**
-     * The temporary file this download owns, or empty.
+     * TDLib's integer file id for the transfer this row is about; 0 until one exists.
      *
-     * Only a path inside the app's own storage ever appears here — TDLib's files directory for the transfer
-     * itself, and nothing else — so a startup sweep can remove what a killed process left behind without
-     * being handed a filename from a database row and deleting wherever it points.
+     * Stored instead of a path, because the only local file in a restore is inside TDLib's own cache and
+     * the only correct way to release it is `deleteFile` with that id — deleting the file from the
+     * filesystem behind TDLib's back leaves its bookkeeping pointing at a path that is gone. This is also
+     * what lets a row left live by a killed process be cleaned up on the next start, which is the whole
+     * reason the row is in a table.
      */
-    @ColumnInfo(name = "temp_path", defaultValue = "")
-    val tempPath: String = "",
+    @ColumnInfo(name = "tdlib_file_id", defaultValue = "0")
+    val tdlibFileId: Int = 0,
 
     @ColumnInfo(name = "requested_at", defaultValue = "0")
     val requestedAtSeconds: Long = 0,

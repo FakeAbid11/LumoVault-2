@@ -75,7 +75,7 @@ interface MediaRestoreDao {
         """
         UPDATE media_restore
         SET state = :state, failure = '', downloaded_bytes = 0, media_store_id = 0, content_hash = '',
-            temp_path = '', updated_at = :updatedAt
+            tdlib_file_id = 0, updated_at = :updatedAt
         WHERE chat_id = :chatId AND message_id = :messageId AND state IN (:restartableStates)
         """,
     )
@@ -87,9 +87,15 @@ interface MediaRestoreDao {
         updatedAt: Long,
     ): Int
 
-    /** The path this download owns, recorded as soon as TDLib names one so a sweep can find the file. */
-    @Query("UPDATE media_restore SET temp_path = :path, updated_at = :updatedAt WHERE chat_id = :chatId AND message_id = :messageId")
-    suspend fun recordTempPath(chatId: Long, messageId: Long, path: String, updatedAt: Long): Int
+    /**
+     * Records which TDLib file this transfer is, as soon as it has an id.
+     *
+     * Before the first progress callback, because the id is the only handle on the bytes once they land —
+     * and a process killed thirty seconds into a large video leaves a cache file that nothing can release
+     * without it.
+     */
+    @Query("UPDATE media_restore SET tdlib_file_id = :fileId, updated_at = :updatedAt WHERE chat_id = :chatId AND message_id = :messageId")
+    suspend fun recordDownloadTarget(chatId: Long, messageId: Long, fileId: Int, updatedAt: Long): Int
 
     @Query(
         """
