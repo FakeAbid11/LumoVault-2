@@ -5,7 +5,6 @@ import com.lumovault.app.data.local.backup.QueueClock
 import com.lumovault.app.data.repository.BackupQueueRepositoryImpl
 import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.UploadState
-import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -133,12 +132,14 @@ class RecognizeBackupUseCaseTest {
     @Test
     fun aFileWhoseContentReplacedIsGivenANewIdentityAndLosesItsBackup() = runBlocking {
         dao.withMedia(1L)
+        cloud.given(HASH_A, CHAT, 777L)
         cloud.unrecognized = 1
         hasher.digest = HASH_A
+
         recognizer().run()
 
-        queue.adoptRemote(1L, RemoteBackup(CHAT, 777L))
         assertEquals(UploadState.BackedUp, stateOf(1L))
+        assertEquals(777L, dao.row(1L).messageId)
 
         // The user edited the photo in place: same MediaStore row, different bytes.
         dao.touchMedia(1L, modifiedSeconds = 1_600_000_000L)
@@ -156,7 +157,7 @@ class RecognizeBackupUseCaseTest {
         )
         assertEquals(0L, dao.row(1L).messageId)
         assertEquals(
-            "the old backup is still in the channel — recognition detaches a record, it does not delete a photo",
+            "recognition detached a record; the message holding the earlier bytes is untouched",
             777L,
             cloud.remoteBackupFor(HASH_A)?.messageId,
         )
