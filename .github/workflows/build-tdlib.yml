@@ -59,21 +59,26 @@ jobs:
           path: lumovault
 
       - name: Build TDLib with the JSON interface
-        # example/android/Dockerfile installs the toolchain (NDK, OpenSSL, gperf, cmake) and builds
-        # every ABI; --output extracts the resulting archives rather than leaving them in an image.
+        # example/android/Dockerfile is the context root: it COPYs fetch-sdk.sh and build-openssl.sh
+        # from its own directory, so `docker build .` from the repository top level has no Dockerfile
+        # to read. It also clones TDLib itself at COMMIT_HASH, which is why the pinned revision is
+        # passed here rather than taken from the checkout above.
         run: |
-          cd td
+          set -euo pipefail
+          cd td/example/android
           docker build \
-            --build-arg COMMIT_HASH="$(git rev-parse HEAD)" \
+            --build-arg COMMIT_HASH="${{ github.event.inputs.tdlib_commit }}" \
             --build-arg TDLIB_INTERFACE=JSON \
-            --output tdlib .
-          ls -laR tdlib | head -60
+            --output "$GITHUB_WORKSPACE/tdlib-out" .
+          ls -la "$GITHUB_WORKSPACE/tdlib-out"
 
       - name: Unpack the produced libraries
+        # The Dockerfile's final stage exports tdlib.zip and tdlib-debug.zip.
         run: |
-          cd td
-          mkdir -p unpacked && unzip -o tdlib/tdlib.zip -d unpacked >/dev/null
-          find unpacked -name 'libtdjson.so' -printf '%p %s\n'
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/unpacked"
+          unzip -o "$GITHUB_WORKSPACE/tdlib-out/tdlib.zip" -d "$GITHUB_WORKSPACE/unpacked" >/dev/null
+          find "$GITHUB_WORKSPACE/unpacked" -name 'libtdjson.so' -printf '%p %s\n'
 
       - name: Build the LumoVault JNI forwarder
         # Four entry points that turn td_create_client_id / td_send / td_receive into Java calls.
@@ -82,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           ABI="${{ matrix.abi }}"
-          TDJSON_DIR="$(dirname "$(find td/unpacked -name 'libtdjson.so' -path "*$ABI*" | head -n1)")"
+          TDJSON_DIR="$(dirname "$(find "$GITHUB_WORKSPACE/unpacked" -name 'libtdjson.so' -path "*$ABI*" | head -n1)")"
           test -n "$TDJSON_DIR"
           NDK_DIR="$(ls -d "$ANDROID_HOME/ndk/"* 2>/dev/null | tail -n1)"
           if [ -z "$NDK_DIR" ]; then
