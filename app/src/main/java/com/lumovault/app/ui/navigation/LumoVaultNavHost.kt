@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.backup.BackupHealthScreen
 import com.lumovault.app.ui.backup.BackupHubScreen
 import com.lumovault.app.ui.backup.DiagnosticsScreen
 import com.lumovault.app.ui.backup.FreeUpSpaceScreen
