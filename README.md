@@ -33,9 +33,8 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   be confused; permission, scanning, empty, error and pull-to-refresh states
 - The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Still not built, by design:** restoring a cloud original to the device and freeing up space, and
-Settings (Phase 9). Later phases added the backup engine, recognition, the library's own organisation,
-and the viewer + map — see the sections below, which are the current record.
+**Still not built, by design:** Settings beyond backup and storage, the About/licenses screen, and the
+release work (Phase 10). Every earlier phase is recorded in the sections below, in order.
 
 ## Build in the cloud — never locally
 
@@ -336,6 +335,80 @@ tiles*) or the map is deliberately blank; the map is empty until photos are open
 because positions come from EXIF that is read on demand; and a photo taken before this build has no
 `date_taken_seconds` until the next scan sees it.
 
+## Restore, free up space, background — Phase 9
+
+**Phase 9 — restore, free up space and background backup:** implemented. See the CI runs listed at the
+end of this section for the build state.
+
+```
+cloud record ──user taps Download──▶ TDLib original ─▶ hash what landed ─▶ MediaStore (pending → live)
+                                                                          │
+                                       queue row: backed_up ◀── scan ─────┘  (cloud message untouched)
+```
+
+- **One capture time, and restored files do not get one invented.** MediaStore's own dates apply until
+  EXIF says otherwise; `date_seconds` on a cloud record is frequently the *message* date, and PRD section
+  28 forbids presenting that as a birthday. The Phase 8 EXIF pass fills the real value in on first open.
+- **The file is written as a pending row.** `IS_PENDING = 1` means the gallery, other scanners and every
+  other reader cannot see it until the bytes are complete and their length matches; every path that gives up
+  deletes the row it made. No permission is needed to create it, because on API 29+ an app owns what it
+  inserts.
+- **Verification is TDLib's completion flag, the file's own length, and a full write.** The manifest hash is
+  compared and *reported*, never required to match: Telegram stores photos and videos in containers of its own,
+  so a downloaded original differs from what left the device routinely, and treating that as a failure would
+  refuse almost every restore while claiming a fidelity nobody has measured. The bytes that landed are what
+  gets hashed and recorded.
+- **A restored file is not uploaded again.** Its queue row is written `backed_up` against the message it was
+  read out of — that is the evidence, and it is stronger than a hash match — so Phase 6 has nothing to offer.
+  Before anything is fetched at all, the app asks whether the content is already local (by that association or
+  by the manifest hash) and says so instead of writing a second copy.
+- **Downloads are polled, not listened for.** `getFile` is an offline method, so asking it on a timer is
+  cheap; the alternative was collecting `updateFile`, and that flow is `DROP_OLDEST` with no replay on
+  purpose — fine for a thumbnail, fatal for the one update that says a 400 MB video has arrived. A transfer
+  that stops moving is cancelled before it is reported, and TDLib is handed its own file id back.
+- **Free Up Space offers only what is proven.** An item must be `backed_up`, name a chat and a message, carry
+  a content hash, still be in the index, not be in Trash, and have its message still present in the cloud
+  index — five conditions and a join, all in SQL, all aggregate: a headline number is never a window count.
+  The list the user approves is **re-checked at confirmation**, and every refusal is returned with its reason
+  so a skipped item can be explained. Deletion goes through Android's own consent request, exactly as Phase 7's
+  Trash does; a dismiss deletes nothing, and below API 30 the screen says the file has to go in the device's
+  photos app rather than pretending. Nothing in any of these paths can delete a Telegram message.
+- **Automatic backup is the same queue.** A pass reads the grant live, reads the settings, scans, takes a
+  window of candidates that match the selected folders, and hands them to `enqueue` — then asks for a worker.
+  It sends nothing itself, so hashing, manifests, duplicate detection and "a started request is not a backup"
+  all still apply. A `cancelled` row is never re-queued, because that was a decision.
+- **Scanning and sending are two workers with two constraint sets.** Noticing a new photo needs no network and
+  no charger; uploading needs a network and whatever the user asked for. Bundling them would mean a phone off
+  Wi-Fi stops noticing anything, which is not what "back up automatically" means. Wi-Fi-only and charging-only
+  bind the unattended path and **never** a hand-tapped backup: the tap is the agreement. Changing either
+  toggle re-installs the periodic work in the same action, because constraints live on the request.
+- **Two screens read aggregates, never lists.** `BackupHealth` comes from counted states, a cloud-only count,
+  `MAX(uploaded_at)` and the scan stamp; "everything is backed up" is only sayable when nothing is waiting,
+  failed or unaccounted for. An empty library is not called safe. The periodic pass runs every six hours —
+  WorkManager's floor is fifteen minutes and its default is twelve hours, and neither is what a user means.
+- **Last scan is stored because it was not knowable.** `last_seen_scan_id` is a prune tag, not a time, and
+  the Diagnostics panel was asked to answer "last scan". Writing 0 means "this build has not scanned yet",
+  which the screen says in those words.
+- **Restore is only ever the user's doing.** PRD section 25's rule survives Phase 9: nothing in the Cloud
+  grid fetches an original while rendering, and the only path into the download layer starts at a tap.
+
+**What this does not do.** No resumable download: an interrupted restore is settled and retried from the
+start, because a half file in TDLib's cache is not a thing this app can verify. No restore into the folder a
+file came from — the path is unknowable after a device change, so restored items live in `Pictures/LumoVault/`
+and `Movies/LumoVault/`. No background *upload* beyond the periodic pass: no MediaStore `ContentObserver`,
+no push, no persistent service — the brief's "eventually discover new media" is answered by a pass every six
+hours plus the scans that already happen on foreground and on pull-to-refresh. Cloud-side media is still not
+deleted from anywhere. Search, People, Pets, OCR, Locked Folder and any second storage backend remain out.
+
+**Verified by CI, not by a phone:** the eligibility rules, the second check, the state machine, the queue
+write that prevents a re-upload, the download request sequence and every count are covered by unit tests;
+that a restored video actually plays, that it appears in the gallery, that the consent dialog reads as
+intended, that the periodic pass survives a reboot, and that v8→v9 opens over an installed library are all
+device questions and none has been asked.
+
+**Runs:** the last green run covering this section is listed in the Phase 9 report; the red ones after it, if
+any, are the ones that have not been chased to green yet.
+
 ## Telegram status — what is real and what is deferred
 
 The client is TDLib, behind interfaces, over TDLib's **own Java binding** rather than its JSON one:
@@ -410,10 +483,11 @@ app/src/main/java/com/lumovault/app/
 ├── AppContainer.kt           lazy dependencies + the application-scoped coroutine scope
 ├── MainActivity.kt           edge-to-edge host, nothing else
 ├── data/
-│   ├── local/                Room database (v8) and its DAOs: settings, media index, cloud index,
-│   │                         backup queue, albums + organisation, EXIF, MediaStore scanning
-│   ├── media/                staged copies for upload, and streamed content hashing
+│   ├── local/                Room database (v9) and its DAOs: settings, media index, cloud index,
+│   │                         backup queue, albums + organisation, EXIF, restore jobs, MediaStore scanning
 │   ├── metadata/             reads one photo's EXIF through a FileDescriptor
+│   ├── media/                staged copies for upload, streamed content hashing, and the writer that
+│   │                         files a restored original into MediaStore
 │   ├── map/                  the tile provider, and the build inputs behind it
 │   ├── backup/               the WorkManager queue runner and its notification
 │   ├── remote/telegram/      TDLib's typed Client/TdApi layer, auth repository, credentials, error mapping
@@ -435,6 +509,7 @@ app/src/main/java/com/lumovault/app/
     ├── onboarding/           the six screens, their flow host, and flow state
     ├── navigation/           main destinations, routes, and the viewer's route
     ├── viewer/               the pager, its three renderers, the details sheet, and the zoom arithmetic
+    ├── backup/               the backup and storage screens, the health aggregate and the diagnostics panel
     ├── map/                  the osmdroid screen, its pins and its preview strip
     ├── components/           shared composables (country picker, placeholders)
     ├── theme/                Color.kt, Theme.kt, Type.kt
@@ -452,11 +527,12 @@ Decisions worth knowing about:
 - **One settings row, one writer.** `AppSettingsStore` performs every change as a
   read-modify-write inside a transaction, so the theme toggle and the onboarding flow sharing one
   row cannot overwrite each other.
-- **Room v8, upgraded by hand-written migrations only.** Phase 1 shipped a v1 the first cloud build
+- **Room v9, upgraded by hand-written migrations only.** Phase 1 shipped a v1 the first cloud build
   rejected (an entity-free `@Database` is illegal), so PRD section 61's `UserSettings` row became the first
   entity. Every step since is explicit — settings fields, `media`, the cloud index, `backup_queue`, its
-  Phase 6 identity columns, Phase 7's three organisation tables, and Phase 8's `media_metadata` with the
-  capture-time column on `media` — and each one mirrors the DDL Room compiles, because a schema the entities
+  Phase 6 identity columns, Phase 7's three organisation tables, Phase 8's `media_metadata` with the
+  capture-time column on `media`, and Phase 9's `media_restore` with the three backup-preference columns
+  — and each one mirrors the DDL Room compiles, because a schema the entities
   describe and no migration produces is a crash on upgrade rather than a build failure.
   `fallbackToDestructiveMigration` appears nowhere.
 - **Nothing cascades from `media`.** The index is rewritten with `INSERT OR REPLACE` on every scan, so a

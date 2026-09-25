@@ -272,6 +272,7 @@ fun BackupHealthScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
     onNavigateUp: () -> Unit,
@@ -537,7 +538,7 @@ fun FreeUpSpaceScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmShown = false }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { confirmShown = false }) { Text(stringResource(R.string.backup_cancel)) }
             },
         )
     }

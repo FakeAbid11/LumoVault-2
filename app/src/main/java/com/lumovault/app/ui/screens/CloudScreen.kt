@@ -66,6 +66,7 @@ import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.CloudViewModel
 import com.lumovault.app.util.DayDistance
 import com.lumovault.app.util.dayDistance
+import com.lumovault.app.util.toByteText
 import com.lumovault.app.util.formatDay
 import com.lumovault.app.util.formatDuration
 import java.time.LocalDate
@@ -558,14 +559,6 @@ private fun CloudUiState.Preparing.Step.labelRes(): Int = when (this) {
     CloudUiState.Preparing.Step.Searching -> R.string.cloud_step_searching
     CloudUiState.Preparing.Step.Validating -> R.string.cloud_step_validating
     CloudUiState.Preparing.Step.Creating -> R.string.cloud_step_creating
-}
-
-/** Bytes to a human line, without pretending a zero is an unknown. */
-private fun Long.toByteText(): String = when {
-    this <= 0L -> "0 B"
-    this >= 1_000_000L -> "%.1f MB".format(this / 1_000_000.0)
-    this >= 1_000L -> "%.0f kB".format(this / 1_000.0)
-    else -> "$this B"
 }
 
 private val CellMinSize = 110.dp

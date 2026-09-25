@@ -502,7 +502,7 @@ class AppContainer(context: Context) {
      * run on its own.
      */
     /** Room's declared schema version, which is the number a failed migration is reported against. */
-    val databaseVersion: Int get() = database.version
+    val databaseVersion: Int get() = database.openHelper.readableDatabase.version
 
     /** Free space where staging would happen: the figure the upload path itself refuses to work under. */
     fun backupFreeSpaceBytes(): Long = File(appContext.cacheDir, "backup_staging").usableSpace

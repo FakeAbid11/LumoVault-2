@@ -74,6 +74,21 @@ Rules that have already caused a mistake here:
 - **A `strings.xml` apostrophe has to be escaped, and AAPT2 blames something else.** `\'` — an unescaped
   one is reported as `Invalid unicode escape sequence in string`, which sends you looking for a `\u` that
   is not there. Same file, same class of miss: `…` is fine, `%` is not (it becomes a format specifier).
+- **Phase 9's rule, in one line: a download is verified by TDLib's completion flag, the file's own length
+  and a full MediaStore write — not by the manifest hash.** Telegram stores photos and videos in containers of
+  its own, so the hash of what comes back differs from what went out, routinely. Writing the manifest's hash as
+  the restored file's identity, or refusing a restore because the two disagree, are both wrong in ways that look
+  careful. Record the hash of the bytes that landed; compare and *report* the manifest's.
+- **Automatic backup goes through the queue, and the queue's states are the contract.** Enqueue, and the
+  existing worker sends. A second upload path would bypass hashing, the manifest and duplicate detection, and
+  the two paths would disagree about what `backed_up` means. `cancelled` is not a backlog: never re-queue it.
+- **Wi-Fi-only and charging-only bind the unattended pass and never a hand-tapped backup.** The tap is the
+  agreement; preferences applied to it would leave a button doing nothing on mobile. Changing either toggle
+  re-installs the periodic work, because constraints live on the WorkManager request, not on the row.
+- **A restored file is settled against the message it came from**, or Phase 6 correctly treats it as new
+  content and uploads the user's own download back to them. Free Up Space re-checks eligibility at
+  confirmation rather than trusting the review list, and deletes only through
+  `MediaStore.createDeleteRequest` — never by a `File.delete()` on media the app does not own.
 - **`TdApi.Object.toString()` is a *native* method.** Never interpolate a TDLib object into a string — not a
   log line, and not a test's assertion message either. Off-device there is no library to answer, so the
   message throws `UnsatisfiedLinkError` and a test that would have reported one wrong value reports a
