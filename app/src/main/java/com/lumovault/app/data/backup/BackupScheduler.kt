@@ -100,7 +100,7 @@ class BackupScheduler(private val context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
     }
 
-    private fun connectedOnly(): Constraints = constraintsFor(MANUAL_WORK)
+    private fun connectedOnly(): Constraints = constraintsFor(manualWorkRequest)
 
     private fun constraintsFor(request: WorkRequest): Constraints = Constraints.Builder()
         .setRequiredNetworkType(
@@ -132,9 +132,6 @@ class BackupScheduler(private val context: Context) {
          */
         const val PERIODIC_INTERVAL_HOURS = 6L
 
-        /** What a hand-tapped backup is allowed to wait for: nothing but a connection. */
-        val MANUAL_WORK = WorkRequest(requiresUnmeteredNetwork = false, requiresCharging = false)
-    }
         const val WORK_TAG = "lumovault-backup"
 
         /** Exponential from half a minute: quick enough to recover a brief dropout, slow enough to
@@ -169,7 +166,6 @@ class BackupWorkerFactory(private val container: () -> AppContainer) : WorkerFac
         else -> null
     }
 }
-}
 
 /**
  * What a pass is willing to wait for, decided apart from WorkManager so the rule can be read and tested
@@ -185,4 +181,7 @@ internal data class WorkRequest(val requiresUnmeteredNetwork: Boolean, val requi
 
 internal fun BackupPreferences.toAutomaticWorkRequest(): WorkRequest =
     WorkRequest(requiresUnmeteredNetwork = wifiOnly, requiresCharging = chargingOnly)
+
+/** What a hand-tapped backup is allowed to wait for: nothing but a connection. */
+internal val manualWorkRequest = WorkRequest(requiresUnmeteredNetwork = false, requiresCharging = false)
 
