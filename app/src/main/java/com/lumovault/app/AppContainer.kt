@@ -7,9 +7,8 @@ import com.lumovault.app.data.local.LumoVaultDatabase
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
-import com.lumovault.app.data.remote.telegram.JniTdLibNative
+import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
-import com.lumovault.app.data.remote.telegram.TdLibJsonClient
 import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
 import com.lumovault.app.data.remote.telegram.TelegramAuthRepositoryImpl
 import com.lumovault.app.data.remote.telegram.TelegramClient
@@ -83,18 +82,12 @@ class AppContainer(context: Context) {
     /**
      * One TDLib client for the whole process, shared by authentication and the cloud scanner.
      *
-     * Not an implementation convenience: TDLib's `td_receive` takes no client id and "must not be
-     * called simultaneously from two different threads", so a second client would need a second
-     * receive loop reading the same stream — which is a corrupted session waiting to happen.
+     * Not an implementation convenience: TDLib's Java Client routes every answer through one receiver
+     * thread it starts itself, and a second client would open the same session database a second time.
      */
     private val telegramClient: TelegramClient by lazy {
-        TdLibJsonClient(
-            // Loads libtdjson + the JNI forwarder when the APK carries them; reports unavailable
-            // when it does not. See .github/workflows/build-tdlib.yml.
-            native = JniTdLibNative(),
-            credentials = telegramCredentials,
-            scope = applicationScope,
-        )
+        // Reports unavailable when the APK carries no libtdjni.so. See build-tdlib.yml.
+        TdLibClient(credentials = telegramCredentials)
     }
 
     val telegramAuthRepository: TelegramAuthRepository by lazy {

@@ -44,8 +44,9 @@ environment variables and exposed through `BuildConfig`; absent values must prod
 "not configured" state, never a crash and never a placeholder that looks real. Never commit or log a
 credential, api hash, session value, phone number, verification code or password. `TelegramCredentials`
 overrides `toString` for this reason — keep it that way, and keep raw TDLib error text out of
-user-visible strings (`TdErrorMapper` is the boundary). Local media metadata is personal too: the one
-logging call in the app records an exception's class name, never a MediaStore message or file path.
+user-visible strings (`TdErrorMapper` is the boundary). Local media metadata is personal too: every
+logging call in the app records an exception's class name or a digit-masked message, never a MediaStore
+message, a file path or a TDLib object.
 
 ## Toolchain
 
@@ -75,6 +76,12 @@ Before writing code against TDLib, Coil, Material 3, MediaStore or androidx, che
   guessing about TDLib instead cost three failed builds.
 - TDLib method and field names come from
   `td/generate/scheme/td_api.tl` — check it, and re-check against the tag the binary is pinned to.
+- **What you read in `td_api.tl` is not what the Java interface calls them.** `td/generate/tl_writer_java.cpp`
+  decides the generated spelling: a TL constructor becomes a class with a capital first letter
+  (`authorizationStateWaitCode` → `TdApi.AuthorizationStateWaitCode`) and each field is camelCased
+  (`code_info` → `codeInfo`), so a snake_case field copied straight out of the scheme does not compile.
+  Every generated class also has a no-argument constructor alongside the full one, which is the safer
+  way to build a request with many nullable fields.
 - An empty grep output is not confirmation. If a lookup returns nothing, say so; do not report the
   value as verified.
 

@@ -3,7 +3,7 @@ package com.lumovault.app.domain.telegram
 /**
  * Every state LumoVault can observe in the Telegram sign-in flow. The UI renders from this and
  * nothing else, so a screen cannot advance past a step Telegram has not actually confirmed —
- * [Authenticated] arrives only when the client reports `authorizationStateReady`.
+ * [Authenticated] arrives only when TDLib reports its ready authorization state.
  *
  * [NotConfigured] is deliberately separate from [Failed]: a build without the TDLib binary or
  * without API credentials is a packaging gap, not something the user did wrong.

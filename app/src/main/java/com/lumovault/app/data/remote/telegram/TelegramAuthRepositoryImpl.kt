@@ -11,17 +11,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import org.drinkless.tdlib.TdApi
 
 /**
- * The authentication state machine, expressed against TDLib's JSON interface.
+ * The authentication state machine, expressed against TDLib's typed interface.
  *
- * TDLib, not this class, decides which step comes next: every method here sends one request and
- * then re-reads the authorization state, so the UI follows Telegram's answer rather than a script
+ * TDLib, not this class, decides which step comes next: every method here sends one request and then
+ * re-reads the authorization state, so the UI follows Telegram's answer rather than a script
  * LumoVault wrote for itself. Nothing in here reports success on its own — [TelegramAuthState
- * .Authenticated] only appears for `authorizationStateReady`.
+ * .Authenticated] only appears for [TdApi.AuthorizationStateReady].
  *
  * The phone number is held only for the duration of a request. Codes and passwords are never
  * stored, never returned, and never logged.
@@ -67,43 +65,41 @@ class TelegramAuthRepositoryImpl(
 
     override suspend fun requestCode(internationalNumber: String) = guard(TelegramAuthState.SendingCode) {
         client.request(
-            method = "setAuthenticationPhoneNumber",
-            params = buildJsonObject {
-                put(PHONE_NUMBER, internationalNumber)
-                put(
-                    SETTINGS,
-                    buildJsonObject {
-                        put("@type", "phoneNumberAuthenticationSettings")
-                        // No flash call, no missed call: the code has to be typed by hand, which is
-                        // the only path LumoVault's UI actually implements.
-                        put("allow_flash_call", false)
-                        put("allow_missed_call", false)
-                        put("is_current_phone_number", false)
-                        put("has_unknown_phone_number", false)
-                        put("allow_sms_retriever_api", false)
-                    },
-                )
+            TdApi.SetAuthenticationPhoneNumber().apply {
+                phoneNumber = internationalNumber
+                settings = TdApi.PhoneNumberAuthenticationSettings().apply {
+                    // No flash call, no missed call: the code has to be typed by hand, which is the
+                    // only path LumoVault's UI actually implements.
+                    allowFlashCall = false
+                    allowMissedCall = false
+                    isCurrentPhoneNumber = false
+                    hasUnknownPhoneNumber = false
+                    allowSmsRetrieverApi = false
+                    // An empty array, not a null one: TDLib's docs call this field nullable only for
+                    // firebase_authentication_settings. A vector it expects to iterate arrives either
+                    // full or empty, and JNI would hand it a reference it cannot measure.
+                    authenticationTokens = emptyArray()
+                }
             },
         )
     }
 
     override suspend fun submitCode(code: String) = guard(TelegramAuthState.VerifyingCode) {
-        client.request(method = "checkAuthenticationCode", params = buildJsonObject { put(CODE, code) })
+        client.request(TdApi.CheckAuthenticationCode().apply { this.code = code })
     }
 
     override suspend fun resendCode() = guard(TelegramAuthState.SendingCode) {
         client.request(
-            method = "resendAuthenticationCode",
             // TDLib requires a reason; this is the user-asked-for-one rather than a retry after a
             // rejected code.
-            params = buildJsonObject {
-                put(REASON, buildJsonObject { put("@type", "resendCodeReasonUserRequest") })
+            TdApi.ResendAuthenticationCode().apply {
+                reason = TdApi.ResendCodeReasonUserRequest()
             },
         )
     }
 
     override suspend fun submitPassword(password: String) = guard(TelegramAuthState.Authenticating) {
-        client.request(method = "checkAuthenticationPassword", params = buildJsonObject { put(PASSWORD, password) })
+        client.request(TdApi.CheckAuthenticationPassword().apply { this.password = password })
     }
 
     override fun cancelPendingRequest() {
@@ -114,7 +110,7 @@ class TelegramAuthRepositoryImpl(
     }
 
     override suspend fun signOut() = guard(TelegramAuthState.Initializing) {
-        client.request("logOut")
+        client.request(TdApi.LogOut())
     }
 
     /**
@@ -122,7 +118,7 @@ class TelegramAuthRepositoryImpl(
      * is only shown while the request is in flight; if Telegram answers with something else, that
      * answer wins.
      */
-    private suspend fun guard(pending: TelegramAuthState, action: suspend () -> JsonObject) {
+    private suspend fun guard(pending: TelegramAuthState, action: suspend () -> TdApi.Object) {
         _state.value = pending
         try {
             action()
@@ -137,8 +133,8 @@ class TelegramAuthRepositoryImpl(
     /**
      * Re-reads the authorization state, completing TDLib's one-time setup steps on the way.
      *
-     * The setup calls answer with a plain `ok`, so the state has to be asked for again after each
-     * one — reading it from the response would stop the loop and leave the UI on `Unknown`.
+     * The setup calls answer with a plain [TdApi.Ok], so the state has to be asked for again after
+     * each one — reading it from the response would stop the loop and leave the UI on `Unknown`.
      */
     private suspend fun refresh() {
         if (handshakeRunning) return
@@ -152,10 +148,7 @@ class TelegramAuthRepositoryImpl(
                         return
                     }
 
-                    Classification.NeedsParameters -> client.request(
-                        method = "setTdlibParameters",
-                        params = tdlibParameters(),
-                    )
+                    Classification.NeedsParameters -> client.request(tdlibParameters())
                 }
             }
         } finally {
@@ -163,11 +156,11 @@ class TelegramAuthRepositoryImpl(
         }
     }
 
-    private suspend fun currentAuthorizationState(): JsonObject? =
-        TdAuthorizationMapper.authorizationStateOf(client.request("getCurrentState"))
+    private suspend fun currentAuthorizationState(): TdApi.AuthorizationState? =
+        TdAuthorizationMapper.authorizationStateOf(client.request(TdApi.GetCurrentState()))
 
     /** An unsolicited update may carry the state directly; setup steps need a re-read instead. */
-    private suspend fun publish(response: JsonObject) {
+    private suspend fun publish(response: TdApi.Object) {
         val state = TdAuthorizationMapper.authorizationStateOf(response) ?: return
         val classification = TdAuthorizationMapper.classify(state)
 
@@ -179,29 +172,31 @@ class TelegramAuthRepositoryImpl(
     }
 
     /**
-     * TDLib takes its parameters flat, not as a nested object. Field names come from the current
-     * `td_api.tl` scheme; `tdlib_parameters` and a separate encryption-key step were older shapes
-     * and are gone.
+     * TDLib takes its parameters flat, not as a nested object, and every field is required.
+     *
+     * `databaseEncryptionKey` is `bytes`, so an empty array rather than the empty string the JSON
+     * interface took: it means "no passphrase", which is this app's answer because the session lives
+     * in app-private storage that Phase 5's encryption covers separately.
      */
-    private fun tdlibParameters(): JsonObject = buildJsonObject {
-        put("use_test_dc", false)
-        put("database_directory", storage.databaseDirectory.absolutePath)
-        put("files_directory", storage.filesDirectory.absolutePath)
-        // bytes travel base64 over the JSON interface; an empty key means "no passphrase".
-        put("database_encryption_key", "")
-        // Authentication needed neither history nor secret chats; the cloud scanner does need the
-        // message database, because paging a channel's history means reading it back out of TDLib.
-        put("use_file_database", true)
-        put("use_chat_info_database", true)
-        put("use_message_database", true)
-        put("use_secret_chats", false)
-        put("api_id", credentials.apiId)
-        put("api_hash", credentials.apiHash)
-        put("system_language_code", info.systemLanguageCode)
-        put("device_model", info.deviceModel)
-        put("system_version", info.systemVersion)
-        put("application_version", info.applicationVersion)
-    }
+    private fun tdlibParameters(): TdApi.Function<TdApi.Ok> =
+        TdApi.SetTdlibParameters().apply {
+            useTestDc = false
+            databaseDirectory = storage.databaseDirectory.absolutePath
+            filesDirectory = storage.filesDirectory.absolutePath
+            databaseEncryptionKey = byteArrayOf()
+            // Authentication needs neither the file cache nor secret chats; the cloud scanner does need
+            // the message database, because paging a channel's history means reading it back out of TDLib.
+            useFileDatabase = true
+            useChatInfoDatabase = true
+            useMessageDatabase = true
+            useSecretChats = false
+            apiId = credentials.apiId
+            apiHash = credentials.apiHash
+            systemLanguageCode = info.systemLanguageCode
+            deviceModel = info.deviceModel
+            systemVersion = info.systemVersion
+            applicationVersion = info.applicationVersion
+        }
 
     private fun fail(error: Exception) {
         val failure = when (error) {
@@ -219,11 +214,6 @@ class TelegramAuthRepositoryImpl(
 
     private companion object {
         const val TAG = "LumoVaultTelegram"
-        const val PHONE_NUMBER = "phone_number"
-        const val SETTINGS = "settings"
-        const val REASON = "reason"
-        const val CODE = "code"
-        const val PASSWORD = "password"
 
         /** Parameters, then a real state: anything longer means TDLib is not advancing. */
         const val MAX_HANDSHAKE_STEPS = 3

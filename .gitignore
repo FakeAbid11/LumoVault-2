@@ -20,7 +20,11 @@ captures/
 *.apk
 *.aab
 
-# TDLib's binaries are fetched by CI from pinned, SHA-256-verified release assets and installed
-# here. Committing them would put an unreviewed native library on the path that holds the user's
-# Telegram session, which is what the project's supply-chain rule exists to prevent.
+# TDLib's Java interface and its native library are fetched by CI from the pinned build-tdlib.yml run
+# and checked against a pinned SHA-256 before they are used. Committing them would put an unreviewed
+# native library on the path that holds the user's Telegram session, and the generated TdApi.java only
+# has to agree with that library — which it does only when both come from the same build of one
+# revision. Both paths are therefore build inputs, never sources.
 app/src/main/jniLibs/
+app/src/main/java/org/drinkless/
+

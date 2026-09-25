@@ -21,6 +21,11 @@ val telegramApiHash: String = providers.gradleProperty("TELEGRAM_API_HASH")
     // An api hash is hex; filtering keeps a stray quote from generating uncompilable BuildConfig.
     .filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
 
+// TDLib's generated Java interface and its native library are build inputs, not sources: CI copies
+// Client.java and TdApi.java into src/main/java/org/drinkless/tdlib/ and libtdjni.so into
+// src/main/jniLibs/<abi>/ from the pinned build-tdlib.yml run, both verified against a pinned SHA-256.
+// Without them the build fails on unresolved org.drinkless.tdlib references, which is the honest
+// outcome — nothing here can compile against a TDLib that was not actually fetched. See README.
 android {
     namespace = "com.lumovault.app"
     compileSdk = 37
@@ -59,6 +64,15 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // The auth failure path logs through android.util.Log — class name and mapped kind only.
+            // Off-device there is no real Log, and AGP's default is to throw from every android.jar
+            // method, which would turn a test of the error mapping into a test of the stub.
+            isReturnDefaultValues = true
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -87,9 +101,6 @@ dependencies {
     // Offline country metadata: calling codes, example numbers, and E.164 normalisation. Hand-rolling
     // a ~240-row table that must agree with the parser is the worse trade; see CountryRepositoryImpl.
     implementation(libs.libphonenumber)
-    // TDLib's client interface is JSON. Parsed via the JsonElement API, so no compiler plugin is
-    // needed and the mapping is testable off-device.
-    implementation(libs.kotlinx.serialization.json)
 
     // Thumbnail loading for content:// URIs: memory and disk caching, decode-to-target-size, and
     // cancellation with the composable that asked. coil-video adds MediaMetadataRetriever frame

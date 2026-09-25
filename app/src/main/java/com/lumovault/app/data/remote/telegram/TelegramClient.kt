@@ -1,30 +1,32 @@
 package com.lumovault.app.data.remote.telegram
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
+import org.drinkless.tdlib.TdApi
 
 /**
- * The client shape the authentication repository codes against: JSON requests out, JSON responses
- * and unsolicited updates back. Nothing above this line knows TDLib's wire format.
+ * The client shape the repositories code against: one typed TDLib request object in, its typed
+ * answer back, plus the updates TDLib sends unprompted.
+ *
+ * `org.drinkless.tdlib` deliberately stops at this line — the shape is typed rather than stringly so
+ * no caller can send a method Telegram never advertised, and so a field that changed name between
+ * TDLib releases fails at compile time instead of at login.
  */
 interface TelegramClient {
     /** False when this build has no TDLib binary or no API credentials. */
     val isUsable: Boolean
 
-    /** Responses that were not asked for, chiefly `updateAuthorizationState`. */
-    val updates: Flow<JsonObject>
+    /** Responses that were not asked for, chiefly [TdApi.UpdateAuthorizationState]. */
+    val updates: Flow<TdApi.Object>
 
+    /** Creates this process's TDLib client. Repeat calls do nothing. */
     suspend fun start()
 
     /**
-     * Sends one request and waits for the response carrying the same `@extra`.
+     * Sends one request and waits for the object answering it.
      *
-     * @throws TelegramRequestException when TDLib answers with an `error` object.
+     * @throws TelegramRequestException when TDLib answers with [TdApi.Error].
      */
-    suspend fun request(method: String, params: JsonObject = buildJsonObject { }): JsonObject
-
-    suspend fun stop()
+    suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T
 }
 
 /**
@@ -34,6 +36,5 @@ interface TelegramClient {
  */
 class TelegramRequestException(
     val code: Int,
-    val method: String,
     val reason: String,
-) : Exception("TDLib request '$method' failed (code $code): $reason")
+) : Exception("TDLib request failed (code $code): $reason")

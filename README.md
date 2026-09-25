@@ -75,30 +75,37 @@ To build a signed-in-capable APK once the binary lands:
 
 ## Telegram status — what is real and what is deferred
 
-The client is TDLib, behind interfaces:
+The client is TDLib, behind interfaces, over TDLib's **own Java binding** rather than its JSON one:
 
 ```
-UI → TelegramAuthRepository → TelegramClient → TdLibNative → (libtdjson + JNI shim, not yet built)
+Kotlin → TelegramClient → org.drinkless.tdlib.Client → org.drinkless.tdlib.TdApi → libtdjni.so → Telegram
 ```
 
-Already implemented and unit-tested off-device: JSON request/response correlation over `@extra`,
-the authorization-state mapping, error mapping including `FLOOD_WAIT_<n>`, and the flow rules that
-decide which screen appears.
+Already implemented and unit-tested off-device: the authorization-state mapping, error mapping
+including `FLOOD_WAIT_<n>`, the cloud message mapper, the channel-marker rules, and the flow rules
+that decide which screen appears. The fakes build real `TdApi` objects, because those are plain data
+until a request is actually sent — so the mapping is tested against the same classes production uses,
+not against a stand-in grammar.
 
-**The remaining seam is the native binary.** TDLib ships no Android artifact and nothing on Maven;
-`example/android/build-tdlib.sh` cross-compiles OpenSSL and TDLib with the NDK. Until that lands and
-a forwarding JNI library exposes `td_json_client_*` under names Kotlin can bind to, `isUsable` is
-false, authentication is honestly reported as unavailable, and **Phase 2's acceptance criterion
-"Telegram authentication works" is not met by this commit**. The Ready screen shows Telegram as
-*Unavailable* rather than ticking it, and no screen pretends otherwise.
+**The remaining seam is the native binary.** `libtdjni.so` and the generated `Client.java` /
+`TdApi.java` come from [`build-tdlib.yml`](.github/workflows/build-tdlib.yml), which runs TDLib's own
+`example/android` Docker build at a pinned revision; [`build.yml`](.github/workflows/build.yml)
+downloads them and verifies each file against a pinned SHA-256 before it assembles. Until that
+workflow has produced a run this build can point at, `isUsable` is false, authentication is honestly
+reported as unavailable, and **Phase 2's acceptance criterion "Telegram authentication works" is not
+met by this commit**. The Ready screen shows Telegram as *Unavailable* rather than ticking it, and no
+screen pretends otherwise.
 
-Because TDLib's JSON schema evolves between releases, the method names and request shapes here were
-taken from TDLib's own scheme (`td/generate/scheme/td_api.tl`) rather than from memory, which already
-corrected three guesses: the phone-code request is `setAuthenticationPhoneNumber` (with a
-`phoneNumberAuthenticationSettings` object), `setTdlibParameters` takes its fields flat rather than as
-a nested `tdlib_parameters` object, and the code length arrives as `code_info.type.length` rather than
-a separate `code_length`. When the binary is pinned to a specific TDLib tag, re-check them against
-that tag.
+Because the API is generated from TDLib's scheme, every request and field name here was read out of
+`td/generate/scheme/td_api.tl` at the pinned revision `ea97bcd`, and the generated Java's naming came
+from `td/generate/tl_writer_java.cpp` — class names are the TL constructor with a capital first letter
+and field names are camelCase, so `authorizationStateWaitCode.code_info` is
+`TdApi.AuthorizationStateWaitCode.codeInfo`. That is also what corrected three earlier guesses: the
+phone-code request is `setAuthenticationPhoneNumber` (with a `PhoneNumberAuthenticationSettings`
+object), `setTdlibParameters` takes its fields flat rather than as a nested `tdlib_parameters` object,
+and the code length arrives as `codeInfo.type.length` rather than a separate `codeLength`. When the
+pin moves, re-check them against that revision; a renamed field is now a compile error rather than a
+login that silently never finishes.
 
 ## Toolchain
 
@@ -111,15 +118,17 @@ that tag.
 | Compose BOM | 2026.09.00 (Material 3) |
 | Room | 2.8.5 |
 | libphonenumber | 9.0.40 |
-| kotlinx-serialization | 1.11.0 (JSON, `JsonElement` API only) |
+| Coil | 3.6.3 (`coil-compose`, `coil-video`; no network artifact) |
+| TDLib | pinned revision `ea97bcd`, Java interface (`libtdjni.so`) |
 | compileSdk / targetSdk / minSdk | 37 / 37 / 26 |
 
 Versions live in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Kotlin stays on the 2.3
 line because KSP has no 2.4.x release; moving Kotlin first would break Room's annotation processing.
 
 Two dependencies were added deliberately, each for a job that hand-rolling would do worse:
-libphonenumber (calling codes, example numbers, E.164 parsing) and kotlinx-serialization-json
-(TDLib's JSON interface, testable off-device via `JsonElement` — no compiler plugin required).
+libphonenumber (calling codes, example numbers, E.164 parsing) and Coil (thumbnail decode and cache
+for `content://` URIs). TDLib contributes no dependency at all: its generated Java sources and its
+`libtdjni.so` are build inputs fetched by CI, not artifacts resolved from a repository.
 
 ## Architecture
 

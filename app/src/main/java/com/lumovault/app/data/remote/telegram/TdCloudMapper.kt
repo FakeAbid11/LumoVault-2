@@ -4,14 +4,15 @@ import com.lumovault.app.domain.model.CloudDateSource
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.telegram.LumoVaultStorageProtocol
-import kotlinx.serialization.json.JsonObject
+import org.drinkless.tdlib.TdApi
 
 /**
  * TDLib's message and chat objects to LumoVault's cloud model.
  *
- * Pure functions over already-parsed JSON, which is what makes the remote protocol testable without
- * a Telegram account: every rule below — what counts as a GIF, which size becomes a preview, when a
- * channel is ours — is exercised from a fixture rather than against live TDLib.
+ * Pure functions over objects TDLib has already decoded, which is what makes the remote protocol
+ * testable without a Telegram account: every rule below — what counts as a GIF, which size becomes a
+ * preview, when a channel is ours — is exercised from a hand-built [TdApi.Message] rather than
+ * against live TDLib.
  *
  * Nothing in here can download anything: it reads the metadata that arrived in the history page and
  * records remote references. PRD section 25's "no automatic original downloads" is enforced by the
@@ -20,17 +21,16 @@ import kotlinx.serialization.json.JsonObject
 internal object TdCloudMapper {
     private const val GIF_MIME_TYPE = "image/gif"
 
-    /** A `message` object, or null when it carries no media LumoVault indexes. */
-    fun toCloudMedia(message: JsonObject, chatId: Long): CloudMedia? {
-        val messageId = message.longOf("id") ?: return null
-        val content = message.objectOf("content") ?: return null
-        val date = message.intOf("date").toLong().takeIf { it > 0 } ?: return null
+    /** A [TdApi.Message], or null when it carries no media LumoVault indexes. */
+    fun toCloudMedia(message: TdApi.Message, chatId: Long): CloudMedia? {
+        val messageId = message.id.takeIf { it != 0L } ?: return null
+        val date = message.date.toLong().takeIf { it > 0 } ?: return null
 
-        val described = when (content.type()) {
-            "messagePhoto" -> photo(content)
-            "messageVideo" -> video(content)
-            "messageAnimation" -> animation(content)
-            "messageDocument" -> document(content)
+        val described = when (val content = message.content) {
+            is TdApi.MessagePhoto -> photo(content)
+            is TdApi.MessageVideo -> video(content)
+            is TdApi.MessageAnimation -> animation(content)
+            is TdApi.MessageDocument -> document(content)
             else -> null
         } ?: return null
 
@@ -54,43 +54,40 @@ internal object TdCloudMapper {
         )
     }
 
-    /** Text of a `messageText`, which is where a channel-description-less marker would be found. */
-    fun textOf(message: JsonObject): String? =
-        message.objectOf("content")
-            ?.takeIf { it.type() == "messageText" }
-            ?.objectOf("text")
-            ?.stringOrNull("text")
+    /** Text of a [TdApi.MessageText], which is where a channel-description-less marker is found. */
+    fun textOf(message: TdApi.Message): String? =
+        (message.content as? TdApi.MessageText)?.text?.text
 
     /** The highest protocol version among [messages] that is a marker, or null if there is none. */
-    fun markerVersionIn(messages: List<JsonObject>): Int? =
+    fun markerVersionIn(messages: List<TdApi.Message>): Int? =
         messages.mapNotNull { textOf(it) }
             .mapNotNull { LumoVaultStorageProtocol.markerVersion(it) }
             .maxOrNull()
 
-    fun chatIdOf(chat: JsonObject): Long? = chat.longOf("id")
-
-    fun titleOf(chat: JsonObject): String = chat.stringOf("title").trim()
+    fun titleOf(chat: TdApi.Chat): String = chat.title.trim()
 
     /**
      * A storage channel is a broadcast supergroup.
      *
-     * There is no `chatTypeChannel` in TDLib — that name was a plausible guess and would have made
-     * every real channel fail validation. Channels are `chatTypeSupergroup` with `is_channel`.
+     * There is no `TdApi.ChatTypeChannel` in TDLib — that name was a plausible guess and would have
+     * made every real channel fail validation. Channels are [TdApi.ChatTypeSupergroup] with `isChannel`.
      */
-    fun isBroadcastChannel(chat: JsonObject): Boolean {
-        val type = chat.objectOf("type") ?: return false
-        return type.type() == "chatTypeSupergroup" && type.flag("is_channel")
+    fun isBroadcastChannel(chat: TdApi.Chat): Boolean {
+        val type = chat.type as? TdApi.ChatTypeSupergroup ?: return false
+        return type.isChannel
     }
 
-    fun supergroupIdOf(chat: JsonObject): Long? = chat.objectOf("type")?.longOf("supergroup_id")
+    fun supergroupIdOf(chat: TdApi.Chat): Long? =
+        (chat.type as? TdApi.ChatTypeSupergroup)?.supergroupId?.takeIf { it != 0L }
 
     /** Only a channel this account created or administers can be its own storage. */
-    fun isOwnedByMe(supergroup: JsonObject): Boolean =
-        supergroup.objectOf("status")?.type() in setOf("chatMemberStatusCreator", "chatMemberStatusAdministrator")
+    fun isOwnedByMe(supergroup: TdApi.Supergroup): Boolean = when (supergroup.status) {
+        is TdApi.ChatMemberStatusCreator, is TdApi.ChatMemberStatusAdministrator -> true
+        else -> false
+    }
 
-    fun descriptionOf(supergroupFullInfo: JsonObject): String = supergroupFullInfo.stringOf("description")
-
-    fun userIdOf(user: JsonObject): Long? = user.longOf("id")
+    fun descriptionOf(supergroupFullInfo: TdApi.SupergroupFullInfo): String =
+        supergroupFullInfo.description.orEmpty()
 
     /** Marker text also travels in the channel description, which one cheap request can read. */
     fun markerVersionInDescription(description: String): Int? =
@@ -109,99 +106,101 @@ internal object TdCloudMapper {
         val caption: String,
     )
 
-    private fun photo(content: JsonObject): Described? {
-        val photo = content.objectOf("photo") ?: return null
-        val sizes = photo.arrayOf("sizes").filter { size ->
-            size.objectOf("photo") != null && size.intOf("width") > 0 && size.intOf("height") > 0
-        }.ifEmpty { photo.arrayOf("sizes").filter { it.objectOf("photo") != null } }
+    private fun photo(content: TdApi.MessagePhoto): Described? {
+        val sizes = content.photo?.sizes?.filter { it.photo != null }.orEmpty()
+        val measured = sizes.filter { it.width > 0 && it.height > 0 }
+            .ifEmpty { sizes }
+            .ifEmpty { return null }
 
-        val largest = sizes.maxByOrNull { it.intOf("width").toLong() * it.intOf("height").toLong() } ?: return null
-        val smallest = sizes.minByOrNull { it.intOf("width").toLong() * it.intOf("height").toLong() } ?: largest
+        val largest = measured.maxByOrNull { it.area } ?: return null
+        val smallest = measured.minByOrNull { it.area } ?: largest
 
         return Described(
             type = MediaType.Photo,
             mimeType = "",
             fileName = "",
-            sizeBytes = fileSizeOf(largest),
-            width = largest.intOf("width"),
-            height = largest.intOf("height"),
+            sizeBytes = fileSizeOf(largest.photo),
+            width = largest.width,
+            height = largest.height,
             durationSeconds = null,
-            originalRemoteId = remoteIdOf(largest.objectOf("photo")),
+            originalRemoteId = remoteIdOf(largest.photo),
             // The smallest rendered size, never the largest: `photo.sizes` ends with the full image,
             // and picking by position would turn every grid cell into an original download.
-            previewRemoteId = remoteIdOf(smallest.objectOf("photo")),
-            caption = content.objectOf("caption").stringOfText(),
+            previewRemoteId = remoteIdOf(smallest.photo),
+            caption = content.caption.textOrEmpty(),
         )
     }
 
-    private fun video(content: JsonObject): Described? {
-        val video = content.objectOf("video") ?: return null
+    private fun video(content: TdApi.MessageVideo): Described? {
+        val video = content.video ?: return null
         return Described(
             type = MediaType.Video,
-            mimeType = video.stringOf("mime_type"),
-            fileName = video.stringOf("file_name"),
-            sizeBytes = fileSizeOf(video.objectOf("video")),
-            width = video.intOf("width"),
-            height = video.intOf("height"),
-            durationSeconds = video.longOf("duration"),
-            originalRemoteId = remoteIdOf(video.objectOf("video")),
+            mimeType = video.mimeType.orEmpty(),
+            fileName = video.fileName.orEmpty(),
+            sizeBytes = fileSizeOf(video.video),
+            width = video.width,
+            height = video.height,
+            durationSeconds = video.duration.toLong().takeIf { it > 0 },
+            originalRemoteId = remoteIdOf(video.video),
             // A video's thumbnail is a separate file from the video itself, so the grid never needs
             // the original.
-            previewRemoteId = remoteIdOf(video.objectOf("thumbnail")?.objectOf("file")),
-            caption = content.objectOf("caption").stringOfText(),
+            previewRemoteId = remoteIdOf(video.thumbnail?.file),
+            caption = content.caption.textOrEmpty(),
         )
     }
 
-    private fun animation(content: JsonObject): Described? {
-        val animation = content.objectOf("animation") ?: return null
-        val mimeType = animation.stringOf("mime_type")
+    private fun animation(content: TdApi.MessageAnimation): Described? {
+        val animation = content.animation ?: return null
+        val mimeType = animation.mimeType.orEmpty()
         return Described(
             // TDLib calls every animated media file an animation, including MP4s. Only a real GIF is
             // a GIF; anything else animating in the library is a video.
             type = if (mimeType.equals(GIF_MIME_TYPE, ignoreCase = true)) MediaType.Gif else MediaType.Video,
             mimeType = mimeType,
-            fileName = animation.stringOf("file_name"),
-            sizeBytes = fileSizeOf(animation.objectOf("animation")),
-            width = animation.intOf("width"),
-            height = animation.intOf("height"),
-            durationSeconds = animation.longOf("duration"),
-            originalRemoteId = remoteIdOf(animation.objectOf("animation")),
-            previewRemoteId = remoteIdOf(animation.objectOf("thumbnail")?.objectOf("file")),
-            caption = content.objectOf("caption").stringOfText(),
+            fileName = animation.fileName.orEmpty(),
+            sizeBytes = fileSizeOf(animation.animation),
+            width = animation.width,
+            height = animation.height,
+            durationSeconds = animation.duration.toLong().takeIf { it > 0 },
+            originalRemoteId = remoteIdOf(animation.animation),
+            previewRemoteId = remoteIdOf(animation.thumbnail?.file),
+            caption = content.caption.textOrEmpty(),
         )
     }
 
     /**
      * GIFs uploaded as documents keep working. Telegram has moved GIF-bearing files between
-     * `messageAnimation` and `messageDocument` across releases, and the MIME type — not the wrapper —
-     * is what makes a GIF one, so a document with `image/gif` is indexed and every other document is
-     * not media at all.
+     * [TdApi.MessageAnimation] and [TdApi.MessageDocument] across releases, and the MIME type — not
+     * the wrapper — is what makes a GIF one, so a document with `image/gif` is indexed and every
+     * other document is not media at all.
      */
-    private fun document(content: JsonObject): Described? {
-        val document = content.objectOf("document") ?: return null
-        if (!document.stringOf("mime_type").equals(GIF_MIME_TYPE, ignoreCase = true)) return null
+    private fun document(content: TdApi.MessageDocument): Described? {
+        val document = content.document ?: return null
+        val mimeType = document.mimeType.orEmpty()
+        if (!mimeType.equals(GIF_MIME_TYPE, ignoreCase = true)) return null
 
         return Described(
             type = MediaType.Gif,
-            mimeType = document.stringOf("mime_type"),
-            fileName = document.stringOf("file_name"),
-            sizeBytes = fileSizeOf(document.objectOf("document")),
-            width = document.intOf("width"),
-            height = document.intOf("height"),
+            mimeType = mimeType,
+            fileName = document.fileName.orEmpty(),
+            sizeBytes = fileSizeOf(document.document),
+            width = document.width,
+            height = document.height,
             durationSeconds = null,
-            originalRemoteId = remoteIdOf(document.objectOf("document")),
-            previewRemoteId = remoteIdOf(document.objectOf("thumbnail")?.objectOf("file")),
-            caption = content.objectOf("caption").stringOfText(),
+            originalRemoteId = remoteIdOf(document.document),
+            previewRemoteId = remoteIdOf(document.thumbnail?.file),
+            caption = content.caption.textOrEmpty(),
         )
     }
 
-    private fun JsonObject?.stringOfText(): String = this?.stringOf("text").orEmpty()
+    private fun TdApi.FormattedText?.textOrEmpty(): String = this?.text.orEmpty()
 
-    /** `file.size` is the real size; `expected_size` is what remains before it is known. */
-    private fun fileSizeOf(file: JsonObject?): Long =
-        file?.longOf("size").takeIfNonZero() ?: file?.longOf("expected_size").takeIfNonZero() ?: 0L
+    private val TdApi.PhotoSize.area: Long
+        get() = width.toLong() * height.toLong()
 
-    private fun Long?.takeIfNonZero(): Long? = this?.takeIf { it > 0 }
+    /** [TdApi.File.size] is the real size; `expectedSize` is what remains before it is known. */
+    private fun fileSizeOf(file: TdApi.File?): Long =
+        file?.size?.takeIf { it > 0 } ?: file?.expectedSize?.takeIf { it > 0 } ?: 0L
 
-    private fun remoteIdOf(file: JsonObject?): String = file?.objectOf("remote")?.stringOf("id").orEmpty()
+    private fun remoteIdOf(file: TdApi.File?): String = file?.remote?.id.orEmpty()
 }

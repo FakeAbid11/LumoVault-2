@@ -7,22 +7,20 @@ import com.lumovault.app.domain.telegram.CloudHistoryPage
 import com.lumovault.app.domain.telegram.LumoVaultStorageProtocol
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import org.drinkless.tdlib.TdApi
 
 /**
- * The cloud side of TDLib, spoken entirely through [TelegramClient]'s JSON interface.
+ * The cloud side of TDLib, spoken entirely through [TelegramClient]'s typed requests.
  *
  * Every request here is a *metadata* request. Reading history yields file sizes and remote
  * identifiers, never bytes, and no method below calls `downloadFile` — that is what keeps PRD
  * section 25's rule structural rather than a promise to behave.
  *
- * Method and field names were read out of `td/generate/scheme/td_api.tl` at the commit pinned in
- * `.github/workflows/build-tdlib.yml`; TDLib has renamed several of them since the tutorials that
- * circulate, which is why each one is written as the scheme states rather than as memory suggests.
+ * The request and field names come from `td/generate/scheme/td_api.tl` at the revision pinned in
+ * `.github/workflows/build-tdlib.yml`. What that file says about `getChatHistory` in particular is
+ * worth stating, because the usual tutorial text is wrong about it: `from_message_id` is a real
+ * message identifier and `offset` is 0 or *negative*, so the walk below asks for each page by its
+ * oldest message id rather than by a negated cursor.
  */
 class TdLibCloudRepository(
     private val client: TelegramClient,
@@ -31,26 +29,23 @@ class TdLibCloudRepository(
         get() = client.isUsable
 
     override suspend fun accountUserId(): Long =
-        TdCloudMapper.userIdOf(request("getMe"))
+        request(TdApi.GetMe()).id.takeIf { it != NO_ID }
             ?: throw CloudFailureException(CloudFailure(CloudFailure.Kind.NotAuthenticated))
 
     /**
-     * `searchChats` searches the chats TDLib already knows about this account — deliberately *not*
-     * `searchChatsOnServer`, which queries Telegram's public directory and could return a stranger's
-     * channel that merely shares the name.
+     * [TdApi.SearchChats] searches the chats TDLib already knows about this account — deliberately
+     * *not* `searchChatsOnServer`, which queries Telegram's public directory and could return a
+     * stranger's channel that merely shares the name.
      */
-    override suspend fun findStorageChannel(): Long? {
-        val response = request(
-            "searchChats",
-            buildJsonObject {
-                put("query", LumoVaultStorageProtocol.CHANNEL_TITLE)
-                put("type_filter", buildJsonObject { put(TYPE, "searchChatTypeFilterChannel") })
-                put("limit", SEARCH_LIMIT)
+    override suspend fun findStorageChannel(): Long? =
+        request(
+            TdApi.SearchChats().apply {
+                query = LumoVaultStorageProtocol.CHANNEL_TITLE
+                typeFilter = TdApi.SearchChatTypeFilterChannel()
+                limit = SEARCH_LIMIT
             },
-        )
-
-        return chatIdsOf(response).firstOrNull { validateChannel(it) is CloudChannelVerdict.Valid }
-    }
+        ).chatIds
+            .firstOrNull { chatId -> validateChannel(chatId) is CloudChannelVerdict.Valid }
 
     /**
      * Name is only a candidate. A chat is adopted when it is a broadcast channel, this account owns
@@ -58,7 +53,7 @@ class TdLibCloudRepository(
      */
     override suspend fun validateChannel(chatId: Long): CloudChannelVerdict {
         val chat = try {
-            client.request("getChat", buildJsonObject { put("chat_id", chatId) })
+            client.request(TdApi.GetChat().apply { this.chatId = chatId })
         } catch (error: TelegramRequestException) {
             return if (error.isMissingChat()) CloudChannelVerdict.NotFound else CloudChannelVerdict.NotAChannel
         } catch (error: Exception) {
@@ -72,7 +67,7 @@ class TdLibCloudRepository(
 
         val supergroupId = TdCloudMapper.supergroupIdOf(chat) ?: return CloudChannelVerdict.NotAChannel
 
-        val supergroup = requestOrNull("getSupergroup", supergroupId)
+        val supergroup = requestOrNull(TdApi.GetSupergroup().apply { this.supergroupId = supergroupId })
             ?: return CloudChannelVerdict.NotFound
         if (!TdCloudMapper.isOwnedByMe(supergroup)) return CloudChannelVerdict.NotOwned
 
@@ -93,30 +88,40 @@ class TdLibCloudRepository(
      */
     override suspend fun createStorageChannel(): Long {
         val created = request(
-            "createNewSupergroupChat",
-            buildJsonObject {
-                put("title", LumoVaultStorageProtocol.CHANNEL_TITLE)
-                put("is_forum", false)
-                // TDLib has no chatTypeChannel; a broadcast supergroup *is* a channel.
-                put("is_channel", true)
-                put("description", LumoVaultStorageProtocol.markerText())
-                put("location", JsonNull)
-                put("message_auto_delete_time", 0)
-                put("for_import", false)
+            TdApi.CreateNewSupergroupChat().apply {
+                title = LumoVaultStorageProtocol.CHANNEL_TITLE
+                isForum = false
+                // TDLib has no ChatTypeChannel; a broadcast supergroup *is* a channel.
+                isChannel = true
+                description = LumoVaultStorageProtocol.markerText()
+                // TDLib's own wording for "not a location-based chat" is a null location.
+                location = null
+                messageAutoDeleteTime = 0
+                forImport = false
             },
         )
-        val chatId = TdCloudMapper.chatIdOf(created)
-            ?: throw CloudFailureException(CloudFailure(CloudFailure.Kind.ChannelCreationFailed))
+        val chatId = created.id
+        if (chatId == NO_ID) {
+            throw CloudFailureException(CloudFailure(CloudFailure.Kind.ChannelCreationFailed))
+        }
 
         request(
-            "sendMessage",
-            buildJsonObject {
-                put("chat_id", chatId)
-                put("topic_id", JsonNull)
-                put("reply_to", JsonNull)
-                put("options", JsonNull)
-                put("reply_markup", JsonNull)
-                put("input_message_content", markerMessage())
+            TdApi.SendMessage().apply {
+                this.chatId = chatId
+                // Topic, reply, options and markup are all documented as "pass null" when they do not
+                // apply, which is the typed form of what the channel marker needs: a plain text post.
+                topicId = null
+                replyTo = null
+                options = null
+                replyMarkup = null
+                inputMessageContent = TdApi.InputMessageText().apply {
+                    text = TdApi.FormattedText().apply {
+                        this.text = LumoVaultStorageProtocol.markerText()
+                        entities = emptyArray()
+                    }
+                    linkPreviewOptions = null
+                    clearDraft = false
+                }
             },
         )
         return chatId
@@ -124,21 +129,22 @@ class TdLibCloudRepository(
 
     override suspend fun loadHistoryPage(chatId: Long, fromMessageId: Long, limit: Int): CloudHistoryPage {
         val response = request(
-            "getChatHistory",
-            buildJsonObject {
-                put("chat_id", chatId)
-                put("from_message_id", fromMessageId)
-                put("offset", 0)
+            TdApi.GetChatHistory().apply {
+                this.chatId = chatId
+                this.fromMessageId = fromMessageId
+                // 0, never negative: a negative offset asks TDLib for *newer* messages as well, and
+                // the walk wants the next hundred going backwards.
+                offset = 0
                 // TDLib caps a page at 100 and returns fewer when it decides so; asking for more is
                 // not an error, it just is not honoured.
-                put("limit", limit.coerceIn(1, MAX_PAGE))
+                this.limit = limit.coerceIn(1, MAX_PAGE)
                 // false: the whole point is to discover what is remote.
-                put("only_local", false)
+                onlyLocal = false
             },
         )
 
-        val messages = messagesOf(response)
-        val oldest = messages.mapNotNull { it.longOf("id") }.minOrNull()
+        val messages = response.messages.asList()
+        val oldest = messages.mapNotNull { it.id.takeIf { id -> id != NO_ID } }.minOrNull()
 
         return CloudHistoryPage(
             media = messages.mapNotNull { TdCloudMapper.toCloudMedia(it, chatId) },
@@ -146,22 +152,8 @@ class TdLibCloudRepository(
             // History comes back newest-first, so the walk is over when the ids stop moving down or
             // the first message is reached — never when a page count says so.
             reachedBeginning = messages.isEmpty() || oldest == null || oldest <= FIRST_MESSAGE_ID,
-            totalRemoteCount = totalCountOf(response),
+            totalRemoteCount = response.totalCount.takeIf { it > 0 },
         )
-    }
-
-    private fun markerMessage() = buildJsonObject {
-        put(TYPE, "inputMessageText")
-        put(
-            "text",
-            buildJsonObject {
-                put(TYPE, "formattedText")
-                put("text", LumoVaultStorageProtocol.markerText())
-                put("entities", buildJsonArray { })
-            },
-        )
-        put("link_preview_options", JsonNull)
-        put("clear_draft", false)
     }
 
     /**
@@ -171,7 +163,7 @@ class TdLibCloudRepository(
      * depend on message ids being dense.
      */
     private suspend fun markerVersion(chatId: Long, supergroupId: Long): Int? {
-        val fullInfo = requestOrNull("getSupergroupFullInfo", supergroupId)
+        val fullInfo = requestOrNull(TdApi.GetSupergroupFullInfo().apply { this.supergroupId = supergroupId })
         if (fullInfo != null) {
             TdCloudMapper.markerVersionInDescription(TdCloudMapper.descriptionOf(fullInfo))?.let { return it }
         }
@@ -180,16 +172,15 @@ class TdLibCloudRepository(
 
     private suspend fun probeHistory(chatId: Long): Int? = try {
         val response = client.request(
-            "getChatHistory",
-            buildJsonObject {
-                put("chat_id", chatId)
-                put("from_message_id", EARLIEST_PROBE_ID)
-                put("offset", 0)
-                put("limit", MAX_PAGE)
-                put("only_local", false)
+            TdApi.GetChatHistory().apply {
+                this.chatId = chatId
+                fromMessageId = EARLIEST_PROBE_ID
+                offset = 0
+                limit = MAX_PAGE
+                onlyLocal = false
             },
         )
-        TdCloudMapper.markerVersionIn(messagesOf(response))
+        TdCloudMapper.markerVersionIn(response.messages.asList())
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: TelegramRequestException) {
@@ -199,16 +190,16 @@ class TdLibCloudRepository(
     }
 
     /** A failed informational request means an absent field, not a failed validation. */
-    private suspend fun requestOrNull(method: String, supergroupId: Long): JsonObject? = try {
-        client.request(method, buildJsonObject { put("supergroup_id", supergroupId) })
+    private suspend fun <T : TdApi.Object> requestOrNull(function: TdApi.Function<T>): T? = try {
+        client.request(function)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: Exception) {
         null
     }
 
-    private suspend fun request(method: String, params: JsonObject = buildJsonObject { }): JsonObject = try {
-        client.request(method, params)
+    private suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T = try {
+        client.request(function)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: TelegramRequestException) {
@@ -230,8 +221,6 @@ class TdLibCloudRepository(
         reason.contains("CHAT_NOT_FOUND") || reason.contains("CHAT_ID_INVALID")
 
     private companion object {
-        const val TYPE = "@type"
-
         /** Candidates with the right name are rare; 20 is generous and keeps start-up bounded. */
         const val SEARCH_LIMIT = 20
 
@@ -241,5 +230,8 @@ class TdLibCloudRepository(
         const val FIRST_MESSAGE_ID = 1L
 
         const val EARLIEST_PROBE_ID = 100L
+
+        /** TDLib reserves 0 for "no identifier", for chats, messages and users alike. */
+        const val NO_ID = 0L
     }
 }

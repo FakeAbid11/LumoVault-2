@@ -44,17 +44,13 @@ jobs:
       matrix:
         abi: [arm64-v8a, armeabi-v7a]
     steps:
+      # This checkout is only the build context: the Dockerfile clones TDLib itself at the pinned
+      # revision, so nothing here compiles from the tree above.
       - uses: actions/checkout@v5
         with:
           repository: tdlib/td
           ref: ${{ github.event.inputs.tdlib_commit }}
           path: td
-
-      # The forwarder lives here, not upstream: it is LumoVault's four-function seam, compiled against
-      # TDLib's exported symbols.
-      - uses: actions/checkout@v5
-        with:
-          path: lumovault
 
       - name: Build TDLib with the Java interface
         # example/android/Dockerfile is the context root: it COPYs fetch-sdk.sh and build-openssl.sh
@@ -80,7 +76,7 @@ jobs:
 
       # No LumoVault JNI forwarder is built any more: TDLib's Java interface ships its own
       # libtdjni.so with the matching native bindings generated alongside TdApi.java, so a hand-written
-      # shim over td_json_client would be a second, competing Telegram implementation.
+      # shim over TDLib's JSON interface would be a second, competing Telegram implementation.
       - name: Verify the artifacts match the interface they claim to be
         run: |
           set -euo pipefail
