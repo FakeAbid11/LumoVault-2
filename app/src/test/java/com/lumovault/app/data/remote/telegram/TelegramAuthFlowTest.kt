@@ -229,12 +229,24 @@ class TelegramAuthFlowTest {
     /**
      * Answers [TdApi.GetCurrentState] from [states], repeating the last one, because after every
      * action the repository asks again.
+     *
+     * The state travels inside an `UpdateAuthorizationState` inside the `Updates` bundle, which is the
+     * shape TDLib actually answers with — `Updates.updates` is an array of updates, not of
+     * authorization states.
      */
     private fun answerStates(vararg states: TdApi.AuthorizationState) {
         var calls = 0
         client.answer = { function ->
-            if (function !is TdApi.GetCurrentState) return@answer TdApi.Ok()
-            TdApi.Updates().apply { updates = arrayOf(states.getOrElse(calls++) { states.last() }) }
+            if (function !is TdApi.GetCurrentState) {
+                TdApi.Ok()
+            } else {
+                val update = TdApi.UpdateAuthorizationState()
+                update.authorizationState = states.getOrElse(calls) { states.last() }
+                calls += 1
+                val bundle = TdApi.Updates()
+                bundle.updates = arrayOf<TdApi.Update>(update)
+                bundle
+            }
         }
     }
 

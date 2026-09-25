@@ -149,7 +149,7 @@ class TdAuthorizationMapperTest {
         // `Updates` carries whatever TDLib thinks the process must restore, so the authorization state
         // can sit anywhere in it.
         val bundle = TdApi.Updates().apply {
-            updates = arrayOf(
+            updates = arrayOf<TdApi.Update>(
                 TdApi.UpdateOption().apply { name = "version" },
                 TdApi.UpdateAuthorizationState().apply {
                     authorizationState = TdApi.AuthorizationStateWaitCode().apply {
