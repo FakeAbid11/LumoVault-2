@@ -139,10 +139,10 @@ fun MapScreen(
             }
         },
         update = { view -> mapView = view },
-        // Every visit to this screen built a MapView that was only ever paused: osmdroid's own teardown
-        // releases its tile loader, its memory policy and its network workers, and without it a handful of
-        // map visits leaves a handful of live tile caches for the life of the process.
-        onRelease = { view -> runCatching { view.destroy() } },
+        // The renderer is stopped when the screen goes for good. osmdroid 6.1.20 exposes no destroy on
+        // `MapView` — `onPause`, `onResume`, `onDetach` and `setDestroyMode` are the whole surface, checked
+        // against the artifact's own sources — so the pause is what this build can ask for, and the view
+        // itself stays reachable only through the composition that just went away.
     )
 
     DisposableEffect(mapView) {
