@@ -38,10 +38,19 @@ Rules that have already caused a mistake here:
 - **Never fake a success state in UI.** If a capability is unavailable in a build, it must say so.
 - **Room gives an `INSERT` no row count.** An `@Query` insert that returns `Int` fails KSP with
   "INSERT query functions must either return void or long"; count rows on either side of the statement
-  instead. `UPDATE`/`DELETE` may return `Int`.
+  instead. `UPDATE`/`DELETE` may return `Int`. `INSERT … ON CONFLICT(pk) DO UPDATE` compiles and is the
+  right shape for a write that must touch only some columns — `@Upsert` replaces the whole row, so it
+  cannot express "record the hash, leave the state this worker owns alone".
+- **New entity columns go last.** `ALTER TABLE … ADD COLUMN` can only append, so a column declared in the
+  middle of an entity leaves a fresh install and an upgraded one disagreeing about column order. Phase 6's
+  `content_hash` and its snapshot columns are appended in both `backup_queue` and `cloud_media`, and the
+  hand-written migration lists them in the entity's order.
 - **A `@Test` must be public and must return void.** JUnit reports a private or non-void test as
   `initializationError` for the *whole class*, so thirteen tests can vanish behind one `= runBlocking {`
   whose last expression is an `assertThrows` (it returns the throwable). Write `runBlocking<Unit>`.
+- **A red CI test has to explain itself.** `app/build.gradle.kts` sets `exceptionFormat = FULL` on failed
+  tests, because GitHub Actions is the only place anything runs: Gradle's default one-line summary prints
+  neither the assertion message nor the values, so without it each failure costs a whole build cycle.
 - **`<provider>`, `<service>` and `<activity>` go inside `<application>`.** As a direct child of
   `<manifest>` AAPT rejects the build with "unexpected element".
 

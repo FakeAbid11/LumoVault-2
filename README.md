@@ -103,6 +103,10 @@ on a phone.
 
 ## Backup recognition — Phase 6
 
+**Phase 6 — backup recognition:** complete and CI-verified green (run
+[36150518196](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36150518196),
+219 unit tests across 24 classes, debug APK published).
+
 LumoVault can now tell whether a local file is already stored, without uploading it to find out.
 
 ```
