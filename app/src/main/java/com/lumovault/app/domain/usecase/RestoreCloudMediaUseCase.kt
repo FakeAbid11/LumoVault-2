@@ -134,7 +134,12 @@ class RestoreCloudMediaUseCase(
         return true
     }
 
-    fun isRunning(chatId: Long, messageId: Long): Boolean = (chatId to messageId) in running
+    /**
+     * `containsKey` spelled out rather than `in`: on a `ConcurrentHashMap` the operator resolves to the
+     * Java `contains` method — which is `containsValue` — and the compiler rejects the ambiguity as an
+     * error rather than letting a liveness check answer a question about values.
+     */
+    fun isRunning(chatId: Long, messageId: Long): Boolean = running.containsKey(chatId to messageId)
 
     /**
      * Releases what a killed process left in TDLib's cache and settles the rows describing it.

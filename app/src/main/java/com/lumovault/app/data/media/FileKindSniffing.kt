@@ -35,15 +35,17 @@ internal object FileKindSniffing {
         // JPEG: SOI marker.
         if (header.hasPrefix(0xFF, 0xD8, 0xFF)) return FileKind.Jpeg
         // PNG: the start of the eight-byte signature.
-        if (header.hasPrefix(0x89, 'P', 'N', 'G')) return FileKind.Png
+        if (header.hasPrefix(0x89, 'P'.code, 'N'.code, 'G'.code)) return FileKind.Png
         // GIF: "GIF8".
-        if (header.hasPrefix('G', 'I', 'F', '8')) return FileKind.Gif
+        if (header.hasPrefix('G'.code, 'I'.code, 'F'.code, '8'.code)) return FileKind.Gif
         // WEBP: "RIFF" at the front and "WEBP" four fields in.
-        if (header.hasPrefix('R', 'I', 'F', 'F') && header.hasPrefixAt(8, 'W', 'E', 'B', 'P')) {
+        if (header.hasPrefix('R'.code, 'I'.code, 'F'.code, 'F'.code) &&
+            header.hasPrefixAt(8, 'W'.code, 'E'.code, 'B'.code, 'P'.code)
+        ) {
             return FileKind.WebP
         }
         // The MP4 family: a box whose type is "ftyp", which sits at byte four.
-        if (header.hasPrefixAt(4, 'f', 't', 'y', 'p')) return FileKind.Mp4
+        if (header.hasPrefixAt(4, 'f'.code, 't'.code, 'y'.code, 'p'.code)) return FileKind.Mp4
         return null
     }
 
@@ -70,15 +72,11 @@ internal object FileKindSniffing {
      * These bytes, at the start or at [offset].
      *
      * Its own helpers rather than standard-library calls because `ByteArray` has no `startsWith`: the
-     * overloads that exist are for `Array<T>` and `List<T>`, and comparing a signed byte against an `Int`
-     * literal is exactly the conversion a header check should not repeat at every call site. Two names, not
-     * one defaulted parameter, so `hasPrefix(0xFF, …)` cannot be read as an offset of 255.
+     * overloads that exist are for `Array<T>` and `List<T>`. And one spelling taking `Int`, not a second
+     * taking `Char` — two `vararg` overloads of one name cannot be resolved against a mixed signature, and
+     * the compiler reports the whole group as inapplicable rather than pointing at the pair that clashed.
      */
     private fun ByteArray.hasPrefix(vararg bytes: Int): Boolean = hasPrefixAt(0, *bytes)
-
-    /** The character spelling, so `"GIF8"` reads as the four bytes it names rather than as four numbers. */
-    private fun ByteArray.hasPrefix(vararg chars: Char): Boolean =
-        hasPrefixAt(0, *chars.map { it.code }.toIntArray())
 
     private fun ByteArray.hasPrefixAt(offset: Int, vararg bytes: Int): Boolean {
         if (offset < 0 || size < offset + bytes.size) return false
@@ -86,9 +84,6 @@ internal object FileKindSniffing {
             this[offset + index].toInt() and 0xFF == bytes[index] and 0xFF
         }
     }
-
-    private fun ByteArray.hasPrefixAt(offset: Int, vararg chars: Char): Boolean =
-        hasPrefixAt(offset, *chars.map { it.code }.toIntArray())
 }
 
 /**

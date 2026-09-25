@@ -60,6 +60,14 @@ Rules that have already caused a mistake here:
   stored "nothing there" reads (`DELETE … WHERE latitude IS NULL`), or the map stays empty forever.
   `Images.ImageColumns.LATITUDE/LONGITUDE` are deprecated since 29 and always null — do not "fix" the
   reader by reaching for them.
+- **Two `vararg` overloads of one name break the whole call group.** `fun ByteArray.hasPrefix(vararg Int)`
+  and `…(vararg Char)` compile separately; used together, every call site is reported as
+  "None of the following candidates is applicable" with mismatches pointing at arguments that were never
+  passed. One spelling, and `.code` at the call site. Relatedly: `InputStream.readNBytes` is API 34 and
+  `ByteArray` has no `startsWith` — check the API level of any `java.io` call this app makes on a 29 floor.
+- **`(key to value) in concurrentMap` is an error here, not a warning.** `ConcurrentHashMap` inherits a Java
+  `contains` that means `containsValue`, so Kotlin's `in` operator is ambiguous and the compiler refuses it
+  (KT-18053). Write `containsKey(…)`.
 - **A `@Test` must be public and must return void.** JUnit reports a private or non-void test as
   `initializationError` for the *whole class*, so thirteen tests can vanish behind one `= runBlocking {`
   whose last expression is an `assertThrows` (it returns the throwable). Write `runBlocking<Unit>`.
