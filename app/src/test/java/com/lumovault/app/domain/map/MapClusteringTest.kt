@@ -82,7 +82,7 @@ class MapClusteringTest {
 
         assertEquals(
             "at a world view, Berlin and Paris are one marker and their two photos are not three",
-            listOf(2, 1),
+            listOf(1, 2),
             pins.map { it.count }.sorted(),
         )
         val cluster = pins.filterIsInstance<MapPin.Cluster>().single()
@@ -90,33 +90,67 @@ class MapClusteringTest {
     }
 
     @Test
-    fun zoomingIntoAClusterTakesItApart() {
-        val pins = listOf(photo(1L, 52.5200, 13.4050), photo(2L, 52.5201, 13.4051))
+    fun photosAPartAtOneZoomAreApartAtAnother() {
+        // 0.05° of longitude is ~3.4 km at this latitude: 9 pixels at zoom 8 (one 64-px cell) and 580 at zoom
+        // 14 (nine cells). Both numbers come from worldSize = 256·2^z rather than from a guess, because the
+        // pair this test first used was 11 m apart — five pixels at zoom 16, which one cell *should* merge, so
+        // the original expectation was testing the comment rather than the rule.
+        val west = photo(1L, 52.52, 13.405)
+        val east = photo(2L, 52.52, 13.455)
 
-        assertEquals(1, MapClustering.cluster(pins, zoom = 5).size)
         assertEquals(
-            "the same two photos, one street apart, are two markers once you are close enough to see the " +
-                "street — which is what a fixed pixel cell gives for free, with no merge ladder to maintain",
+            "close enough on screen is the whole definition of a cluster, and at this zoom it is one bubble",
+            1,
+            MapClustering.cluster(listOf(west, east), zoom = 8).size,
+        )
+        assertEquals(
+            "the same two photos, one tap-zoom deeper, are two markers — which is what a fixed pixel cell " +
+                "gives for free, with no merge ladder to maintain",
             2,
-            MapClustering.cluster(pins, zoom = 16).size,
+            MapClustering.cluster(listOf(west, east), zoom = 14).size,
         )
     }
 
     @Test
-    fun aMarkerForTwoPhotosSitsWhereBothAreAndNotBetweenThemOnTheMap() {
-        val east = photo(1L, 0.0, 179.999)
-        val west = photo(2L, 0.0, -179.999)
+    fun aClusterSitsAtTheMercatorMeanAndNotTheAverageOfTheTwoLatitudes() {
+        // Mercator stretches toward the poles, so the middle of a cell is not the arithmetic mean of its
+        // latitudes. The difference only becomes visible where a cell covers tens of degrees — at zoom 1 a
+        // 64-pixel cell runs from the equator to ~41° S — which is exactly the zoom at which a misplaced
+        // bubble is a bubble in the wrong country.
+        val equator = photo(1L, 0.0, 13.4)
+        val south = photo(2L, -40.0, 13.4)
 
-        val cluster = MapClustering.cluster(listOf(east, west), zoom = 3)
+        val cluster = MapClustering.cluster(listOf(equator, south), zoom = 1)
             .filterIsInstance<MapPin.Cluster>()
             .single()
 
         assertTrue(
-            "averaging longitudes directly would place this cluster at 0°, in the Gulf of Guinea, next to " +
-                "neither photo",
-            kotlin.math.abs(WebMercator.longitudeGap(179.999, cluster.longitude)) < 0.5,
+            "the average of 0 and -40 is -20, which is not the middle of these two on the screen; " +
+                "got ${cluster.latitude}",
+            cluster.latitude < -20.5,
         )
-        assertEquals(0.0, cluster.latitude, 0.01)
+        assertEquals(13.4, cluster.longitude, 0.001)
+    }
+
+    @Test
+    fun photosOnEitherSideOfTheSeamAreBothPlacedAndNeitherMovesToTheMiddle() {
+        val east = photo(1L, 0.0, 179.999)
+        val west = photo(2L, 0.0, -179.999)
+
+        val pins = MapClustering.cluster(listOf(east, west), zoom = 3)
+
+        assertEquals(
+            "a cell boundary falls at the world's edge as it does everywhere else, so these are two markers",
+            2,
+            pins.size,
+        )
+        pins.forEach { pin ->
+            assertTrue(
+                "what must not happen is either of them being averaged toward 0°, which is the Gulf of " +
+                    "Guinea; got ${pin.longitude}",
+                kotlin.math.abs(pin.longitude) > 179.0,
+            )
+        }
     }
 
     @Test

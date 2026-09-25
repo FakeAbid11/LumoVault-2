@@ -52,7 +52,7 @@ class TileTemplateTest {
         assertEquals(
             "an explicit cleartext host is accepted, because a self-hosted tile server on a LAN is a real " +
                 "thing people run and refusing it would refuse the use case",
-            "http://tiles.local/{z}/{x}/{y}.png",
+            "http://tiles.local/1/0/0.png",
             TileTemplate.of("http://tiles.local/{z}/{x}/{y}.png")?.urlFor(1, 0, 0),
         )
     }

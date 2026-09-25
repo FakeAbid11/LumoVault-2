@@ -129,8 +129,12 @@ sealed interface MapPin {
  * is the "progressively reveal more precise clusters" of PRD section 31 with one fewer data structure to keep
  * in sync.
  *
- * Longitude is normalised before bucketing, so two photos a metre apart on either side of ±180 share a cell.
- * Without that, a cluster splits in half at the map's own seam — not an edge case in the Pacific.
+ * A longitude outside ±180 is normalised before bucketing, so a malformed 190° lands at the world's edge
+ * instead of in a column that does not exist. What no grid can promise is that two photos on either side of
+ * ±180 share a *cell*: the edge of the world is a cell boundary like any other, and a pair that straddles it
+ * becomes two markers at that zoom — near Fiji, not anywhere else in particular. The alternative is merging
+ * neighbour cells across the seam, which buys one marker in one place and costs a rule that the rest of this
+ * file does not have.
  */
 object MapClustering {
 
