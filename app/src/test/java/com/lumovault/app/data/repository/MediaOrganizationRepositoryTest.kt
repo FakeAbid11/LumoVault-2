@@ -173,7 +173,9 @@ class MediaOrganizationRepositoryTest {
             repository.observeContents(SystemAlbum.Camera, 10).first().size.toLong(),
         )
         assertEquals(
-            listOf(5L, 1L),
+            // Newest arrival first, which is the timeline's rule: item 1 is today's photo and item 5 is a
+            // decade old, so the favourites album leads with the one the user took last week.
+            listOf(1L, 5L),
             repository.observeContents(SystemAlbum.Favorites, 10).first().map { it.id },
         )
     }
@@ -217,7 +219,11 @@ class MediaOrganizationRepositoryTest {
 
         assertNull("the index row is gone", store.media[1L])
         assertNull("so is its organisation", store.organizationOf(1L))
-        assertEquals("and its membership", emptyList<Long>(), albums.membersWithin(albumId, listOf(1L, 2L)))
+        assertEquals(
+            "its membership is gone, and the other item's is not",
+            listOf(2L),
+            albums.membersWithin(albumId, listOf(1L, 2L)),
+        )
         assertEquals(
             "the file that stayed is unaffected",
             listOf(2L),

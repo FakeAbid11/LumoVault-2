@@ -10,7 +10,6 @@ import com.lumovault.app.domain.organization.AlbumRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,9 +129,14 @@ class AlbumRepositoryTest {
         assertEquals(listOf(1L), repository.membersWithin(trip, listOf(1L, 2L)))
         assertEquals("the photo itself is still in the library", 2, store.media.size)
         assertEquals(
-            "both albums still hold it, newest album first — the same order the Albums list uses",
-            listOf(trip, summer),
+            "taking it out of one album leaves the other one holding it",
+            listOf(trip),
             repository.albumsContaining(1L),
+        )
+        assertEquals(
+            "and the item that was never removed stays filed where it was",
+            listOf(summer),
+            repository.albumsContaining(2L),
         )
     }
 
@@ -193,7 +197,11 @@ class AlbumRepositoryTest {
         val contents = repository.observeContents(id, limit = 10).first()
 
         assertEquals(listOf(2L), contents.map { it.id })
-        assertNotNull("the membership itself is untouched, so restoring brings the item back", store.members.singleOrNull())
+        assertEquals(
+            "both membership rows are still there, so restoring brings the item back",
+            2,
+            store.members.size,
+        )
     }
 
     @Test

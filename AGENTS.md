@@ -45,6 +45,12 @@ Rules that have already caused a mistake here:
   middle of an entity leaves a fresh install and an upgraded one disagreeing about column order. Phase 6's
   `content_hash` and its snapshot columns are appended in both `backup_queue` and `cloud_media`, and the
   hand-written migration lists them in the entity's order.
+- **Never hang a cascading foreign key off `media`.** Room's `@Upsert` is `INSERT OR REPLACE`, which
+  deletes and re-inserts the row, so a child that cascades from a table the scanner rewrites is emptied on
+  every sync — an album that vanishes after a pull-to-refresh is this, not a bug in the album code. New
+  relations to media are therefore keyed by id and joined, with the cleanup written as an explicit sweep
+  that runs once per scan (`… WHERE media_store_id NOT IN (SELECT media_store_id FROM media)`, never a
+  `NOT IN (:ids)` list a large library would blow past SQLite's parameter limit).
 - **A `@Test` must be public and must return void.** JUnit reports a private or non-void test as
   `initializationError` for the *whole class*, so thirteen tests can vanish behind one `= runBlocking {`
   whose last expression is an `assertThrows` (it returns the throwable). Write `runBlocking<Unit>`.
@@ -53,6 +59,11 @@ Rules that have already caused a mistake here:
   neither the assertion message nor the values, so without it each failure costs a whole build cycle.
 - **`<provider>`, `<service>` and `<activity>` go inside `<application>`.** As a direct child of
   `<manifest>` AAPT rejects the build with "unexpected element".
+- **Grep back every `R.string` you add; an unreferenced one is usually an unwired feature.** AAPT does not
+  complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
+  build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was
+  titled "New album". `strings.xml` well-formedness and `R.string.*` / `R.plurals.*` resolution are both
+  checkable without compiling; run them before pushing.
 
 ## Secrets and sensitive data
 
