@@ -28,7 +28,7 @@ class MediaMetadataRepositoryTest {
     private val store = OrganizationStore()
     private val organization = FakeMediaOrganizationDao(store)
     private val metadata = FakeMediaMetadataDao(store)
-    private val repository: MediaMetadataRepository = MediaMetadataRepositoryImpl(metadata = metadata)
+    private val repository: MediaMetadataRepository = MediaMetadataRepositoryImpl(mediaMetadata = metadata)
 
     private val berlin = MapBounds(minLatitude = 52.0, maxLatitude = 53.0, minLongitude = 13.0, maxLongitude = 14.0)
 

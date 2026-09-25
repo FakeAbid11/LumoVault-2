@@ -157,7 +157,7 @@ class AppContainer(context: Context) {
 
     /** Where and with what a photo was taken — see [MediaMetadataRepository]. */
     val mediaMetadataRepository: MediaMetadataRepository by lazy {
-        MediaMetadataRepositoryImpl(metadata = mediaMetadataDao)
+        MediaMetadataRepositoryImpl(mediaMetadata = mediaMetadataDao)
     }
 
     /**

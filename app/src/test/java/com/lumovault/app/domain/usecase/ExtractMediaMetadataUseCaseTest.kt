@@ -32,7 +32,7 @@ import org.junit.Test
 class ExtractMediaMetadataUseCaseTest {
     private val store = OrganizationStore()
     private val metadata = FakeMediaMetadataDao(store)
-    private val repository = MediaMetadataRepositoryImpl(metadata = metadata)
+    private val repository = MediaMetadataRepositoryImpl(mediaMetadata = metadata)
     private val reader = FakeReader()
 
     private var clock = 1_790_000_000L
