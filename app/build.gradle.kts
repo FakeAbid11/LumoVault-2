@@ -8,42 +8,58 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Trims a build property, or drops it.
+ *
+ * These values are written out as Java string literals in the generated BuildConfig, so a quote, a backslash
+ * or a dollar sign in one of them would fail the build with an error that points at generated code nobody
+ * reads. Dropping the value instead turns a typo into the app's honest "not configured" state.
+ */
+fun safeBuildConfigValue(raw: String): String =
+    if (raw.none { c -> c == '"' || c == '\\' || c == '$' }) raw.trim() else ""
+
+/** Whether a string is a tile template at all: it has to be reachable, and it has to name a tile. */
+fun String.canAddressTiles(): Boolean =
+    (startsWith("https://") || startsWith("http://")) &&
+        contains("{z}") && contains("{x}") && contains("{y}")
+
 // Telegram API credentials are build inputs, never source code. Absent values stay absent:
 // TELEGRAM_API_ID 0 / empty hash means "not configured in this build", which the app reports as a
 // clear setup state instead of crashing or pretending to authenticate.
 // Locally: -PTELEGRAM_API_ID=... -PTELEGRAM_API_HASH=...  In CI: repository secrets passed as properties.
-private const val BACKSLASH_CODE = 92
-
 val telegramApiId: Int = providers.gradleProperty("TELEGRAM_API_ID")
     .orElse(providers.environmentVariable("TELEGRAM_API_ID"))
     .getOrElse("0")
-    .filter { it.isDigit() }
     .toIntOrNull()
     ?: 0
 
 // Map tiles are a provider choice, not a constant. `MAP_TILE_URL` is a {z}/{x}/{y} template and
-// `MAP_TILE_USER_AGENT` is the identifying string the provider's terms require; both are build inputs like
-// the Telegram credentials, and an absent URL is a supported state — see MapTileProvider.
-val mapTileUrl: String = providers.gradleProperty("MAP_TILE_URL")
-    .orElse(providers.environmentVariable("MAP_TILE_URL"))
-    .getOrElse("")
-    // A template is only usable if it can name a tile at all; anything else is a typo that would otherwise
-    // surface as a blank map with no explanation.
-    .filter { url -> url.contains("{z}") && url.contains("{x}") && url.contains("{y}") }
-    // Quoted into BuildConfig as a Java string, so a quote or a backslash in the value would generate
-    // uncompilable source. Filtering is kinder than failing. 92 is the backslash, written as a code
-    // point so this line survives both the Kotlin lexer and whoever generates it next.
-    .filter { url -> url.none { c -> c == '"' || c.code == BACKSLASH_CODE || c == '$' } }
+// `MAP_TILE_USER_AGENT` is the identifying string a provider's terms require; both are build inputs like the
+// Telegram credentials, and an absent URL is a supported state — see domain/map/TileTemplate.kt, which is what
+// decides whether a template can address a tile at all.
+val mapTileUrl: String = safeBuildConfigValue(
+    providers.gradleProperty("MAP_TILE_URL")
+        .orElse(providers.environmentVariable("MAP_TILE_URL"))
+        .getOrElse(""),
+)
+    .takeIf { it.canAddressTiles() }
+    ?: ""
 
-val mapTileUserAgent: String = providers.gradleProperty("MAP_TILE_USER_AGENT")
-    .orElse(providers.environmentVariable("MAP_TILE_USER_AGENT"))
-    .getOrElse("LumoVault/0.1")
-    .filter { agent -> agent.none { c -> c == '"' || c.code == BACKSLASH_CODE } }
+// A tile host that sees the library's default agent sees nothing: TileDownloader refuses to fetch when the
+// agent is literally "osmdroid". So a build that names no agent still gets one that identifies an app.
+val defaultTileUserAgent: String = "LumoVault/0.1"
 
-val mapTileAttribution: String = providers.gradleProperty("MAP_TILE_ATTRIBUTION")
-    .orElse(providers.environmentVariable("MAP_TILE_ATTRIBUTION"))
-    .getOrElse("")
-    .filter { note -> note.none { c -> c == '"' || c.code == BACKSLASH_CODE } }
+val mapTileUserAgent: String = safeBuildConfigValue(
+    providers.gradleProperty("MAP_TILE_USER_AGENT")
+        .orElse(providers.environmentVariable("MAP_TILE_USER_AGENT"))
+        .getOrElse(defaultTileUserAgent),
+).ifBlank { defaultTileUserAgent }
+
+val mapTileAttribution: String = safeBuildConfigValue(
+    providers.gradleProperty("MAP_TILE_ATTRIBUTION")
+        .orElse(providers.environmentVariable("MAP_TILE_ATTRIBUTION"))
+        .getOrElse(""),
+)
 
 val mapTileMaxZoom: Int = providers.gradleProperty("MAP_TILE_MAX_ZOOM")
     .orElse(providers.environmentVariable("MAP_TILE_MAX_ZOOM"))
