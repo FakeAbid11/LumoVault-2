@@ -53,7 +53,13 @@ class BackupQueueRepositoryImpl(
 
     override suspend fun enqueue(mediaStoreIds: Collection<Long>): Int {
         if (mediaStoreIds.isEmpty()) return 0
-        return dao.insertMissing(mediaStoreIds, UploadState.Queued.storageKey, nowSeconds())
+        // Room gives an INSERT no row count, so the difference across the statement is what "how many
+        // did you take" means here — and it counts only ids that ended up with a row, so an item that
+        // left the media index between the tap and the query is reported as not queued rather than as
+        // queued and then failed.
+        val before = dao.countExisting(mediaStoreIds)
+        dao.insertMissing(mediaStoreIds, UploadState.Queued.storageKey, nowSeconds())
+        return dao.countExisting(mediaStoreIds) - before
     }
 
     override suspend fun claimNext(chatId: Long): BackupRequest? {

@@ -38,6 +38,10 @@ interface BackupQueueDao {
      * Enqueues ids that have no row yet, and only those that exist in the media index — a queue row
      * for an item the scanner never indexed could never be staged, so refusing it here is more honest
      * than failing it later. Tapping "Back Up" twice therefore changes nothing the second time.
+     *
+     * Returns nothing because Room will not give an `INSERT` a row count: the affected-row total is
+     * what [countExisting] either side of this statement reports, and a queue that could not answer
+     * "how many did you take" could not tell the user whether their tap did anything.
      */
     @Query(
         """
@@ -49,7 +53,10 @@ interface BackupQueueDao {
           )
         """,
     )
-    suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long): Int
+    suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long)
+
+    @Query("SELECT COUNT(*) FROM backup_queue WHERE media_store_id IN (:ids)")
+    suspend fun countExisting(ids: Collection<Long>): Int
 
     /**
      * Hands the oldest queued item to a worker in one statement.

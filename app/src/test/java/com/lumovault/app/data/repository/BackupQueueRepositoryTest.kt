@@ -261,8 +261,7 @@ private class FakeBackupQueueDao(private val clock: () -> Long) : BackupQueueDao
             .map { (state, count) -> BackupStateCountRow(state, count) }
     }
 
-    override suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long): Int {
-        var added = 0
+    override suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long) {
         ids.forEach { id ->
             if (id in media && id !in rows) {
                 rows[id] = BackupQueueEntity(
@@ -271,12 +270,13 @@ private class FakeBackupQueueDao(private val clock: () -> Long) : BackupQueueDao
                     queuedAt = now,
                     updatedAt = now,
                 )
-                added++
             }
         }
         bump()
-        return added
     }
+
+    override suspend fun countExisting(ids: Collection<Long>): Int =
+        rows.values.count { it.mediaStoreId in ids }
 
     override suspend fun claimOldest(
         queuedState: String,

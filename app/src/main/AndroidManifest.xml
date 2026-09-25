@@ -67,6 +67,27 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <!--
+            The library's manifest starts WorkManager through AndroidX Startup. Removing that entry
+            hands initialisation to LumoVaultApplication's Configuration.Provider instead, which is the
+            only way a worker can be given the AppContainer it needs — a worker built by the default
+            factory could only reach for its dependencies globally, and this app's container is created
+            per process.
+
+            It has to sit inside <application>: a provider is an application component, and AAPT
+            rejects it as a direct child of <manifest>.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -78,22 +99,5 @@
             </intent-filter>
         </activity>
     </application>
-
-    <!--
-        The library's manifest starts WorkManager through AndroidX Startup. Removing that entry hands
-        initialisation to LumoVaultApplication's Configuration.Provider instead, which is the only way
-        a worker can be given the AppContainer it needs — a worker built by the default factory could
-        only reach for its dependencies globally, and this app's container is created per process.
-    -->
-    <provider
-        android:name="androidx.startup.InitializationProvider"
-        android:authorities="${applicationId}.androidx-startup"
-        android:exported="false"
-        tools:node="merge">
-        <meta-data
-            android:name="androidx.work.WorkManagerInitializer"
-            android:value="androidx.startup"
-            tools:node="remove" />
-    </provider>
 
 </manifest>
