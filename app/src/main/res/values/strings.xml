@@ -458,7 +458,7 @@
     <string name="free_space_done">Removed %1$s items and freed about %2$s.</string>
     <string name="free_space_nothing_left">Nothing was removed. These items changed before the deletion could happen.</string>
     <string name="free_space_declined">Cancelled. Nothing was removed.</string>
-    <string name="free_space_unavailable">This Android version will not let LumoVault ask. Remove the files in the device's own gallery app.</string>
+    <string name="free_space_unavailable">This Android version will not let LumoVault ask. Remove them with the photos app on this device.</string>
     <string name="free_space_failed">Android did not allow the deletion. Nothing was removed.</string>
     <string name="action_dismiss">Dismiss</string>
 
