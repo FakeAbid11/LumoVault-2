@@ -91,7 +91,13 @@ internal class TdLibOriginalRepositoryTest {
 
             assertTrue("expected a refusal for $mediaType, got $result", result is OriginalDownload.Failed)
             val asked = client.sentOf<TdApi.GetRemoteFile>().single().fileType
-            assertTrue("$mediaType asked for the wrong TDLib file type: $asked", matches(asked))
+            // The class name, never the object: `TdApi.Object.toString()` is a native method, so
+            // interpolating one of these throws UnsatisfiedLinkError on a build server instead of
+            // arriving as the assertion failure the test is about.
+            assertTrue(
+                "$mediaType asked for the wrong TDLib file type: ${asked?.javaClass?.simpleName}",
+                matches(asked),
+            )
         }
     }
 

@@ -66,6 +66,12 @@ Rules that have already caused a mistake here:
 - **A `strings.xml` apostrophe has to be escaped, and AAPT2 blames something else.** `\'` — an unescaped
   one is reported as `Invalid unicode escape sequence in string`, which sends you looking for a `\u` that
   is not there. Same file, same class of miss: `…` is fine, `%` is not (it becomes a format specifier).
+- **`TdApi.Object.toString()` is a *native* method.** Never interpolate a TDLib object into a string — not a
+  log line, and not a test's assertion message either. Off-device there is no library to answer, so the
+  message throws `UnsatisfiedLinkError` and a test that would have reported one wrong value reports a
+  linkage crash instead (`eachKindOfMediaIsAskedForUnderTheTypeItWasStoredAs` did exactly this). Print
+  `?.javaClass?.simpleName`, or the field you actually care about. Kotlin data classes that *contain* only
+  Kotlin values are safe; `assertEquals(aTdApiFile, anotherTdApiFile)` is not.
 - **Kotlin's overload errors concentrate in the two places a script decides.** In `app/build.gradle.kts`:
   `const val` is illegal at script top level, and `String.filter { s -> s.contains("{z}") }` binds `s` to a
   **Char**, so the predicate body fails to resolve on a value that is obviously a string — use
