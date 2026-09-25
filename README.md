@@ -33,9 +33,10 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   be confused; permission, scanning, empty, error and pull-to-refresh states
 - The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Still not built, by design:** Telegram upload, the backup queue, hashing, the remote manifest,
-channel discovery and the Cloud library, restore, free-up-space, map, albums, trash and Settings.
-Phase 3 is entirely local — nothing leaves the device.
+**Still not built, by design:** the photo viewer and EXIF metadata (Phase 8), restoring a cloud original
+to the device and freeing up space (Phase 9), Settings, and the map (Phase 10). Later phases added the
+backup engine, recognition and the library's own organisation — see the sections below, which are the
+current record.
 
 ## Build in the cloud — never locally
 
@@ -159,6 +160,62 @@ is a different claim from having read the stored bytes back.
 recovery, duplicate prevention and changed-media detection are the three behaviours a device has to
 confirm, and none of them has been run on one.
 
+## Organisation — Phase 7
+
+**Phase 7 — albums and organisation:** complete and CI-verified green (run
+[36160991063](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36160991063),
+260 unit tests across 28 classes, debug APK published).
+
+The library can now be arranged without touching the files or the backups in it.
+
+```
+media  ──1:1──  media_organization   favorite · archived · trashed_at
+   │
+   └──<:">──  album_media  >──1──  albums        (user albums only)
+
+system albums = queries over the two tables above, never rows of their own
+```
+
+- **Eight system albums, zero stored rows.** Camera, Screenshots, Downloads and Videos are answers about
+  the file (`RELATIVE_PATH`, `media_type`); Favorites, Archive and Trash are answers about what the user
+  decided; Recently Added is a 30-day window over `date_added_seconds`. Each is derived at query time,
+  because a stored membership for those would be a second copy that nothing recomputes. The folder
+  patterns are a heuristic and are stated as one — `IS_SCREENSHOT` needs API 31 and nothing at all says
+  "from the camera" on the API 29 this app supports.
+- **Three independent dimensions, one sparse row each.** Every write is a single-column upsert
+  (`INSERT … ON CONFLICT DO UPDATE`), so favouriting cannot disturb an archive mark and neither can
+  disturb a pending upload. A 100,000-item library whose owner never pressed anything keeps 0 rows here.
+- **Backup state is not organisation state and neither is Telegram's.** No repository in this phase has a
+  handle on `backup_queue`: an album, a favourite, an archive or a Trash entry queues nothing, and a
+  photo already `BACKED_UP` keeps its message id through all of them.
+- **Deleting an album deletes the list.** `album_media` cascades from `albums` and nothing else — not the
+  media row, not the organisation, not the backup. `album_media` pointedly has no foreign key to `media`:
+  the index is rewritten with `INSERT OR REPLACE` on every scan, and a cascade from a parent the scanner
+  replaces would empty every album on the next sync. Orphans are instead swept once per sync, in the same
+  transaction as the prune.
+- **Trash is a mark, not a deletion.** `trashed_at` hides an item from the timeline and every album view
+  while leaving the file alone, and the timestamp is what makes "restore" mean something after a restart.
+  Permanent deletion asks Android for consent — `MediaStore.createDeleteRequest`, which names the files to
+  the user — and only a `RESULT_OK` clears the local rows. On API 29 that request does not exist and
+  LumoVault does not hold a write grant, so the screen says the file has to go in the device's own gallery
+  rather than pretending a button worked. Nothing in any of these paths calls a Telegram delete: a local
+  file leaving the phone still leaves the cloud copy, which PRD section 72 treats as the point.
+- **Phase 6 is untouched.** `content_hash`, the manifest format, `UploadState` and the ☁/↑/✓/↻ glyphs all
+  still mean what they did; the timeline query gained a `LEFT JOIN` and a `WHERE`, not a new state.
+- **Scale**: counts and covers come from subqueries in the list statement rather than a query per album,
+  every organisation predicate is indexed, and each screen reads a window (`LIMIT 300`, widened on
+  scroll) instead of a materialised library.
+
+**What this does not do.** No album reordering, no per-album cover choice, no pull-to-refresh on the
+album grid, and no undo snackbar — the confirmation dialogs are the only safety net. Trash has no
+automatic expiry: `trashed_at` records how long an item has been sitting, and nothing acts on it yet.
+Cloud-side organisation remains the single "LumoVault Backup" channel — a Telegram folder is not an album,
+and nothing here presents it as one. The free-up-space flow (PRD section 74) is Phase 9's.
+
+**Verified by CI, not by a phone:** the grid layout of two new screens, the consent dialog itself, and
+what a restored, archived or trashed item looks like after a reinstall all need a device. The behaviours
+are covered by unit tests over fakes that mirror the SQL; the pixels are not covered by anything.
+
 ## Telegram status — what is real and what is deferred
 
 The client is TDLib, behind interfaces, over TDLib's **own Java binding** rather than its JSON one:
@@ -209,7 +266,7 @@ login that silently never finishes.
 | libphonenumber | 9.0.40 |
 | Coil | 3.6.3 (`coil-compose`, `coil-video`; no network artifact) |
 | TDLib | pinned revision `ea97bcd`, Java interface (`libtdjni.so`) |
-| compileSdk / targetSdk / minSdk | 37 / 37 / 26 |
+| compileSdk / targetSdk / minSdk | 37 / 37 / 29 |
 
 Versions live in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Kotlin stays on the 2.3
 line because KSP has no 2.4.x release; moving Kotlin first would break Room's annotation processing.
@@ -227,13 +284,19 @@ app/src/main/java/com/lumovault/app/
 ├── AppContainer.kt           lazy dependencies + the application-scoped coroutine scope
 ├── MainActivity.kt           edge-to-edge host, nothing else
 ├── data/
-│   ├── local/                Room database, UserSettings row, DAO, single-writer store
+│   ├── local/                Room database (v7) and its DAOs: settings, media index, cloud index,
+│   │                         backup queue, albums + organisation, MediaStore scanning
+│   ├── media/                staged copies for upload, and streamed content hashing
+│   ├── backup/               the WorkManager queue runner and its notification
 │   ├── remote/telegram/      TDLib's typed Client/TdApi layer, auth repository, credentials, error mapping
 │   └── repository/           Room / libphonenumber / permission implementations
 ├── domain/
-│   ├── model/                ThemeMode, Country, onboarding state + checklist derivation
-│   ├── repository/           Settings, Onboarding, Permission, Country interfaces
-│   └── telegram/             TelegramAuthRepository, auth state, auth failure, code channel
+│   ├── model/                ThemeMode, Country, Media, SystemAlbum, onboarding state + checklist derivation
+│   ├── organization/         Album, MediaOrganization repository interfaces
+│   ├── backup/               upload state, identity, hashing and staging interfaces
+│   ├── repository/           Settings, Onboarding, Permission, Country, Media interfaces
+│   ├── telegram/             TelegramAuthRepository, auth state, auth failure, code channel, manifest
+│   └── usecase/              the two flows that span repositories: cloud sync + recognition, the queue
 └── ui/
     ├── LumoVaultRoot.kt      launch decision: onboarding or main
     ├── LumoVaultApp.kt       the four-tab shell
@@ -255,9 +318,16 @@ Decisions worth knowing about:
 - **One settings row, one writer.** `AppSettingsStore` performs every change as a
   read-modify-write inside a transaction, so the theme toggle and the onboarding flow sharing one
   row cannot overwrite each other.
-- **Room v2.** Phase 1 shipped a v1 the first cloud build rejected (an entity-free `@Database` is
-  illegal), so PRD section 61's `UserSettings` row became the first entity, and Phase 2's fields are
-  an explicit `MIGRATION_1_2`.
+- **Room v7, upgraded by hand-written migrations only.** Phase 1 shipped a v1 the first cloud build
+  rejected (an entity-free `@Database` is illegal), so PRD section 61's `UserSettings` row became the first
+  entity. Every step since is explicit — settings fields, `media`, the cloud index, `backup_queue`, its
+  Phase 6 identity columns, and Phase 7's three organisation tables — and each one mirrors the DDL Room
+  compiles, because a schema the entities describe and no migration produces is a crash on upgrade rather
+  than a build failure. `fallbackToDestructiveMigration` appears nowhere.
+- **Nothing cascades from `media`.** The index is rewritten with `INSERT OR REPLACE` on every scan, so a
+  child table with a cascading foreign key on it is emptied on every sync. `backup_queue`, `album_media`
+  and `media_organization` therefore relate to media by id and a join, with an explicit sweep for orphans
+  once a scan has decided what exists.
 - **Permission state is read live, decisions are stored.** A remembered "granted" would be wrong the
   moment the user revokes access in system settings.
 - **The country list is derived, not bundled.** `Locale.getISOCountries()` for names,
