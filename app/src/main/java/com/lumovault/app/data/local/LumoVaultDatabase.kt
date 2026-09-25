@@ -12,6 +12,12 @@ import com.lumovault.app.data.local.cloud.CloudMediaDao
 import com.lumovault.app.data.local.cloud.CloudMediaEntity
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
+import com.lumovault.app.data.local.organization.AlbumDao
+import com.lumovault.app.data.local.organization.AlbumEntity
+import com.lumovault.app.data.local.organization.AlbumMembershipEntity
+import com.lumovault.app.data.local.organization.MediaOrganizationDao
+import com.lumovault.app.data.local.organization.MediaOrganizationEntity
+import com.lumovault.app.data.local.organization.SystemAlbumDao
 
 /**
  * Phase 1 shipped v1 with only `theme_mode` (an entity-free database is rejected by Room's
@@ -26,8 +32,11 @@ import com.lumovault.app.data.local.media.MediaEntity
         CloudMediaEntity::class,
         CloudChannelEntity::class,
         BackupQueueEntity::class,
+        AlbumEntity::class,
+        AlbumMembershipEntity::class,
+        MediaOrganizationEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
@@ -36,6 +45,9 @@ abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun cloudMediaDao(): CloudMediaDao
     abstract fun cloudChannelDao(): CloudChannelDao
     abstract fun backupQueueDao(): BackupQueueDao
+    abstract fun albumDao(): AlbumDao
+    abstract fun mediaOrganizationDao(): MediaOrganizationDao
+    abstract fun systemAlbumDao(): SystemAlbumDao
 
     companion object {
         /**
@@ -241,7 +253,77 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        /**
+         * Mirrors Room's generated DDL for [AlbumEntity], [AlbumMembershipEntity] and
+         * [MediaOrganizationEntity] column-for-column and in declaration order, including the foreign
+         * key's action clauses — a schema that differs from the compiled one fails validation when an
+         * existing install opens the database, not at build time, and `app/schemas` exists only in the
+         * runner's workspace.
+         *
+         * Three new tables and no `ALTER`, which is why this migration cannot lose anything: every row of
+         * `media`, `cloud_media`, `cloud_channel`, `backup_queue` and `app_settings` is left exactly as
+         * it was. That matters most for `backup_queue.content_hash` — the Phase 6 identity of a user's
+         * library — and for `cloud_media`, whose scan cursor would otherwise send a Phase 7 upgrade back
+         * to reading the whole channel history.
+         *
+         * `albums` is created before `album_media` because the child's foreign key names it, and SQLite
+         * resolves that reference when the child's DDL runs.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `albums` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `album_media` (
+                        `album_id` INTEGER NOT NULL,
+                        `media_store_id` INTEGER NOT NULL,
+                        `added_at` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`album_id`, `media_store_id`),
+                        FOREIGN KEY(`album_id`) REFERENCES `albums`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_album_media_media_store_id` ON `album_media` (`media_store_id`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `media_organization` (
+                        `media_store_id` INTEGER NOT NULL,
+                        `favorite` INTEGER NOT NULL DEFAULT 0,
+                        `archived` INTEGER NOT NULL DEFAULT 0,
+                        `trashed_at` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`media_store_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_organization_favorite` ON `media_organization` (`favorite`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_organization_archived` ON `media_organization` (`archived`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_organization_trashed_at` ON `media_organization` (`trashed_at`)",
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+        )
     }
 }

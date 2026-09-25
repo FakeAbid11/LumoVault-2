@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -59,6 +60,7 @@ fun MediaCell(
     modifier: Modifier = Modifier,
     status: BackupCellStatus = BackupCellStatus.Unbacked,
     selected: Boolean = false,
+    favorite: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
@@ -151,7 +153,9 @@ fun MediaCell(
 
             MediaType.Gif -> Surface(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    // Bottom edge, because the favourite mark owns the top-right corner: a GIF that is
+                    // also a favourite has to show both, and the type badge has nowhere else to crowd.
+                    .align(Alignment.BottomEnd)
                     .padding(ShapeInset),
                 shape = RoundedCornerShape(SmallCorner),
                 color = BadgeScrim,
@@ -165,6 +169,18 @@ fun MediaCell(
             }
 
             MediaType.Photo -> Unit
+        }
+
+        if (favorite) {
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = stringResource(R.string.organization_favorite_marked),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(ShapeInset)
+                    .size(IconSize),
+                tint = FavoriteTint,
+            )
         }
     }
 }
@@ -230,3 +246,6 @@ private val BadgePadding = 4.dp
 private val SelectionRing = 2.dp
 private val BadgeScrim = Color(0xB3000000)
 private val OnMediaScrim = Color(0xFFFFFFFF)
+
+/** Not the theme's primary: a heart in the accent colour would compete with the selection ring for "this one is special". */
+private val FavoriteTint = Color(0xFFFF5A6E)

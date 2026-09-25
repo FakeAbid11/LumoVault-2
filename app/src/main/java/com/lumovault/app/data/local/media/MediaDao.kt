@@ -5,21 +5,58 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * The media index.
+ *
+ * Four of these reads carry `WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0`.
+ * That is the whole of PRD section 9's "archived and trashed items are hidden from the timeline", and it
+ * lives here, in the query, rather than in a filter the UI applies afterwards: a window is a `LIMIT` over
+ * what is *visible*, so hiding items in Kotlin would quietly shorten every page while `observeCount`
+ * still reported the unfiltered total — the screen would decide it had loaded everything when it had not.
+ * The `LEFT JOIN` with `COALESCE` is what keeps an item the user never organised (no row at all) visible,
+ * which is the overwhelming majority of a library.
+ */
 @Dao
 interface MediaDao {
-    @Query("SELECT * FROM media ORDER BY date_added_seconds DESC, media_store_id DESC LIMIT :limit")
+    @Query(
+        """
+        SELECT m.* FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0
+        ORDER BY m.date_added_seconds DESC, m.media_store_id DESC LIMIT :limit
+        """,
+    )
     fun observeWindow(limit: Int): Flow<List<MediaEntity>>
 
-    @Query("SELECT COUNT(*) FROM media")
+    @Query(
+        """
+        SELECT COUNT(*) FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
     fun observeCount(): Flow<Int>
 
-    @Query("SELECT media_type AS mediaType, COUNT(*) AS itemCount FROM media GROUP BY media_type")
+    @Query(
+        """
+        SELECT m.media_type AS mediaType, COUNT(*) AS itemCount FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0
+        GROUP BY m.media_type
+        """,
+    )
     fun observeTypeCounts(): Flow<List<MediaTypeCount>>
 
     @Query("SELECT DISTINCT relative_path FROM media WHERE relative_path <> '' ORDER BY relative_path")
     fun observeFolders(): Flow<List<String>>
 
-    @Query("SELECT COUNT(*) FROM media")
+    @Query(
+        """
+        SELECT COUNT(*) FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
     suspend fun currentCount(): Int
 
     /**
@@ -32,6 +69,17 @@ interface MediaDao {
     /** Removes rows the current scan did not see. Returns how many went. */
     @Query("DELETE FROM media WHERE last_seen_scan_id < :scanId")
     suspend fun pruneBefore(scanId: Long): Int
+
+    /**
+     * Removes specific items from the index, for the one case where the file itself is known to be gone:
+     * Android confirmed a deletion LumoVault asked for.
+     *
+     * A scan's prune cannot do this job, because the MediaStore row can outlive the confirmation by
+     * however long the next scan takes — and an item that is deleted and still indexed is an item the
+     * library will offer to back up again.
+     */
+    @Query("DELETE FROM media WHERE media_store_id IN (:ids)")
+    suspend fun deleteByIds(ids: Collection<Long>): Int
 
     @Query("DELETE FROM media")
     suspend fun clear()

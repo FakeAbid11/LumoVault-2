@@ -22,11 +22,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -76,6 +82,7 @@ fun PhotosScreen(
     val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val backup by viewModel.backup.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -126,6 +133,7 @@ fun PhotosScreen(
             is PhotosUiState.Content -> Timeline(
                 state = current,
                 backup = backup,
+                favoriteIds = favorites,
                 selected = selected,
                 onCellClick = viewModel::onCellClick,
                 onCellLongClick = viewModel::onCellLongClick,
@@ -140,6 +148,9 @@ fun PhotosScreen(
             selectionSize = selected.size,
             summary = backup.summary,
             onBackUp = viewModel::backUpSelected,
+            onFavorite = { viewModel.setFavoriteSelected(true) },
+            onArchive = viewModel::archiveSelected,
+            onTrash = viewModel::moveToTrashSelected,
             onClear = viewModel::clearSelection,
             onCancel = viewModel::cancelPending,
             onRetryFailed = viewModel::retryFailed,
@@ -161,6 +172,9 @@ private fun BackupBar(
     selectionSize: Int,
     summary: BackupQueueSummary,
     onBackUp: () -> Unit,
+    onFavorite: () -> Unit,
+    onArchive: () -> Unit,
+    onTrash: () -> Unit,
     onClear: () -> Unit,
     onCancel: () -> Unit,
     onRetryFailed: () -> Unit,
@@ -185,6 +199,12 @@ private fun BackupBar(
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.weight(1f),
                     )
+                    // Organisation first, backup last. Favourite, archive and Trash are decisions about the
+                    // library; "Back Up" is the one that costs the user data, so it sits at the end where
+                    // the thumb finishes. They share a strip because they act on the same selection.
+                    ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_favorite_action, onFavorite)
+                    ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
+                    ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
                     TextButton(onClick = onClear) {
                         Text(stringResource(R.string.backup_selection_clear))
                     }
@@ -236,6 +256,7 @@ private fun BackupBar(
 private fun Timeline(
     state: PhotosUiState.Content,
     backup: BackupOverview,
+    favoriteIds: Set<Long>,
     selected: Set<Long>,
     onCellClick: (Long) -> Unit,
     onCellLongClick: (Long) -> Unit,
@@ -276,6 +297,7 @@ private fun Timeline(
                 MediaCell(
                     media = media,
                     status = backup.statusOf(media.id),
+                    favorite = media.id in favoriteIds,
                     selected = media.id in selected,
                     onClick = { onCellClick(media.id) },
                     onLongClick = { onCellLongClick(media.id) },
@@ -429,6 +451,17 @@ private fun LibraryUnavailable(onRetry: () -> Unit) {
         TextButton(onClick = onRetry) {
             Text(stringResource(R.string.error_retry))
         }
+    }
+}
+
+/**
+ * A labelled icon button. Every one of these actions is undescribed until its content description is
+ * read, and a heart with no label leaves the user guessing whether it marks the selection or the cell.
+ */
+@Composable
+private fun ActionIcon(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(imageVector = icon, contentDescription = stringResource(label))
     }
 }
 

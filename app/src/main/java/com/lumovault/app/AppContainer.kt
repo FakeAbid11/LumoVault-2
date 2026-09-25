@@ -11,9 +11,13 @@ import com.lumovault.app.data.local.LumoVaultDatabase
 import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudMediaDao
+import com.lumovault.app.data.local.organization.AlbumDao
+import com.lumovault.app.data.local.organization.MediaOrganizationDao
+import com.lumovault.app.data.local.organization.SystemAlbumDao
 import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
 import com.lumovault.app.data.media.ContentResolverMediaHasher
 import com.lumovault.app.data.media.MediaFileStager
+import com.lumovault.app.data.media.MediaStoreLocalDeleter
 import com.lumovault.app.data.remote.telegram.TdLibClient
 import com.lumovault.app.data.remote.telegram.TdLibCloudRepository
 import com.lumovault.app.data.remote.telegram.TdLibPreviewRepository
@@ -36,6 +40,8 @@ import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.MediaContentHasher
 import com.lumovault.app.domain.backup.MediaSourceStager
 import com.lumovault.app.domain.backup.TelegramUploadRepository
+import com.lumovault.app.domain.organization.AlbumRepository
+import com.lumovault.app.domain.organization.MediaOrganizationRepository
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.CountryRepository
 import com.lumovault.app.domain.repository.MediaRepository
@@ -90,7 +96,50 @@ class AppContainer(context: Context) {
             database = database,
             dao = database.mediaDao(),
             source = MediaStoreDataSource(appContext.contentResolver),
+            organization = mediaOrganizationDao,
+            albums = albumDao,
         )
+    }
+
+    private val albumDao: AlbumDao by lazy { database.albumDao() }
+
+    private val mediaOrganizationDao: MediaOrganizationDao by lazy { database.mediaOrganizationDao() }
+
+    private val systemAlbumDao: SystemAlbumDao by lazy { database.systemAlbumDao() }
+
+    /**
+     * User albums.
+     *
+     * It gets no reference to the media or backup tables on purpose: an album holds ids, and the only way
+     * for "delete this album" to remove a photo or its backup would be for this class to reach past its
+     * own DAOs.
+     */
+    val albumRepository: AlbumRepository by lazy {
+        AlbumRepositoryImpl(albums = albumDao, nowSeconds = ::unixNow)
+    }
+
+    /** Favourite, archive and Trash — organisation that never enqueues an upload by construction. */
+    val mediaOrganizationRepository: MediaOrganizationRepository by lazy {
+        MediaOrganizationRepositoryImpl(
+            database = database,
+            organization = mediaOrganizationDao,
+            systemAlbums = systemAlbumDao,
+            media = database.mediaDao(),
+            albums = albumDao,
+            nowSeconds = ::unixNow,
+        )
+    }
+
+    /**
+     * The one piece of Trash that touches the platform.
+     *
+     * Deliberately not behind a domain interface: its whole job is to hand an `IntentSender` to an
+     * Activity result launcher, and hiding that inside a domain type would only move the Android
+     * dependency somewhere less obvious. The bookkeeping that follows a confirmed deletion is in
+     * [mediaOrganizationRepository], which is unit-testable.
+     */
+    val localMediaDeleter: MediaStoreLocalDeleter by lazy {
+        MediaStoreLocalDeleter(appContext.contentResolver)
     }
 
     private val telegramCredentials: TelegramCredentials by lazy { TelegramCredentials.fromBuildConfig() }

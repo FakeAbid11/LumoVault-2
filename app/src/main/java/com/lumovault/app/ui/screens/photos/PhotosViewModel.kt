@@ -72,6 +72,20 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupOverview())
 
+    /**
+     * Which of the visible items are favourited.
+     *
+     * A flow of its own rather than a sixth input to [uiState] for the same reason [backup] is: `combine`
+     * types five flows and quietly degrades to `Array<Any>` at six, which would break the derivation in a
+     * way the compiler cannot point at. Scoped to the loaded window for the same cost reason — the grid
+     * marks what it draws, not what the device holds.
+     */
+    val favorites: StateFlow<Set<Long>> = items
+        .map { media -> media.map { it.id } }
+        .distinctUntilChanged()
+        .flatMapLatest { ids -> container.mediaOrganizationRepository.observeFavoritesWithin(ids) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptySet())
+
     val uiState: StateFlow<PhotosUiState> = combine(
         access,
         items,
@@ -164,6 +178,44 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
             container.backupQueueRepository.enqueue(ids)
             selection.value = emptySet()
             container.backupScheduler.start()
+        }
+    }
+
+    /**
+     * Favourites or un-favourites the selection, and keeps the selection so the second tap can undo it.
+     *
+     * No upload is queued from here, and none can be: this writes to the organisation table and touches
+     * nothing the backup engine reads. A photo can be favourite-and-backed-up or favourite-and-not, and
+     * the two marks live in different tables on purpose.
+     */
+    fun setFavoriteSelected(favorite: Boolean) {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch { container.mediaOrganizationRepository.setFavorite(ids, favorite) }
+    }
+
+    /**
+     * Archives the selection, which makes them leave this screen — the timeline query filters archived
+     * items out in the database, so the grid refills from Room rather than this class forgetting rows.
+     * That is also why the selection is cleared: the ids are still selected, but on items the user can no
+     * longer see, and an action bar counting invisible rows would be a bug dressed as a feature.
+     */
+    fun archiveSelected() {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            container.mediaOrganizationRepository.setArchived(ids, true)
+            selection.value = emptySet()
+        }
+    }
+
+    /** Moves the selection to Trash. The files and the backups are untouched; see [archiveSelected]. */
+    fun moveToTrashSelected() {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            container.mediaOrganizationRepository.moveToTrash(ids)
+            selection.value = emptySet()
         }
     }
 

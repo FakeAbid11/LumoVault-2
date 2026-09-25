@@ -2,6 +2,7 @@ package com.lumovault.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -19,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.R
+import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
 import com.lumovault.app.ui.navigation.icon
@@ -35,14 +37,21 @@ fun LumoVaultApp(
     navController: NavHostController = rememberNavController(),
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = LumoVaultDestination.entries
-        .firstOrNull { it.route == backStackEntry?.destination?.route }
-        ?: LumoVaultDestination.Start
+    val route = backStackEntry?.destination?.route
+    val currentDestination = LumoVaultDestination.forRoute(route)
+    // An album screen is a child of the Albums tab rather than a fifth tab, so the bar keeps Albums
+    // highlighted and only the back arrow changes.
+    val isNested = route?.startsWith(AlbumRoutes.DETAIL_PREFIX) == true
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopBar(destination = currentDestination, onCycleThemeMode = onCycleThemeMode)
+            TopBar(
+                destination = currentDestination,
+                onCycleThemeMode = onCycleThemeMode,
+                onNavigateUp = { if (isNested) navController.navigateUp() },
+                showNavigateUp = isNested,
+            )
         },
         bottomBar = {
             NavigationBar {
@@ -71,9 +80,26 @@ fun LumoVaultApp(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TopBar(destination: LumoVaultDestination, onCycleThemeMode: () -> Unit) {
+private fun TopBar(
+    destination: LumoVaultDestination,
+    onCycleThemeMode: () -> Unit,
+    onNavigateUp: () -> Unit,
+    showNavigateUp: Boolean,
+) {
     TopAppBar(
         title = { Text(destination.label()) },
+        navigationIcon = {
+            // The nested screens are the only ones with somewhere to go back to, and an arrow that
+            // appeared on a tab would be a control that does nothing.
+            if (showNavigateUp) {
+                IconButton(onClick = onNavigateUp) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                    )
+                }
+            }
+        },
         actions = {
             // Stand-in for the Settings entry point (PRD section 43); it becomes a real
             // destination in Phase 2, when there is a connected account to show.

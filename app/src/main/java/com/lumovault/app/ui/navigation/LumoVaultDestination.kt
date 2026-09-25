@@ -24,6 +24,22 @@ enum class LumoVaultDestination(val route: String) {
     companion object {
         /** LumoVault opens into the local library (PRD section 11). */
         val Start: LumoVaultDestination = Photos
+
+        /**
+         * Which tab a route belongs to.
+         *
+         * An album detail screen is not a tab, so it is reported as the one it sits under — otherwise
+         * opening an album would un-highlight the bar, and a bottom bar with nothing selected reads as a
+         * screen that has lost track of itself.
+         */
+        fun forRoute(route: String?): LumoVaultDestination = when {
+            route == null -> Start
+            route == Photos.route -> Photos
+            route == Cloud.route -> Cloud
+            route == Map.route -> Map
+            route == Albums.route || route.startsWith(AlbumRoutes.DETAIL_PREFIX) -> Albums
+            else -> Start
+        }
     }
 }
 
