@@ -20,6 +20,8 @@ import com.lumovault.app.data.local.organization.AlbumMembershipEntity
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.data.local.organization.MediaOrganizationEntity
 import com.lumovault.app.data.local.organization.SystemAlbumDao
+import com.lumovault.app.data.local.restore.MediaRestoreDao
+import com.lumovault.app.data.local.restore.MediaRestoreEntity
 
 /**
  * Phase 1 shipped v1 with only `theme_mode` (an entity-free database is rejected by Room's
@@ -38,8 +40,9 @@ import com.lumovault.app.data.local.organization.SystemAlbumDao
         AlbumMembershipEntity::class,
         MediaOrganizationEntity::class,
         MediaMetadataEntity::class,
+        MediaRestoreEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class LumoVaultDatabase : RoomDatabase() {
@@ -52,6 +55,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
     abstract fun mediaOrganizationDao(): MediaOrganizationDao
     abstract fun systemAlbumDao(): SystemAlbumDao
     abstract fun mediaMetadataDao(): MediaMetadataDao
+    abstract fun mediaRestoreDao(): MediaRestoreDao
 
     companion object {
         /**
@@ -365,6 +369,63 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Mirrors Room's generated DDL for Phase 9: three appended columns on `app_settings` and the whole
+         * of [MediaRestoreEntity], column-for-column in declaration order, with the index named the way Room
+         * names it.
+         *
+         * The settings columns go last in both the entity and here because `ALTER TABLE … ADD COLUMN` can
+         * only append. Their defaults are the interesting part, and they are load-bearing in both
+         * directions: `wifi_only` defaults to 1, which is why an upgraded install must be given 1 rather
+         * than 0 — a Phase 8 user never chose to back up over mobile data, because there was no background
+         * pass to choose about, so the migration has to leave them where they were. `last_scan_seconds`
+         * defaults to 0, meaning "no scan recorded by this build", which the Diagnostics screen renders as
+         * exactly that rather than as a date.
+         *
+         * Nothing existing is rewritten. `media_restore` starts empty, and empty is the right answer: on a
+         * Phase 8 install no original was ever downloaded, and the first restore the user asks for creates
+         * the first row.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `app_settings` ADD COLUMN `wifi_only` INTEGER NOT NULL DEFAULT 1",
+                )
+                db.execSQL(
+                    "ALTER TABLE `app_settings` ADD COLUMN `charging_only` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "ALTER TABLE `app_settings` ADD COLUMN `last_scan_seconds` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `media_restore` (
+                        `chat_id` INTEGER NOT NULL,
+                        `message_id` INTEGER NOT NULL,
+                        `media_type` TEXT NOT NULL DEFAULT '',
+                        `mime_type` TEXT NOT NULL DEFAULT '',
+                        `display_name` TEXT NOT NULL DEFAULT '',
+                        `relative_path` TEXT NOT NULL DEFAULT '',
+                        `remote_file_id` TEXT NOT NULL DEFAULT '',
+                        `expected_size_bytes` INTEGER NOT NULL DEFAULT 0,
+                        `downloaded_bytes` INTEGER NOT NULL DEFAULT 0,
+                        `state` TEXT NOT NULL DEFAULT 'pending',
+                        `failure` TEXT NOT NULL DEFAULT '',
+                        `media_store_id` INTEGER NOT NULL DEFAULT 0,
+                        `content_hash` TEXT NOT NULL DEFAULT '',
+                        `temp_path` TEXT NOT NULL DEFAULT '',
+                        `requested_at` INTEGER NOT NULL DEFAULT 0,
+                        `updated_at` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`chat_id`, `message_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_restore_state` ON `media_restore` (`state`)",
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -373,6 +434,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
     }
 }

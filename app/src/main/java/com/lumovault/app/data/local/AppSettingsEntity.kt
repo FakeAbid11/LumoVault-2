@@ -35,6 +35,31 @@ data class AppSettingsEntity(
     val sourceSelection: String? = null,
     @ColumnInfo(name = "selected_folders", defaultValue = "")
     val selectedFolders: String = "",
+
+    /**
+     * Automatic backup waits for an unmetered network.
+     *
+     * Defaults to on, because a library's first pass is the expensive one and nobody has agreed to spend
+     * their mobile data allowance by installing a photo app. Manual backup is not governed by this: a tap
+     * on "Back Up" is the agreement.
+     */
+    @ColumnInfo(name = "wifi_only", defaultValue = "1")
+    val wifiOnly: Boolean = true,
+
+    /** Off by default — waiting for a charger can mean a phone that never backs up. */
+    @ColumnInfo(name = "charging_only", defaultValue = "0")
+    val chargingOnly: Boolean = false,
+
+    /**
+     * When the local library was last reconciled with MediaStore, in epoch seconds; 0 when it has not
+     * happened in this install.
+     *
+     * Stored because the Diagnostics screen has to answer "last scan" and the only candidate in `media` is
+     * `last_seen_scan_id`, which is a tag used to decide what to prune, not a time anyone promised to keep.
+     * Inventing the answer from a row count would be exactly the fake this project refuses.
+     */
+    @ColumnInfo(name = "last_scan_seconds", defaultValue = "0")
+    val lastScanSeconds: Long = 0,
 ) {
     companion object {
         const val SINGLETON_ROW_ID = 1
