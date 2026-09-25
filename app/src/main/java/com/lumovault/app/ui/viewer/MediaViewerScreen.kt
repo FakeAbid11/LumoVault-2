@@ -95,9 +95,26 @@ fun MediaViewerScreen(
     val listing by viewModel.listing.collectAsStateWithLifecycle()
 
     when (val state = listing) {
-        // Room has not answered about this item's list yet. Drawing nothing is the honest frame: a spinner
-        // over black would look broken for one frame on every single open.
-        Listing.Loading -> Unit
+        // Room has not answered about this item's list yet. There is no picture to draw, so the frame stays
+        // black rather than spinning over nothing — but the control that leaves is drawn regardless. A
+        // screen that is both black and has no visible way out reads as a crash, and "the query answers
+        // promptly" is not a promise this screen gets to assume.
+        Listing.Loading -> Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        ) {
+            IconButton(
+                onClick = onNavigateUp,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.viewer_close),
+                    tint = OnMedia,
+                )
+            }
+        }
 
         // The list came back and does not hold the tapped photo. Say so, rather than opening some other
         // photograph at index zero — which is the failure a pager with a fallback index always has.
