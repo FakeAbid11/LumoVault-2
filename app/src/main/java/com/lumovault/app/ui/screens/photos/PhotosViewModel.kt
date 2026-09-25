@@ -146,12 +146,14 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Selection starts on a long press, not on a tap.
+     * Toggles a cell, but only once a selection already exists.
      *
-     * The grid has no other tap action yet — the local viewer is not this phase's to add — and a single
-     * tap that silently started a mode the user did not ask for would make the library feel broken. Once
-     * in the mode, tapping toggles, which is what makes a ten-item selection possible without a
-     * long-press per item.
+     * Selection starts on a long press because a tap belongs to the viewer: opening the photograph a person
+     * touched is what they asked for, and a mode that began on a single tap would make the library feel
+     * broken. After that first long press, tapping adds — which is what makes a ten-item selection
+     * possible without a long-press per item.
+     *
+     * The screen decides which of the two a tap means; this class only knows about the selection.
      */
     fun onCellClick(mediaId: Long) {
         if (selection.value.isNotEmpty()) toggle(mediaId)

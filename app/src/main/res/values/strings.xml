@@ -233,6 +233,54 @@
     <string name="backup_failure_rejected">Telegram refused this file.</string>
     <string name="backup_failure_unknown">Backup couldn\'t finish.</string>
 
+    <!--
+        Phase 8: the viewer. The details rows are labels only, because a value the file does not hold is not
+        drawn at all (PRD section 28's "never invent metadata"), and the one place a missing answer is named is
+        location — where an empty space reads as a bug rather than as a fact about the photograph.
+    -->
+    <string name="viewer_close">Close</string>
+    <string name="viewer_more_actions">More actions</string>
+    <string name="viewer_info">About this file</string>
+    <string name="viewer_details_title">File information</string>
+    <string name="viewer_gone_title">This item is no longer here</string>
+    <string name="viewer_gone_body">The photo or video was removed from this device. Your backups are unaffected.</string>
+    <string name="viewer_gone_body_empty">This album is empty now. The photos themselves are untouched.</string>
+    <string name="viewer_image_unreadable">This file couldn't be displayed.</string>
+    <string name="viewer_video_unavailable">This device can't play this clip. Your backup of it is unaffected.</string>
+    <string name="viewer_play">Play</string>
+    <string name="viewer_pause">Pause</string>
+
+    <string name="viewer_backup_action">Back up</string>
+    <string name="viewer_uploading">Uploading…</string>
+    <string name="viewer_backed_up">Backed up</string>
+    <string name="viewer_retry_action">Retry</string>
+
+    <string name="viewer_add_to_album">Add to album</string>
+    <string name="viewer_trash_title">Move to Trash?</string>
+    <string name="viewer_trash_body">It leaves your library and stays here on this device. Your backup isn't deleted.</string>
+
+    <string name="viewer_field_taken">Taken</string>
+    <string name="viewer_field_added">Added on this device</string>
+    <string name="viewer_field_location">Location</string>
+    <string name="viewer_location_none">Location unavailable</string>
+    <string name="viewer_field_camera">Camera</string>
+    <string name="viewer_field_lens">Lens</string>
+    <string name="viewer_field_focal_length">Focal length</string>
+    <string name="viewer_field_aperture">Aperture</string>
+    <string name="viewer_field_iso">ISO</string>
+    <string name="viewer_field_shutter">Shutter</string>
+    <string name="viewer_field_dimensions">Dimensions</string>
+    <string name="viewer_field_name">Name</string>
+    <string name="viewer_field_size">Size</string>
+    <string name="viewer_field_type">Type</string>
+    <string name="viewer_field_duration">Length</string>
+    <string name="viewer_open_map">View on map</string>
+
+    <plurals name="viewer_position">
+        <item quantity="one">%1$d of %2$d</item>
+        <item quantity="other">%1$d of %2$d</item>
+    </plurals>
+
     <plurals name="cloud_count_photos">
         <item quantity="one">%1$d photo</item>
         <item quantity="other">%1$d photos</item>

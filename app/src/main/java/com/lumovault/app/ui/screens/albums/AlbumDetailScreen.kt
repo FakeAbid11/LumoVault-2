@@ -73,6 +73,7 @@ import com.lumovault.app.ui.navigation.AlbumTarget
 fun AlbumDetailScreen(
     target: AlbumTarget?,
     onNavigateUp: () -> Unit,
+    onOpenMedia: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AlbumDetailViewModel = viewModel(),
 ) {
@@ -123,7 +124,9 @@ fun AlbumDetailScreen(
             items = state.items,
             favoriteIds = state.favoriteIds,
             selection = state.selection,
-            onCellClick = viewModel::onCellClick,
+            onCellClick = { mediaId ->
+                if (state.selection.isEmpty()) onOpenMedia(mediaId) else viewModel.onCellClick(mediaId)
+            },
             onCellLongClick = viewModel::onCellLongClick,
             onLoadMore = viewModel::loadMore,
             modifier = Modifier.weight(1f),

@@ -46,6 +46,7 @@ import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.MediaContentHasher
 import com.lumovault.app.domain.backup.MediaSourceStager
 import com.lumovault.app.domain.backup.TelegramUploadRepository
+import com.lumovault.app.domain.map.MapFocus
 import com.lumovault.app.domain.metadata.MediaContentMetadataReader
 import com.lumovault.app.domain.organization.AlbumRepository
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
@@ -341,6 +342,9 @@ class AppContainer(context: Context) {
             resolveChannel = { cloudIndexRepository.association()?.chatId ?: NO_CHANNEL },
         )
     }
+
+    /** The viewer's "view on map" hands the map a centre through this, not through a route argument. */
+    val mapFocus = MapFocus()
 
     val backupScheduler: BackupScheduler by lazy { BackupScheduler(appContext) }
 

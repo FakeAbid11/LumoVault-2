@@ -41,6 +41,13 @@ libphonenumber = { group = "com.googlecode.libphonenumber", name = "libphonenumb
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version = "1.4.2" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "coil" }
+# Verified against Coil's own docs and artifacts for 3.6.3: GIFs are NOT animated by `coil-compose` alone —
+# coil-core ships only BitmapFactoryDecoder, BlackholeDecoder and StaticImageDecoder(animated = false), and
+# none of the compose artifacts registers a DecoderServiceLoaderTarget. This artifact does, and it selects
+# ImageDecoder + AnimatedImageDrawable on API 28+, which at our minSdk 29 is always the path taken. Without
+# it a GIF in the viewer renders as a still and looks exactly like a correct GIF right up until it fails to
+# move.
+coil-gif = { group = "io.coil-kt.coil3", name = "coil-gif", version.ref = "coil" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

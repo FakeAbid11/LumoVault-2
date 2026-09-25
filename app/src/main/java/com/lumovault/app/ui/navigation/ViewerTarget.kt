@@ -44,6 +44,19 @@ sealed interface ViewerTarget {
         /** A path segment cannot be empty, so "this kind needs no argument" needs a word of its own. */
         const val NO_ARGUMENT = "-"
 
+        /**
+         * The viewer's source for an album screen.
+         *
+         * An album detail screen *is* a list, so opening one of its items should swipe through that album and
+         * nothing else. A screen that has not resolved its album yet falls back to the timeline, which is the
+         * only list that is always there.
+         */
+        fun of(albumTarget: AlbumTarget?): ViewerTarget = when (albumTarget) {
+            is AlbumTarget.User -> Album(albumTarget.albumId)
+            is AlbumTarget.System -> SystemAlbumView(albumTarget.album)
+            null -> Photos
+        }
+
         fun decode(kind: String?, argument: String?): ViewerTarget = when (kind) {
             KIND_ALBUM -> argument?.toLongOrNull()?.let(::Album) ?: Photos
             KIND_SYSTEM -> SystemAlbum.entries.firstOrNull { it.name == argument }?.let(::SystemAlbumView) ?: Photos
@@ -68,3 +81,12 @@ object ViewerRoutes {
     fun of(mediaStoreId: Long, target: ViewerTarget): String =
         "$PREFIX$mediaStoreId/${target.kind}/${target.argument}"
 }
+
+/**
+ * Whether a route is the viewer's.
+ *
+ * Lives with the routes rather than in the shell because the test is a property of how they are spelled: if
+ * the viewer's pattern ever gains a segment, this is the one line that has to know, and the shell should be
+ * asking a question rather than repeating a string literal.
+ */
+fun viewerRouteActive(route: String?): Boolean = route?.startsWith(ViewerRoutes.PREFIX) == true

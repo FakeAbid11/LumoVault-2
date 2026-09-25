@@ -23,6 +23,7 @@ import com.lumovault.app.R
 import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
+import com.lumovault.app.ui.navigation.viewerRouteActive
 import com.lumovault.app.ui.navigation.icon
 import com.lumovault.app.ui.navigation.label
 
@@ -42,19 +43,24 @@ fun LumoVaultApp(
     // An album screen is a child of the Albums tab rather than a fifth tab, so the bar keeps Albums
     // highlighted and only the back arrow changes.
     val isNested = route?.startsWith(AlbumRoutes.DETAIL_PREFIX) == true
+    // A photograph is the screen, so the bar it would otherwise sit under is not drawn at all rather than
+    // drawn over it: a translucent nav bar on top of a dark image is a second, dimmer copy of the same black.
+    val isViewer = viewerRouteActive(route)
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopBar(
-                destination = currentDestination,
-                onCycleThemeMode = onCycleThemeMode,
-                onNavigateUp = { if (isNested) navController.navigateUp() },
-                showNavigateUp = isNested,
-            )
+            if (!isViewer) {
+                TopBar(
+                    destination = currentDestination,
+                    onCycleThemeMode = onCycleThemeMode,
+                    onNavigateUp = { if (isNested) navController.navigateUp() },
+                    showNavigateUp = isNested,
+                )
+            }
         },
         bottomBar = {
-            NavigationBar {
+            if (isViewer) Unit else NavigationBar {
                 LumoVaultDestination.entries.forEach { destination ->
                     NavigationBarItem(
                         selected = destination == currentDestination,
@@ -73,7 +79,9 @@ fun LumoVaultApp(
     ) { innerPadding ->
         LumoVaultNavHost(
             navController = navController,
-            modifier = Modifier.padding(innerPadding),
+            // The viewer's own chrome pads for the system bars it is drawn behind; every other screen lets
+            // the scaffold do it, which is what keeps a status bar from landing on top of a title.
+            modifier = if (isViewer) modifier else modifier.padding(innerPadding),
         )
     }
 }

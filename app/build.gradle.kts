@@ -140,6 +140,10 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
 
+    // GIF animation in the viewer. See the catalog entry: this is not a nicety, it is the only thing that
+    // makes an animated file move, and a still GIF is a wrong answer that looks right.
+    implementation(libs.coil.gif)
+
     // Phase 8 reads a photo's own GPS and camera data out of its EXIF block. The platform's
     // android.media.ExifInterface is not the same class: it does not parse the HEIF/HEIC and PNG containers
     // that photos actually arrive in on modern devices, so choosing it would silently drop half a library

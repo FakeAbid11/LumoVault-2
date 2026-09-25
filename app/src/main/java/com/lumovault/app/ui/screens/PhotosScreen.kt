@@ -75,6 +75,7 @@ import java.time.LocalDate
  */
 @Composable
 fun PhotosScreen(
+    onOpenMedia: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PhotosViewModel = viewModel(),
 ) {
@@ -135,7 +136,12 @@ fun PhotosScreen(
                 backup = backup,
                 favoriteIds = favorites,
                 selected = selected,
-                onCellClick = viewModel::onCellClick,
+                // One tap opens, one long press selects, and after that every tap adds to the selection.
+                // The rule is decided here rather than in the model because it is a fact about the touch,
+                // not about the data: the same id means different things depending on what is already chosen.
+                onCellClick = { mediaId ->
+                    if (selected.isEmpty()) onOpenMedia(mediaId) else viewModel.onCellClick(mediaId)
+                },
                 onCellLongClick = viewModel::onCellLongClick,
                 onLoadMore = viewModel::loadMore,
             )
