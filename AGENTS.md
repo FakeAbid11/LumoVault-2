@@ -107,6 +107,28 @@ Rules that have already caused a mistake here:
   neither the assertion message nor the values, so without it each failure costs a whole build cycle.
 - **`<provider>`, `<service>` and `<activity>` go inside `<application>`.** As a direct child of
   `<manifest>` AAPT rejects the build with "unexpected element".
+- **An `IN (…)` list has a ceiling, and a growable window will reach it.** Room binds one placeholder per
+  element, and the SQLite shipped with API 29 stops at 999 variables per statement — so every read or write
+  that takes a collection of ids has to chunk against `data/local/QueryChunk.kt`'s `MAX_IDS_PER_QUERY`. A
+  timeline window starts at 300 and only ever gets bigger, which makes this a fourth-page-of-scrolling crash
+  on a 1,200-photo library, not a theoretical one. A DAO method taking `List<Entity>` for `@Upsert`/`@Insert`
+  is *not* affected: Room compiles that to one statement executed in a loop.
+- **Manual and unattended work must not share a unique work name.** `APPEND_OR_REPLACE` on one name puts a
+  hand-tapped backup into the chain the unattended pass already occupies, and a chain waits for the
+  constraints of the work inside it — so "Wi-Fi only" began blocking a backup the user started on mobile
+  data, which is the one thing `BackupPreferences` promises cannot happen.
+- **A `CoroutineWorker` that launches an infinite collector as a child of `supervisorScope` never finishes
+  `doWork`.** The scope waits for its children and a Room flow has no last value, so the foreground service
+  and its notification outlive the queue. Keep the `Job` and cancel it in a `finally`.
+- **Delete the whole expression, not just the clause.** Removing a `catch` from `val x = try { … } catch …`
+  leaves a bare `try`, which is a Kotlin syntax error, not a style one; and moving a top-level function to
+  another file leaves every previous same-package call site needing an `import`. Both were CI's to find.
+- **A claim that names an API is a claim to check.** Phase 10's audits asked for `MapView.destroy()` — which
+  osmdroid 6.1.20 does not have (`onPause`, `onResume`, `onDetach`, `setDestroyMode` are the whole surface,
+  read from the artifact's sources jar) — and for `combining(Iterable<Flow<T>>)`, which kotlinx-coroutines
+  1.11.0 does not either; the collection overload is the ordinary `combine(flows) { Array<T> -> R }`, while
+  `debounce` is still `@FlowPreview` and `sample` is not.
+
 - **Grep back every `R.string` you add; an unreferenced one is usually an unwired feature.** AAPT does not
   complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
   build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was

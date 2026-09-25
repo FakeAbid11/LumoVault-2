@@ -33,8 +33,9 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   be confused; permission, scanning, empty, error and pull-to-refresh states
 - The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Still not built, by design:** Settings beyond backup and storage, the About/licenses screen, and the
-release work (Phase 10). Every earlier phase is recorded in the sections below, in order.
+**Still not built, by design:** Settings beyond backup and storage, the About/licenses screen, and any
+release or signing work. Phase 10 was the hardening pass, and it is recorded below. Every earlier phase is
+recorded in the sections above, in order.
 
 ## Build in the cloud — never locally
 
@@ -412,6 +413,62 @@ that disagreed with its path, `ByteArray.startsWith` and `InputStream.readNBytes
 `vararg` overloads of one name, `in` on a `ConcurrentHashMap`, a companion object closed in the middle of its
 body, a `private` extension three files wanted, two fakes sharing a name, and an unescaped apostrophe that
 AAPT2 reported as an invalid unicode escape.
+
+## Hardening and polish — Phase 10
+
+**Phase 10 — polish, hardening, testing and the final debug APK:** complete from the implementation and CI
+side (run 36201397850 at `c652f27`: **411 tests, 0 failed, 0 errors, 0 skipped across 44 classes**, debug APK
+published at 39,501,791 bytes, `libtdjni.so` verified present for both `arm64-v8a` and `armeabi-v7a`). This
+phase added no feature and removed no earlier one: three tests went in, none came out, and no assertion was
+weakened.
+
+**What only shows up at scale.** The Photos timeline and the album screens fed their whole loaded window into
+a single `IN (…)`; Room binds one placeholder per element and the SQLite shipped with API 29 stops at 999
+variables per statement, so scrolling a 1,200-item library to its fourth page was a crash rather than a slow
+screen. Every id-list read and write reachable from a growable window now chunks against one shared ceiling
+(`data/local/QueryChunk.kt`), including the Trash's "empty everything" sweep. Two passes claiming from the same
+queue each moved a different row and then both read back *the newest one in `preparing`* — one photo uploaded
+twice, another stranded — and that pair is now one transaction. `purgeStale` at start-up remains the backstop,
+not the plan: a staged copy is deleted on every exit from an item's run, including the ones that threw.
+
+**What only shows up when the app is not in the foreground.** The upload worker's status collector was an
+infinite child of a `supervisorScope`, which waits for its children, so `doWork` never returned after the queue
+drained and the `dataSync` foreground service held its notification until the system intervened. Manual and
+unattended sends shared one unique work name, so a hand-tapped backup could join the chain waiting for Wi-Fi —
+the outcome the backup preferences promise is impossible; they have separate names now, and the automatic pass
+retries an absent media permission a bounded number of times instead of forever. A video page prepared its
+decoder when the pager composed it rather than when it was looked at, nothing paused playback when the screen
+went off, and a recreated player could be left with no surface at all.
+
+**What only shows up on the second visit or the fourth screen.** Four screens drew their own app bar while the
+shell drew another one titled after the tab they were not on. The map was built per visit and only ever paused.
+The cloud sheet had no response to the back gesture. The viewer's pre-answer frame was black with no visible
+exit. Diagnostics seeded itself with a database at version 0 and a full disk before anything had been read, the
+free-space review drew a spinner for "still loading" and "nothing came back" alike, and a device that refused a
+deletion request reported itself as something the user had declined.
+
+**Verified by CI, not by a phone.** Real-device validation was **not performed** in this phase either: no
+device was attached at any point. What is covered by tests is the queue's and recognition's behaviour —
+including the two duplicate rules the phase made mandatory: a settled item is neither enqueued nor claimed
+again, and a restored file survives the recognition pass that runs straight after it rather than being revoked
+and re-uploaded. What remains a device question, and is not claimed: that a restored video plays, that the
+consent dialog reads as intended, that the periodic pass survives a reboot, that the timeline is smooth at
+10,000 items, and that the map's markers land where the photo was taken.
+
+**Runs:** 6 in Phase 10, of which the last is green and each red one named a real mistake of mine rather than a
+flaky check — `combine` imported in one repository and not the next, `java.util.concurrent` one package away
+from `java.util.concurrent.atomic`, a `try` left with neither `catch` nor `finally`, a top-level function moved
+without importing it at the call site, a new parameter never passed, and an `MapView.destroy()` that osmdroid
+6.1.20 does not have.
+
+**Still true after Phase 10:** the Phase 9 limitations are unchanged — no resumable restore, restored files go
+to `Pictures/LumoVault` and `Movies/LumoVault`, local-media discovery is periodic rather than push-based, and
+the free-space review still shows 400 items per visit. Three more belong to this phase's scope decisions:
+osmdroid's only teardown reachable from Compose is a pause, so a map view outlives the screen that made it
+until the process ends; "empty Trash" still asks Android to name every item in one consent request, because
+splitting it would hide files from the dialog that the dialog exists to show; and the reason a backup failed is
+recorded but never drawn — the failure copy exists in `strings.xml` with no screen reading it, which is a
+product decision rather than a hardening one.
 
 ## Telegram status — what is real and what is deferred
 
