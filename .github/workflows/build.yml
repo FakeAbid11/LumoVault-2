@@ -214,6 +214,23 @@ jobs:
 
           unzip -l "$APK" | grep -E 'lib/.*\.so'
 
+      # Gradle's test task is silent about how much it ran, and nothing here can execute tests on the
+      # developer's machine, so the suite's size is read back from the report the task left behind.
+      # A count of zero passes the build just as loudly as a failure would.
+      - name: Report the unit test totals
+        run: |
+          set -euo pipefail
+          DIR=app/build/test-results/testDebugUnitTest
+          count() {
+            grep -oh "$1=\"[0-9]*\"" "$DIR"/*.xml | tr -d -c '0-9\n' | awk '{ s += $1 } END { print s + 0 }'
+          }
+          tests=$(count tests); failed=$(count failures); errors=$(count errors); skipped=$(count skipped)
+          echo "Unit tests: $tests run, $failed failed, $errors errors, $skipped skipped ($(ls "$DIR"/TEST-*.xml | wc -l) classes)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$((failed + errors))" -ne 0 ] || [ "$tests" -eq 0 ]; then
+            echo "the suite did not pass, or did not run"; exit 1
+          fi
+
       - name: Report artifact to the run summary
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
