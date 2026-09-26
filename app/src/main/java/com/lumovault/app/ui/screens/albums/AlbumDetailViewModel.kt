@@ -2,6 +2,7 @@ package com.lumovault.app.ui.screens.albums
 
 import android.app.Activity
 import android.app.Application
+import android.util.Log
 import androidx.activity.result.IntentSenderRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +12,7 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.ui.navigation.AlbumTarget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -214,25 +216,34 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
      */
     fun emptyTrash(launch: (IntentSenderRequest) -> Unit, onUnsupported: () -> Unit) {
         viewModelScope.launch {
-            val count = container.mediaOrganizationRepository.trashedCount()
-            if (count == 0) return@launch
-            val trashed = container.mediaOrganizationRepository
-                .observeContents(SystemAlbum.Trash, count)
-                .first()
-            if (trashed.isEmpty()) {
-                // Organisation rows for files the index no longer holds. Nothing to ask the device about,
-                // so this is bookkeeping rather than deletion.
-                container.mediaOrganizationRepository.forgetDeletedLocally(
-                    container.mediaOrganizationRepository.trashedMediaIds(),
+            try {
+                val count = container.mediaOrganizationRepository.trashedCount()
+                if (count == 0) return@launch
+                val trashed = container.mediaOrganizationRepository
+                    .observeContents(SystemAlbum.Trash, count)
+                    .first()
+                if (trashed.isEmpty()) {
+                    // Organisation rows for files the index no longer holds. Nothing to ask the device about,
+                    // so this is bookkeeping rather than deletion.
+                    container.mediaOrganizationRepository.forgetDeletedLocally(
+                        container.mediaOrganizationRepository.trashedMediaIds(),
+                    )
+                    return@launch
+                }
+                requestDeletion(
+                    ids = trashed.map { it.id }.toSet(),
+                    uris = trashed.map { it.contentUri },
+                    launch = launch,
+                    onUnsupported = onUnsupported,
                 )
-                return@launch
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // The honest state is "the device could not be asked", not a crash mid-consent-flow;
+                // the class name is the whole log, like every failure this app records.
+                Log.w(TAG, "empty trash failed: ${error.javaClass.simpleName}")
+                onUnsupported()
             }
-            requestDeletion(
-                ids = trashed.map { it.id }.toSet(),
-                uris = trashed.map { it.contentUri },
-                launch = launch,
-                onUnsupported = onUnsupported,
-            )
         }
     }
 
@@ -249,8 +260,16 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         pendingDeletion = null
         if (resultCode != Activity.RESULT_OK || ids == null || ids.isEmpty()) return
         viewModelScope.launch {
-            container.mediaOrganizationRepository.forgetDeletedLocally(ids)
-            selection.value = emptySet()
+            try {
+                container.mediaOrganizationRepository.forgetDeletedLocally(ids)
+                selection.value = emptySet()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // The deletion itself already happened — the device confirmed it. A cleanup that failed
+                // leaves rows the next scan sweeps; losing the app over them would misreport a success.
+                Log.w(TAG, "post-deletion cleanup failed: ${error.javaClass.simpleName}")
+            }
         }
     }
 
@@ -262,7 +281,14 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         launch: (IntentSenderRequest) -> Unit,
         onUnsupported: () -> Unit,
     ) {
-        val request = container.localMediaDeleter.requestFor(uris)
+        // The resolver can refuse outright — a uri whose grant died between listing and confirming is a
+        // SecurityException, not a deletion. "Cannot ask" is the state the screen already knows how to show.
+        val request = try {
+            container.localMediaDeleter.requestFor(uris)
+        } catch (error: Exception) {
+            Log.w(TAG, "deletion request refused: ${error.javaClass.simpleName}")
+            null
+        }
         if (request == null) {
             pendingDeletion = null
             onUnsupported()
@@ -301,6 +327,7 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     companion object {
+        private const val TAG = "LumoVaultAlbumDetail"
         private const val WINDOW_START = 300
         private const val WINDOW_STEP = 300
 

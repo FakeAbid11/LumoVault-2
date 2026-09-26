@@ -1,15 +1,18 @@
 package com.lumovault.app.ui.backup
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
 import com.lumovault.app.domain.restore.FreeUpSpacePlan
 import com.lumovault.app.domain.usecase.PreparedDeletion
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -114,27 +117,40 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
         val ids = selected.value.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            val prepared = container.freeUpSpace.prepare(ids)
-            if (prepared.nothingLeft) {
-                outcome.value = DeletionOutcome.NothingLeft
-                return@launch
+            // Preparing reads and hashes real files and the request goes to the resolver: a uri whose
+            // grant died, or storage that vanished mid-read, throws. Nothing has been deleted at this
+            // point, so the honest outcome is the screen's own "failed" sentence rather than a crash.
+            try {
+                val prepared = container.freeUpSpace.prepare(ids)
+                if (prepared.nothingLeft) {
+                    outcome.value = DeletionOutcome.NothingLeft
+                    return@launch
+                }
+                val request = container.localMediaDeleter.requestFor(prepared.uris)
+                if (request == null) {
+                    outcome.value = DeletionOutcome.Unavailable
+                    return@launch
+                }
+                pending.value = prepared
+                outcome.value = DeletionOutcome.Asked
+                _pendingConsent.value = request.intentSender
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "free-up-space confirm failed: ${error.javaClass.simpleName}")
+                pending.value = null
+                outcome.value = DeletionOutcome.Failed
             }
-            val request = container.localMediaDeleter.requestFor(prepared.uris)
-            if (request == null) {
-                outcome.value = DeletionOutcome.Unavailable
-                return@launch
-            }
-            pending.value = prepared
-            outcome.value = DeletionOutcome.Asked
-            pendingConsent.value = request.intentSender
         }
     }
 
+    private val _pendingConsent = MutableStateFlow<android.content.IntentSender?>(null)
+
     /** The intent the screen hands to its launcher, consumed once launched. */
-    val pendingConsent = MutableStateFlow<android.content.IntentSender?>(null)
+    val pendingConsent: StateFlow<android.content.IntentSender?> = _pendingConsent.asStateFlow()
 
     fun consentConsumed() {
-        pendingConsent.value = null
+        _pendingConsent.value = null
     }
 
     fun onDeleted() {
@@ -142,14 +158,23 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
         pending.value = null
         if (prepared == null) return
         viewModelScope.launch {
-            val deleted = container.freeUpSpace.complete(prepared)
-            outcome.value = if (deleted == 0) {
-                DeletionOutcome.NothingLeft
-            } else {
-                DeletionOutcome.Removed(deleted = deleted, reclaimedBytes = prepared.reclaimedBytes)
+            try {
+                val deleted = container.freeUpSpace.complete(prepared)
+                outcome.value = if (deleted == 0) {
+                    DeletionOutcome.NothingLeft
+                } else {
+                    DeletionOutcome.Removed(deleted = deleted, reclaimedBytes = prepared.reclaimedBytes)
+                }
+                selected.value = emptySet()
+                loadReview()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // The device already deleted what it showed the user; only the bookkeeping failed, and
+                // the next review recomputes from the rows rather than from this call.
+                Log.w(TAG, "free-up-space completion failed: ${error.javaClass.simpleName}")
+                outcome.value = DeletionOutcome.Failed
             }
-            selected.value = emptySet()
-            loadReview()
         }
     }
 
@@ -168,6 +193,8 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private companion object {
+        private const val TAG = "LumoVaultFreeUpSpace"
+
         /**
          * How many items the review list can hold.
          *
