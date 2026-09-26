@@ -126,6 +126,7 @@ fun FolderSelectionScreen(
     selectedFolders: List<String>,
     onToggle: (String) -> Unit,
     onBack: () -> Unit,
+    onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     OnboardingScaffold(
@@ -133,7 +134,10 @@ fun FolderSelectionScreen(
         totalSteps = ONBOARDING_STEPS,
         title = stringResource(R.string.folders_title),
         primaryLabel = stringResource(R.string.folders_action),
-        onPrimary = onBack,
+        // Forward, not back: every tick is committed the moment it is tapped, so this screen has no
+        // draft to lose — and a "Continue" that pops to Sources leaves a user who chose folders with
+        // no way to finish setup.
+        onPrimary = onContinue,
         onBack = onBack,
         modifier = modifier,
     ) {

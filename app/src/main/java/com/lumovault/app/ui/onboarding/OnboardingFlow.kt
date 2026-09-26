@@ -159,7 +159,12 @@ fun OnboardingFlow(
                 onOpenFolders = { navController.navigate(OnboardingStep.Folders.route) },
                 onBack = { navController.popBackStack() },
                 onContinue = {
-                    if (state.progress.backupSource == BackupSource.SelectedFolders) {
+                    // The picker is a stop on the way to Ready only while there is nothing picked:
+                    // a user who already chose folders and comes back here continues forward, and
+                    // "Selected folders" with zero folders is the one case that must not skip the pick.
+                    if (state.progress.backupSource == BackupSource.SelectedFolders &&
+                        state.progress.selectedFolders.isEmpty()
+                    ) {
                         navController.navigate(OnboardingStep.Folders.route)
                     } else {
                         navController.navigate(OnboardingStep.Ready.route)
@@ -175,6 +180,7 @@ fun OnboardingFlow(
                 selectedFolders = state.progress.selectedFolders,
                 onToggle = viewModel::toggleFolder,
                 onBack = { navController.popBackStack() },
+                onContinue = { navController.navigate(OnboardingStep.Ready.route) },
             )
         }
 
