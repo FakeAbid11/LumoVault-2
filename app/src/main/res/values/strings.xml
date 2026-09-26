@@ -244,8 +244,8 @@
     <string name="viewer_gone_body_empty">This album is empty now. The photos themselves are untouched.</string>
     <string name="viewer_image_unreadable">This file couldn\'t be displayed.</string>
     <string name="viewer_video_unavailable">This device can\'t play this clip. Your backup of it is unaffected.</string>
-    <string name="viewer_video_failed_title">Can't play this video</string>
-    <string name="viewer_video_failed_body">The file may be in a format this phone cannot decode, or it may no longer be where the library remembers it. Your photo and the rest of the album are unaffected.</string>
+    <string name="viewer_video_failed_title">Can\'t play this video</string>
+    <string name="viewer_video_failed_body">The file may be in a format this phone cannot decode, or it may no longer be where the library remembers it. Your backup and the rest of the album are unaffected.</string>
     <string name="viewer_play">Play</string>
     <string name="viewer_pause">Pause</string>
 
