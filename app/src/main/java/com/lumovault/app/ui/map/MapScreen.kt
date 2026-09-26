@@ -163,6 +163,9 @@ fun MapScreen(
         }
         val delayed = org.osmdroid.events.DelayedMapListener(listener, VIEWPORT_DEBOUNCE_MILLIS)
         map.addMapListener(delayed)
+        // Publish the initial viewport as well as later pans/zooms. Without this, the ViewModel
+        // keeps a null viewport until the user moves the map, so both photo pins and the strip stay empty.
+        publishViewport(map, viewModel)
         // Taps on empty map close the preview card. Added first so markers, which osmdroid asks in reverse
         // order, keep priority over it.
         val events = MapEventsOverlay(
