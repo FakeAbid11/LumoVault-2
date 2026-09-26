@@ -415,6 +415,11 @@ private class FakeQueue : BackupQueueRepository {
         limit: Int,
     ): List<Long> = emptyList()
 
+    // Not this pass's question: the queue under test drains what it is handed and knows nothing about
+    // folders, so a selection change has nothing here to withdraw. `ApplyBackupSelectionUseCaseTest` and
+    // `BackupQueueRepositoryTest` are where that rule is asserted.
+    override suspend fun releaseUnsentOutside(folders: Collection<String>): Int = 0
+
     override suspend fun residentBackupFor(remote: RemoteBackup, manifestHash: String): Long? = null
 
     override suspend fun recordRestored(
