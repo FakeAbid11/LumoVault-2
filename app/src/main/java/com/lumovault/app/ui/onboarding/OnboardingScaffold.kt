@@ -3,6 +3,7 @@ package com.lumovault.app.ui.onboarding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
+import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceXl
+import com.lumovault.app.ui.theme.SpaceXs
 
 /**
  * The shared frame for all six onboarding screens: a header, scrollable body, and one pinned
@@ -71,70 +77,94 @@ fun OnboardingScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = SpaceXl),
         ) {
             StepProgress(step = step, totalSteps = totalSteps)
 
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .widthIn(max = 560.dp)
+                    .widthIn(max = FormMaxWidth)
                     .align(Alignment.CenterHorizontally)
                     .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.Start,
                 // Top-aligned on purpose: a vertically-centred arrangement inside a scroll column
                 // pushes the first line out of reach on short screens.
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(SpaceLg),
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Start,
-                )
-                if (description != null) {
+                Column(
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(SpaceXs),
+                ) {
                     Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // `headlineMedium` is 28 sp, and at that size the heading was the largest thing on a
+                        // screen whose actual subject is the form or the picture underneath it. Small enough to
+                        // be a heading, big enough to be the first thing read.
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Start,
                     )
+                    if (description != null) {
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 content()
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(SpaceXl))
 
             Button(
                 onClick = onPrimary,
                 enabled = primaryEnabled,
+                // The inner `padding(vertical = 8.dp)` on the label is gone: a Material button is already 40 dp
+                // tall, and padding its text made every step's primary action a 56 dp block sitting in the last
+                // of the space the body had been given.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 560.dp)
+                    .widthIn(max = FormMaxWidth)
                     .align(Alignment.CenterHorizontally),
             ) {
-                Text(text = primaryLabel, modifier = Modifier.padding(vertical = 8.dp))
+                Text(text = primaryLabel)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(SpaceLg))
         }
     }
 }
 
+/**
+ * One bar with the count beside it, rather than a bar and then a line of its own.
+ *
+ * Six steps of a flow should not cost six screen-heights of chrome: the fraction and the bar answer the same
+ * question, and a row that answers it once leaves the answer and the room for the content both.
+ */
 @Composable
 private fun StepProgress(step: Int, totalSteps: Int) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(vertical = SpaceLg),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
         LinearProgressIndicator(
             progress = { step.toFloat() / totalSteps.toFloat() },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .height(ProgressHeight),
         )
         Text(
             text = "$step / $totalSteps",
-            style = MaterialTheme.typography.labelMedium,
+            style = LumoVaultType.sectionDetail,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
+
+private val FormMaxWidth = 560.dp
+private val ProgressHeight = 6.dp

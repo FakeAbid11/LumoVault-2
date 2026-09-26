@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,10 +47,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,8 +67,13 @@ import java.util.Date
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.ChromeScrim
 import com.lumovault.app.ui.theme.FavoriteAccent
 import com.lumovault.app.ui.theme.BackedUpAccent
+import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXl
 
 /**
  * The full-screen viewer: one item, the list it came from, and what can be done to it.
@@ -205,6 +214,19 @@ private fun ViewerPager(
 
         if (chromeVisible) {
             val shown = currentItem
+            // A band, not a bar: the controls are white and a bright photograph is full of white, but the
+            // picture is still the screen, so only the top of it is darkened — and only for as long as the
+            // chrome is up.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .systemBarsPadding()
+                    .height(ChromeScrimHeight)
+                    .background(
+                        Brush.verticalGradient(listOf(ChromeScrim, Color.Transparent)),
+                    ),
+            )
             ViewerTopBar(
                 item = shown,
                 position = pagerState.settledPage + 1,
@@ -428,7 +450,7 @@ private fun ViewerActionBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(10.dp),
+            .padding(SpaceMd),
         shape = RoundedCornerShape(16.dp),
         color = MediaBadgeScrim,
     ) {
@@ -532,36 +554,51 @@ private fun MediaDetailsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = SpaceXl)
+                .padding(bottom = SpaceXl),
+            verticalArrangement = Arrangement.spacedBy(SpaceMd),
         ) {
             Text(
                 text = stringResource(R.string.viewer_details_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = LumoVaultType.sectionHeader,
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
+            // Label left, value right, one line each where it can go on one line. The rows used to be two
+            // `Text`s in a row with the label taking half the width: a long camera name then wrapped under
+            // itself while a short resolution sat alone on the right, and a list whose rows break at
+            // different points is a list you have to re-read to parse.
             ViewerPresentation.detailFields(media, metadata).forEach { field ->
                 val value = ViewerFormatting.fieldValue(field, media, metadata, dateTime)
                 val missing = ViewerFormatting.fieldMissing(field)
                 if (value != null || missing != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
+                        verticalAlignment = Alignment.Top,
+                    ) {
                         Text(
                             text = stringResource(ViewerFormatting.fieldLabel(field)),
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.weight(1f),
+                            style = LumoVaultType.sectionDetail,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(DetailLabelWidth),
                         )
                         Text(
                             text = value ?: stringResource(requireNotNull(missing)),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
             }
 
             if (onOpenMap != null) {
-                TextButton(onClick = onOpenMap) { Text(stringResource(R.string.viewer_open_map)) }
+                TextButton(
+                    onClick = onOpenMap,
+                    modifier = Modifier.padding(top = SpaceSm),
+                ) { Text(stringResource(R.string.viewer_open_map)) }
             }
         }
     }
@@ -617,4 +654,13 @@ private fun showSystemBars(window: Window?) {
 
 /** Pages still to load before the pager would reach the end of what Room has handed over. */
 private const val LOAD_AHEAD = 6
+
+/**
+ * How far down the top band of scrim reaches: the bar's own 64 dp plus the height of the tallest title it
+ * carries, so the fade ends below the words rather than through the middle of them.
+ */
+private val ChromeScrimHeight = 104.dp
+
+/** The metadata sheet's label column. Wide enough for "Exposure programme", narrow enough to leave a value room. */
+private val DetailLabelWidth = 116.dp
 

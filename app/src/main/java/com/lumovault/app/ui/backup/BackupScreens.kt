@@ -8,20 +8,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,14 @@ import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
 import com.lumovault.app.util.toByteText
+import com.lumovault.app.ui.theme.GroupCardCorner
+import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.MinTouchTarget
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXl
+import com.lumovault.app.ui.theme.SpaceXs
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -91,15 +101,15 @@ fun BackupHubScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = SpaceLg,
+                end = SpaceLg,
+                top = SpaceXs,
+                bottom = SpaceXl,
+            ),
+            verticalArrangement = Arrangement.spacedBy(SpaceXs),
         ) {
-            item {
-                Text(
-                    text = stringResource(R.string.backup_hub_section_backup),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
+            item { SectionLabel(R.string.backup_hub_section_backup) }
             item {
                 ToggleRow(
                     title = stringResource(R.string.backup_automatic),
@@ -139,22 +149,12 @@ fun BackupHubScreen(
                 )
             }
 
-            item { HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp)) }
-            item {
-                Text(
-                    text = stringResource(R.string.backup_hub_section_status),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
+            // The rule between sections is gone: a heading that is a heading does the separating, and two
+            // hairlines plus their margins were 24 dp of decoration saying what four words already said.
+            item { SectionLabel(R.string.backup_hub_section_status) }
             item { HealthSummary(health = health, onOpenDetails = onOpenHealth) }
 
-            item { HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp)) }
-            item {
-                Text(
-                    text = stringResource(R.string.backup_hub_section_storage),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
+            item { SectionLabel(R.string.backup_hub_section_storage) }
             item {
                 EntryRow(
                     title = stringResource(R.string.free_space_title),
@@ -173,57 +173,95 @@ fun BackupHubScreen(
     }
 }
 
+/** A section of the hub: a heading that separates, with no rule to do it for it. */
+@Composable
+private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
+    Text(
+        text = stringResource(label),
+        style = LumoVaultType.sectionHeader,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = SpaceMd, bottom = SpaceXs),
+    )
+}
+
+/**
+ * The one card on this screen, and deliberately the compact one.
+ *
+ * It used to run to eight lines — a title, three counts, two timestamps, a warning and a button — which made
+ * the summary taller than the settings above it and turned the screen into a report about the queue rather
+ * than a place to decide things. The counts are one line and the timestamps are one line: each figure is the
+ * same string from the same resource, and a person scanning "3 waiting · 1 failed" is reading the same three
+ * facts they read from three rows, in a third of the height. A zero count is still absent rather than shown,
+ * because "0 failed" is not news and the line that carries it is.
+ */
 @Composable
 private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(GroupCardCorner),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = SpaceLg, vertical = SpaceMd),
+            verticalArrangement = Arrangement.spacedBy(SpaceXs),
+        ) {
             Text(
                 text = if (health.allLocalMediaBackedUp) {
                     stringResource(R.string.health_all_backed_up, health.backedUp.toString())
                 } else {
                     stringResource(R.string.health_backed_up, health.backedUp.toString(), health.localTotal.toString())
                 },
-                style = MaterialTheme.typography.titleMedium,
+                style = LumoVaultType.itemTitle,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            CountLine(R.string.health_waiting, health.pending)
-            CountLine(R.string.health_failed, health.failed)
-            CountLine(R.string.health_cloud_only, health.cloudOnly)
+
+            val counts = listOfNotNull(
+                if (health.pending > 0) stringResource(R.string.health_waiting, health.pending.toString()) else null,
+                if (health.failed > 0) stringResource(R.string.health_failed, health.failed.toString()) else null,
+                if (health.cloudOnly > 0) {
+                    stringResource(R.string.health_cloud_only, health.cloudOnly.toString())
+                } else {
+                    null
+                },
+            )
+            if (counts.isNotEmpty()) {
+                Text(
+                    text = counts.joinToString(separator = "  ·  "),
+                    style = LumoVaultType.sectionDetail,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             Text(
                 text = stringResource(
                     R.string.health_last_backup,
                     health.lastBackupSeconds?.asText() ?: stringResource(R.string.health_never),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = stringResource(
+                ) + "  ·  " + stringResource(
                     R.string.health_last_scan,
                     health.lastScanSeconds?.asText() ?: stringResource(R.string.health_never),
                 ),
-                style = MaterialTheme.typography.bodySmall,
+                style = LumoVaultType.sectionDetail,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            // The one line this screen is allowed to shout with, and it does: an item that has no cloud copy
+            // is the fact the whole feature exists to fix. Everything else here is quiet so that this is not
+            // one red row in a screen of warnings.
             if (health.notBackedUp > 0) {
                 Text(
                     text = stringResource(R.string.health_not_backed_up, health.notBackedUp.toString()),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = LumoVaultType.sectionDetail,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            TextButton(onClick = onOpenDetails) {
+
+            TextButton(
+                onClick = onOpenDetails,
+                modifier = Modifier.align(Alignment.Start),
+            ) {
                 Text(stringResource(R.string.health_view_issues))
             }
         }
     }
-}
-
-@Composable
-private fun CountLine(@androidx.annotation.StringRes label: Int, count: Int) {
-    if (count <= 0) return
-    Text(
-        text = stringResource(label, count.toString()),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 /**
@@ -655,15 +693,18 @@ private fun ToggleRow(
     enabled: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MinTouchTarget)
+            .padding(vertical = SpaceXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(text = title, style = LumoVaultType.itemTitle, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = LumoVaultType.sectionDetail,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -671,21 +712,38 @@ private fun ToggleRow(
     }
 }
 
+/**
+ * A row that opens another screen.
+ *
+ * The mark at its end used to be a tick. On the folders row that could be read as "these are chosen", but the
+ * same component draws "Free up space" and "Diagnostics", and a tick on those says nothing true — the screen
+ * they open is not a state this one can confirm. A chevron says the one thing that is always true about an
+ * entry row: there is somewhere to go.
+ */
 @Composable
 private fun EntryRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MinTouchTarget)
+            .clip(RoundedCornerShape(GroupCardCorner))
+            .clickable(onClick = onClick)
+            .padding(horizontal = SpaceXs, vertical = SpaceSm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(text = title, style = LumoVaultType.itemTitle, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = LumoVaultType.sectionDetail,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(Icons.Filled.Check, contentDescription = null)
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+        )
     }
 }

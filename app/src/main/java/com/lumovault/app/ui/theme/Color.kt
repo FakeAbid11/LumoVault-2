@@ -36,6 +36,16 @@ internal val MediaBadgeScrim = Color(0xB3000000)
 internal val MediaGlyphScrim = Color(0x8C000000)
 internal val OnMedia = Color(0xFFFFFFFF)
 internal val FullScreenScrim = Color(0xCC000000)
+
+/**
+ * The band behind the viewer's top bar, fading down into the photograph.
+ *
+ * The bar's own glyphs are white, and white is the colour a bright sky, a wedding dress and a snow scene all
+ * contain — a control that disappears on exactly the photos that need it most. A *band* rather than a solid
+ * bar because the photograph is the screen: the top of it may be darkened where the controls are, and the rest
+ * may be left alone.
+ */
+internal val ChromeScrim = Color(0xA6000000)
 internal val MapNoticeScrim = Color(0x99000000)
 
 /** The two states of a thumbnail's own glyph, kept out of the scheme so a theme change cannot mute them. */
