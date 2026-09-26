@@ -45,6 +45,16 @@ guard on every player callback and the failure screen are the ones the crash fix
 than removed. Playback on hardware is **not** verified — see
 [Video playback is Media3, with LumoVault's own guards](#video-playback-is-media3-with-lumovaults-own-guards).
 
+**Selected-folder backup:** complete and CI-verified (runs
+[36228045612](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36228045612) — red, one interface member
+missing from a test fake — and
+[36228240891](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36228240891), 489 unit tests, 0 failed,
+debug APK built with both TDLib ABIs packaged). Saving a folder selection now writes the choice, withdraws
+what the narrowed selection no longer covers while it is still unsent, re-installs the periodic pass and asks
+for one immediately; a pass asks for a send whenever the queue holds work, so a queue that outlived its
+process resumes. Whether a folder's photos actually arrive in the Telegram channel is **not** verified on a
+device — see [Folder backup — what a saved selection starts](#folder-backup--what-a-saved-selection-starts).
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
@@ -586,6 +596,39 @@ object), `setTdlibParameters` takes its fields flat rather than as a nested `tdl
 and the code length arrives as `codeInfo.type.length` rather than a separate `codeLength`. When the
 pin moves, re-check them against that revision; a renamed field is now a compile error rather than a
 login that silently never finishes.
+
+## Folder backup — what a saved selection starts
+
+A folder chosen for backup should mean the photos in it get backed up — the ones already there, and the ones
+added later, without the app being open when either happens. It did not reliably do that, and the reason was
+not one bug at the top of the list but four along the path, none of them visible from the settings screen:
+
+| | |
+| --- | --- |
+| **The save stopped at the settings row.** | `selected_folders` and `backup_enabled` were written and nothing else. The periodic pass had been installed — or cancelled — under the *previous* answer, so the new selection was noticed only when a process restart re-read the settings, which is why the same action sometimes worked. |
+| **A queue that outlived its process had nobody left.** | The pass asked for a send only when it had *added* rows. After a kill or a reboot the old rows are still `queued` and there is nothing new to find — so the work that was already promised stopped being work. |
+| **Deselecting a folder did half the job.** | It stopped new items being queued and left the rows already lined up to leave the phone exactly where they were. |
+| **Two scans could prune each other.** | A scan tags the rows it saw and deletes everything tagged older. Only foreground triggers existed before; a save, a schedule and a chain of retries make an overlap ordinary, and an overlap loses index rows for files that exist. |
+
+The shape of the fix is one place that decides what a selection change means —
+`domain/usecase/ApplyBackupSelectionUseCase.kt`, which both onboarding's picker and the Settings screen now
+call — plus `releaseUnsentOutside` on the queue, a resume rule on the pass, a one-shot scan on its own unique
+WorkManager name, and a single-flight mutex around `sync()`.
+
+Two rules kept their shape on purpose. A withdrawal only ever touches rows still waiting to be claimed:
+nothing claimed, sent, failed or cancelled is altered, and no Telegram message is — a `backed_up` row is a
+record of something that happened, not a queue entry to be tidied. And the immediate scan is a *scan*: the
+bytes still leave through the existing worker under the existing Wi-Fi and charging constraints, so there is
+one upload pipeline, one set of identity and duplicate rules, and a hand-tapped backup still waits for a
+connection and nothing more.
+
+**Not verified on a device.** Whether a folder's photos actually land in the LumoVault Backup channel, whether
+Android runs the periodic pass on a given vendor's battery policy, and whether a photo taken while the app
+was closed appears within the next six hours are device questions, and they are still that. What the tests
+cover is the decisions: that a save schedules and triggers, that scope admits and excludes the right items,
+that a selection change withdraws the unsent and only the unsent, that a window bigger than one batch drains,
+that a denied permission leaves the queue waiting rather than finished, and that the unattended send waits for
+exactly what the user ticked.
 
 ## Video playback is Media3, with LumoVault's own guards
 

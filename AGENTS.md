@@ -117,6 +117,11 @@ Rules that have already caused a mistake here:
   hand-tapped backup into the chain the unattended pass already occupies, and a chain waits for the
   constraints of the work inside it — so "Wi-Fi only" began blocking a backup the user started on mobile
   data, which is the one thing `BackupPreferences` promises cannot happen.
+- **A member added to a repository interface is a compile error at every fake, and CI names one.**
+  `RunBackupQueueUseCaseTest`'s queue stub and `FakeBackupQueueDao` are two implementations of the same pair of
+  interfaces; the build stopped at the first. Grep `: <InterfaceName>` across `app/src/test` before pushing an
+  interface change, and answer with the stub the pass under test does not exercise (`0` with a sentence about
+  where the rule *is* asserted), never with a copy of the real logic.
 - **A settings write that changes what background work should do must re-decide the schedule in the same
   call, and ask for a pass.** Saving a folder selection wrote `selected_folders` and `backup_enabled` and
   nothing else: the periodic pass had been installed (or cancelled) under the previous answer, so what the
