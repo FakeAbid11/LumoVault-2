@@ -1,7 +1,10 @@
 package com.lumovault.app.ui.screens.albums
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,6 +101,9 @@ fun AlbumDetailScreen(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result -> viewModel.onDeletionResult(result.resultCode) }
 
+    // Back leaves selection mode rather than the album, matching the Photos grid.
+    BackHandler(enabled = state.selection.isNotEmpty()) { viewModel.clearSelection() }
+
     val isTrash = state.systemAlbum == SystemAlbum.Trash
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -104,7 +111,7 @@ fun AlbumDetailScreen(
             title = state.userAlbum?.name
                 ?: state.systemAlbum?.let { stringResource(it.titleRes) }
                 ?: state.folderName.orEmpty(),
-            itemCount = state.items.size,
+            itemCount = state.items?.size ?: 0,
             isUserAlbum = state.isUserAlbum,
             explainer = state.systemAlbum?.let { album ->
                 when (album) {
@@ -125,17 +132,29 @@ fun AlbumDetailScreen(
             NoticeBanner(stringResource(R.string.trash_delete_unsupported))
         }
 
-        MediaGrid(
-            items = state.items,
-            favoriteIds = state.favoriteIds,
-            selection = state.selection,
-            onCellClick = { mediaId ->
-                if (state.selection.isEmpty()) onOpenMedia(mediaId) else viewModel.onCellClick(mediaId)
-            },
-            onCellLongClick = viewModel::onCellLongClick,
-            onLoadMore = viewModel::loadMore,
-            modifier = Modifier.weight(1f),
-        )
+        val loadedItems = state.items
+        if (loadedItems == null) {
+            // Room has not answered yet. "No items" here would be a false claim on every album open,
+            // and a failed load would be indistinguishable from an empty album.
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            MediaGrid(
+                items = loadedItems,
+                favoriteIds = state.favoriteIds,
+                selection = state.selection,
+                onCellClick = { mediaId ->
+                    if (state.selection.isEmpty()) onOpenMedia(mediaId) else viewModel.onCellClick(mediaId)
+                },
+                onCellLongClick = viewModel::onCellLongClick,
+                onLoadMore = viewModel::loadMore,
+                modifier = Modifier.weight(1f),
+            )
+        }
 
         if (state.selection.isNotEmpty()) {
             AlbumActionBar(
@@ -147,9 +166,9 @@ fun AlbumDetailScreen(
                 onUnfavorite = { viewModel.setFavorite(false) },
                 onArchive = { viewModel.setArchived(true) },
                 onUnarchive = { viewModel.setArchived(false) },
-                onTrash = viewModel::moveToTrash,
+                onTrash = { confirming = Confirmation.MoveToTrash },
                 onRestore = viewModel::restoreFromTrash,
-                onRemoveFromAlbum = viewModel::removeFromAlbum,
+                onRemoveFromAlbum = { confirming = Confirmation.RemoveFromAlbum },
                 onDeleteForever = { confirming = Confirmation.DeleteForever },
             )
         }
@@ -221,12 +240,36 @@ fun AlbumDetailScreen(
             },
         )
 
+        // The same confirmation the viewer shows for one item: trashing a selection is the same act
+        // at a larger scale, and neither has an undo from this screen.
+        Confirmation.MoveToTrash -> ConfirmDialog(
+            title = R.string.viewer_trash_title,
+            body = R.string.viewer_trash_body,
+            action = R.string.organization_trash_action,
+            onDismiss = { confirming = null },
+            onConfirm = {
+                confirming = null
+                viewModel.moveToTrash()
+            },
+        )
+
+        Confirmation.RemoveFromAlbum -> ConfirmDialog(
+            title = R.string.album_remove_confirm_title,
+            body = R.string.album_remove_confirm_body,
+            action = R.string.album_remove_from_album_action,
+            onDismiss = { confirming = null },
+            onConfirm = {
+                confirming = null
+                viewModel.removeFromAlbum()
+            },
+        )
+
         null -> Unit
     }
 }
 
 /** What the user has agreed to, between the confirmation and the action. */
-private enum class Confirmation { DeleteAlbum, DeleteForever, EmptyTrash }
+private enum class Confirmation { DeleteAlbum, DeleteForever, EmptyTrash, MoveToTrash, RemoveFromAlbum }
 
 @Composable
 private fun AlbumHeader(
@@ -373,7 +416,11 @@ private fun AlbumActionBar(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            // Scrollable rather than compressed: Trash plus six organisation marks plus a count and a
+            // Clear do not fit a narrow phone, and squeezing them shrinks every tap target at once.
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {

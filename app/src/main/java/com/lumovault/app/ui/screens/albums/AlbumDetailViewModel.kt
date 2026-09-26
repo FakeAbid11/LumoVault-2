@@ -37,7 +37,8 @@ import kotlinx.coroutines.launch
 data class AlbumDetailUiState(
     val userAlbum: Album? = null,
     val systemAlbum: SystemAlbum? = null,
-    val items: List<Media> = emptyList(),
+    /** Null until Room's first answer: an empty album and an unqueried one mean opposite things. */
+    val items: List<Media>? = null,
     val favoriteIds: Set<Long> = emptySet(),
     val memberIds: Set<Long> = emptySet(),
     val selection: Set<Long> = emptySet(),
@@ -66,9 +67,9 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     private val loadedLimit = MutableStateFlow(WINDOW_START)
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
 
-    private val items: StateFlow<List<Media>> = combine(target, loadedLimit) { value, limit -> value to limit }
+    private val items: StateFlow<List<Media>?> = combine(target, loadedLimit) { value, limit -> value to limit }
         .flatMapLatest { (value, limit) -> contentsOf(value, limit) }
-        .stateIn(viewModelScope, STOP_POLICY, emptyList())
+        .stateIn(viewModelScope, STOP_POLICY, null)
 
     private val userAlbum = target.flatMapLatest { value ->
         if (value is AlbumTarget.User) {
@@ -79,12 +80,16 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private val favoriteIds = items.flatMapLatest { list ->
-        container.mediaOrganizationRepository.observeFavoritesWithin(list.map(Media::id))
+        if (list == null) {
+            flowOf(emptySet())
+        } else {
+            container.mediaOrganizationRepository.observeFavoritesWithin(list.map(Media::id))
+        }
     }
 
     /** Which of the loaded window this album already holds, for the add-media sheet's ticks. */
     private val memberIds = combine(target, items) { value, list ->
-        value to list.map { it.id }
+        value to (list?.map { it.id } ?: emptyList())
     }.flatMapLatest { (value, ids) ->
         if (value is AlbumTarget.User && ids.isNotEmpty()) {
             flow { emit(container.albumRepository.membersWithin(value.albumId, ids).toSet()) }
@@ -201,7 +206,7 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         if (chosen.isEmpty()) return
         requestDeletion(
             ids = chosen,
-            uris = urisForIds(items.value, chosen),
+            uris = urisForIds(items.value.orEmpty(), chosen),
             launch = launch,
             onUnsupported = onUnsupported,
         )
@@ -301,7 +306,7 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     private fun urisForIds(items: List<Media>, ids: Set<Long>): List<String> =
         items.filter { it.id in ids }.map { it.contentUri }
 
-    private suspend fun contentsOf(target: AlbumTarget?, limit: Int) = when (target) {
+    private suspend fun contentsOf(target: AlbumTarget?, limit: Int): Flow<List<Media>?> = when (target) {
         is AlbumTarget.User -> container.albumRepository.observeContents(target.albumId, limit)
         is AlbumTarget.System -> container.mediaOrganizationRepository.observeContents(target.album, limit)
 
@@ -310,7 +315,9 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         is AlbumTarget.LocalFolder ->
             container.mediaOrganizationRepository.observeLocalFolderContents(target.relativePath, limit)
 
-        null -> flowOf<List<Media>>(emptyList())
+        // Null, not an empty list: nothing has been asked yet, and "no items" would be a false claim
+        // until the first answer arrives.
+        null -> flowOf(null)
     }
 
     private fun toggle(mediaId: Long) {
