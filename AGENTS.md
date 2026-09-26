@@ -129,6 +129,16 @@ Rules that have already caused a mistake here:
   1.11.0 does not either; the collection overload is the ordinary `combine(flows) { Array<T> -> R }`, while
   `debounce` is still `@FlowPreview` and `sample` is not.
 
+- **An empty Telegram answer is not an answer about Telegram.** `searchChats` is *offline*: on a fresh
+  install TDLib knows no chats, so it returns nothing, and `SynchronizeCloudUseCase` used to read that as
+  "this account has no storage channel" and create one — orphaning every backup in the real channel, which
+  no later sync repairs because the association now points at the empty new one. Discovery therefore returns
+  found / conclusively-absent / could-not-conclude, and only the middle one may create anything. Absence means
+  `loadChats` reported its documented 404 *and* `searchChatsOnServer` answered cleanly in the same round.
+  Related: TDLib's two request classes that share a field name have no common typed supertype — building
+  `if (x) TdApi.SearchChatsOnServer() else TdApi.SearchChats()` and then setting `.query` does not compile,
+  because the inferred type is `Function` and `Function` has no fields.
+
 - **Grep back every `R.string` you add; an unreferenced one is usually an unwired feature.** AAPT does not
   complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
   build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was

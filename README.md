@@ -470,6 +470,48 @@ splitting it would hide files from the dialog that the dialog exists to show; an
 recorded but never drawn — the failure copy exists in `strings.xml` with no screen reading it, which is a
 product decision rather than a hardening one.
 
+## Reinstall recovery — finding the channel that already exists
+
+A fresh install has nothing: no Room file, no DataStore, no TDLib database, no saved association. The only
+record of what was ever backed up is the Telegram account and the private "LumoVault Backup" channel inside
+it — so the first thing a reinstall has to get right is *finding that channel instead of building a new one*.
+
+That is `SynchronizeCloudUseCase`, and the rule it now enforces is that **an empty answer is not the same
+answer as absence**. Discovery runs in bounded rounds, and each round asks three things of TDLib:
+
+- `searchChatsOnServer` — Telegram searching *this account's* own chats. This is what reaches a channel that
+  the fresh local database has never heard of. It is not `searchPublicChats`, which is the internet's channel
+  directory and could return a stranger's channel that merely shares the name; nothing in LumoVault calls it,
+  and the storage channel stays private with no username, no publish step and nothing for a user to type in.
+- `loadChats` — drives TDLib's chat list forward from the server, and its documented 404 is the only answer
+  that says the list is complete.
+- `searchChats` — TDLib's offline search, kept because on a warm cache it is one request and it is enough.
+
+The outcome is a three-way choice, and only one of them may create anything:
+
+| Discovery said | What happens |
+| --- | --- |
+| `Found(chatId)` | adopted after the full check, association saved, history scanned |
+| `Absent` | list complete *and* the server answered cleanly in the same round — one channel is created |
+| `InProgress` | TDLib still loading, or Telegram refused/paused/lost the request — retryable, and creation is refused |
+
+A candidate is still adopted only on evidence, never on a name: broadcast type, this account's ownership and
+a supported marker, each of which has a rejection case of its own. If two channels pass all of that — which
+is what the old bug leaves behind — the one holding messages wins deterministically, ties break to the lower
+chat id, and the other channel is left exactly as it was: nothing is deleted, migrated or renamed.
+
+`logcat -s LumoVaultCloudRecovery` says which of these happened: `CLOUD_CHANNEL_ASSOCIATION_FOUND` (the saved
+channel was reused, no search at all), `CLOUD_CHANNEL_DISCOVERY_STARTED`, `_CANDIDATE_FOUND`, `_VALIDATED`,
+`_AMBIGUOUS`, `_ABSENT`, `_DISCOVERY_RETRY`, `_CREATION_ALLOWED`, `_CREATED`. Chat ids and event names only —
+never a chat title, a path, a phone number or a TDLib object.
+
+**Not verified on a device.** This is exactly the kind of fix that unit tests can describe and only Telegram
+can settle: that `searchChatsOnServer` answers for a freshly-created private channel on a brand-new TDLib
+database, and that the rounds are enough patience on a real network. Fifteen tests cover the state machine —
+seven at the TDLib boundary in `TdLibCloudRepositoryTest`, eight in the use case —
+adopt-over-impostor, retry-until-found, conclusive absence, failed search never read as absence, two-channel
+resolution, cancellation leaving nothing behind — and none of them is a phone.
+
 ## Telegram status — what is real and what is deferred
 
 The client is TDLib, behind interfaces, over TDLib's **own Java binding** rather than its JSON one:
