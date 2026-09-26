@@ -40,8 +40,12 @@ sealed interface QueueRun {
     data object TelegramUnavailable : QueueRun
 }
 
-/** What became of one claimed item. */
-private enum class ItemRun { Sent, Deduplicated, Failed }
+/** What became of one claimed item. A failure carries its kind, because [QueueRun.Done.deferred] is a promise about retryable work only. */
+private sealed interface ItemRun {
+    data object Sent : ItemRun
+    data object Deduplicated : ItemRun
+    data class Failed(val kind: BackupFailureKind) : ItemRun
+}
 
 /**
  * Drains the backup queue: claim one item, put its bytes where TDLib can read them, send them as the
@@ -86,6 +90,11 @@ class RunBackupQueueUseCase(
         // Bounded by the queue itself: one entry per item this pass was refused, which is also the
         // worst case for how long the loop can run.
         val deferred = mutableSetOf<Long>()
+        // Only a *retryable* refusal may raise [QueueRun.Done.deferred]: the flag is the worker's
+        // signal to ask WorkManager for another pass, and a pass over items that failed because the
+        // file is gone or the space is not there cannot make progress — scheduling one is a loop with
+        // backoff instead of an answer.
+        var awaitingRetry = false
 
         while (true) {
             coroutineContext.ensureActive()
@@ -97,17 +106,18 @@ class RunBackupQueueUseCase(
                 break
             }
 
-            when (send(chatId, request, onProgress)) {
+            when (val outcome = send(chatId, request, onProgress)) {
                 ItemRun.Sent -> sent++
                 ItemRun.Deduplicated -> deduplicated++
-                ItemRun.Failed -> {
+                is ItemRun.Failed -> {
                     failed++
                     deferred += request.mediaStoreId
+                    if (outcome.kind.retryable) awaitingRetry = true
                 }
             }
         }
 
-        return QueueRun.Done(sent, failed, deferred = deferred.isNotEmpty(), deduplicated = deduplicated)
+        return QueueRun.Done(sent, failed, deferred = awaitingRetry, deduplicated = deduplicated)
     }
 
     /** Withdraws everything still waiting. An in-flight send is left to finish on its own. */
@@ -127,7 +137,7 @@ class RunBackupQueueUseCase(
         val staged = when (val source = stager.stage(request.contentUri, request.displayName)) {
             is StagedSource.Unavailable -> {
                 queue.release(request, source.failure)
-                return ItemRun.Failed
+                return ItemRun.Failed(source.failure.kind)
             }
 
             is StagedSource.Ready -> source
@@ -161,7 +171,7 @@ class RunBackupQueueUseCase(
         ) {
             is UploadIdentity.Unreadable -> {
                 queue.release(request, identity.failure)
-                return ItemRun.Failed
+                return ItemRun.Failed(identity.failure.kind)
             }
 
             is UploadIdentity.AlreadyStored -> {
@@ -206,7 +216,7 @@ class RunBackupQueueUseCase(
 
             is UploadEvent.Refused -> {
                 queue.release(request, terminal.failure)
-                ItemRun.Failed
+                ItemRun.Failed(terminal.failure.kind)
             }
 
             // Nothing terminal came back — either the flow ended silently or it stopped on a progress
@@ -214,7 +224,7 @@ class RunBackupQueueUseCase(
             // is the honest answer rather than a failure invented on its behalf.
             null, is UploadEvent.Progress -> {
                 queue.release(request, BackupFailure(BackupFailureKind.Unknown))
-                ItemRun.Failed
+                ItemRun.Failed(BackupFailureKind.Unknown)
             }
         }
     }

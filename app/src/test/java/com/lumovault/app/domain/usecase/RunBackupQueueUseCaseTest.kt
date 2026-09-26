@@ -156,7 +156,11 @@ class RunBackupQueueUseCaseTest {
 
         val outcome = useCase().run()
 
-        assertEquals(QueueRun.Done(sent = 0, failed = 1, deferred = true), outcome)
+        assertEquals(
+            "`deferred` is the retry signal, and a file that is gone cannot arrive on a second pass",
+            QueueRun.Done(sent = 0, failed = 1, deferred = false),
+            outcome,
+        )
         assertEquals(0, upload.started)
         assertEquals(emptyList<Pair<Long, Long>>(), queue.backedUp)
         assertEquals(BackupFailureKind.SourceMissing, queue.released.single().second.kind)
@@ -195,7 +199,11 @@ class RunBackupQueueUseCaseTest {
 
         val outcome = useCase().run()
 
-        assertEquals(QueueRun.Done(sent = 1, failed = 1, deferred = true), outcome)
+        assertEquals(
+            "Telegram's own refusal is not retryable, so nothing here asks for another pass",
+            QueueRun.Done(sent = 1, failed = 1, deferred = false),
+            outcome,
+        )
         assertEquals(listOf(1L), queue.released.map { it.first.mediaStoreId })
         assertEquals(listOf(CHANNEL to 9002L), queue.backedUp)
     }
@@ -222,7 +230,12 @@ class RunBackupQueueUseCaseTest {
 
         val outcome = useCase().run()
 
-        assertEquals(QueueRun.Done(sent = 0, failed = 1, deferred = true), outcome)
+        assertEquals(
+            "no space for the copy is a fact about the device, not a network hiccup — another pass " +
+                "scheduled against it would find the same full disk",
+            QueueRun.Done(sent = 0, failed = 1, deferred = false),
+            outcome,
+        )
         assertEquals(
             "the row was claimed but never reached the send",
             listOf(UploadState.Preparing),

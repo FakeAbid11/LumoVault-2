@@ -28,9 +28,12 @@ class TdLibClientTest {
     }
 
     @Test
-    fun `a request before start is refused rather than quietly queued`() {
+    fun `a request in a build without TDLib is refused rather than quietly queued`() {
         val client = TdLibClient(fakeCredentials())
 
+        // `request` starts the client itself — that is what lets the unattended backup work in a fresh
+        // process — so what a build without the binary has to see is `start()`'s refusal arriving
+        // through the request, not an UnsatisfiedLinkError and not a silently dropped question.
         val error = runBlocking { runCatching { client.request(TdApi.GetMe()) }.exceptionOrNull() }
 
         assertTrue(error is IllegalStateException)

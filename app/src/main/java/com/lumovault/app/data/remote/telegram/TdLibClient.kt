@@ -61,6 +61,12 @@ class TdLibClient(
         function: TdApi.Function<T>,
         timeoutMillis: Long,
     ): T {
+        // A request is its own moment of need. Sign-in used to be the only door that called `start()`,
+        // which left the unattended path dead whenever WorkManager ran in a fresh process: every queued
+        // item failed with "not started" until the user happened to open a Telegram screen. `start()`
+        // is idempotent under its mutex, and in a build without TDLib its `check(isUsable)` refuses
+        // with the same clarity the old throw did.
+        start()
         val target = client ?: throw IllegalStateException("TDLib client has not been started")
         val response = CompletableDeferred<TdApi.Object>()
 
