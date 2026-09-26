@@ -65,6 +65,19 @@ itself to where the photos are, and shipped with no tile host; all three are fix
 `onDetach` clearing is now survived by a re-attach. Whether the map actually draws — tiles, markers, a pan
 that stays where it was left — is still a device question and is not claimed.
 
+**Viewer swipe and date rail:** complete and CI-verified (runs
+[36236080383](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36236080383) — red, two imports missing
+from files that were otherwise finished — and
+[36236222320](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36236222320), 512 unit tests, 0 failed,
+debug APK built with both TDLib ABIs packaged). A zoomed photo used to swallow every horizontal swipe at every
+scale, including 1×, because `Modifier.transformable` treats a single finger past the touch slop as pan motion and
+then consumes the rest of the gesture the pager is waiting on; `canPan` now gates that claim on the scale the
+gesture itself writes, so the flag the viewer carried alongside it was deleted rather than synchronised. The
+timeline gained a month-per-tick date rail that owns no scroll position and no list — it converts a finger's
+height into an index on the `LazyGridState` that was already there, and the arithmetic is in
+`domain/model/TimelineRail.kt` where the tests can reach it. Swiping between pages, panning a zoomed photo and
+dragging the rail on a phone are **not** verified.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
