@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A notification small icon must be monochrome and alpha-only, so this is drawn as plain geometry
+    rather than borrowing a Material glyph's path data from memory: a mistyped path still compiles and
+    only shows up as a blank square on a device, which is the worst possible time to find out.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3 L5,11 L10,11 L10,17 L14,17 L14,11 L19,11 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,19 L20,19 L20,21 L4,21 Z" />
+</vector>

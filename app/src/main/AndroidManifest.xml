@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Telegram is reached over the network; no media or notification permission is declared
+         here that the runtime does not also request. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Phase 2 asks for media access per Android's current model (PRD section 38.1): typed media
+        permissions from API 33, the user-selected subset from API 34, and the broad read permission
+        only for the API 26-32 devices that still need it. Battery optimisation is NOT a runtime
+        permission: the setup card opens the system page.
+
+        ACCESS_MEDIA_LOCATION is a media permission, not the device-location one, and it is the only way
+        Android will hand over a photo's own GPS coordinates: without it MediaProvider strips them before
+        the file reaches the app. It is declared here because the photo map is a core PRD feature (section
+        29) and cannot exist without it — but it is deliberately NOT part of the onboarding ask, and is
+        requested only from inside the Map screen, once, and only when there is a library to place.
+        ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION remain absent: LumoVault never wants to know where
+        the phone is, only where a photograph says it was taken (PRD section 30).
+    -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Optional on purpose: skipping it must not block onboarding (PRD section 38.2). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        A backup that outlives the screen needs a foreground service, and from API 34 a service only
+        gets one by declaring which kind it is. `dataSync` is the honest answer for an upload queue.
+        FOREGROUND_SERVICE, WAKE_LOCK and ACCESS_NETWORK_STATE arrive with androidx.work itself, so
+        they are not repeated here.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!--
+        Needed to ask, under Android 11+ package visibility, whether this device offers the battery
+        optimisation page at all — so the setup card can say "unavailable" instead of showing a
+        button that leads nowhere.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
+        </intent>
+    </queries>
+
+    <!--
+        Backup rules are meaningful now that TDLib writes a session to app-private storage: the
+        session must never leave the device, while the harmless settings row may.
+    -->
+    <application
+        android:name=".LumoVaultApplication"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.LumoVault">
+
+        <!--
+            WorkManager's own foreground service ships without a type, and Android 14+ refuses to
+            start one that has none — the upload would fail at the moment it most needs to keep going.
+            Merging the attribute in is the supported fix; the service class is the library's.
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
+        <!--
+            The library's manifest starts WorkManager through AndroidX Startup. Removing that entry
+            hands initialisation to LumoVaultApplication's Configuration.Provider instead, which is the
+            only way a worker can be given the AppContainer it needs — a worker built by the default
+            factory could only reach for its dependencies globally, and this app's container is created
+            per process.
+
+            It has to sit inside <application>: a provider is an application component, and AAPT
+            rejects it as a direct child of <manifest>.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

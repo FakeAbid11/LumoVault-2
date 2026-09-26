@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Only the pre-Compose window surface. Compose owns every colour the UI actually reads;
+    this exists so the launch frame is already the right tone instead of flashing white.
+-->
+<resources>
+    <style name="Theme.LumoVault" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFFFFFF</item>
+    </style>
+</resources>

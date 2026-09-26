@@ -1,0 +1,126 @@
+name: Build TDLib native libraries
+
+# Deliberately manual, and deliberately not part of build.yml.
+#
+# Builds TDLib's Android *Java interface* from pinned upstream source, which yields the two things
+# LumoVault's Telegram layer needs: libtdjni.so per ABI, and the generated org.drinkless.tdlib
+# Java sources (Client.java, TdApi.java). This is the KeepMe-style integration - TDLib's own JNI
+# binding - so the app never compiles TDLib and never carries a hand-written shim.
+#
+# Provenance: pinned revision, TDLib's own example/android Dockerfile, SHA-256 recorded over both the
+# .so and the .java files, ELF class/machine asserted against the ABI. Nothing is committed to Git;
+# build.yml downloads these artifacts from this workflow's run and places the .so files in jniLibs and
+# the .java files on a source path before it assembles.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tdlib_commit:
+        description: TDLib commit to build (full 40-character SHA)
+        required: true
+        # Verified as of 2026-09-25; the Java interface at this revision is what the Telegram layer is
+        # written against. It must be complete: actions/checkout only treats `ref` as a commit at 40
+        # hex characters, and the short form was fetched as a branch name and failed every job.
+        default: ea97bcdd3a15523c58ddfe772b4547187cf5bbeb
+      abis:
+        description: Comma-separated ABIs
+        required: false
+        default: arm64-v8a,armeabi-v7a
+
+env:
+  # TDLib's own example builds one .so per ABI with this NDK; the version is what its
+  # example/android/build-tdlib.sh expects by default.
+  ANDROID_NDK_VERSION: 23.2.8568313
+
+permissions:
+  contents: read
+
+jobs:
+  tdlib:
+    name: Build libtdjni for ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a]
+    steps:
+      # This checkout is only the build context: the Dockerfile clones TDLib itself at the pinned
+      # revision, so nothing here compiles from the tree above.
+      - uses: actions/checkout@v5
+        with:
+          repository: tdlib/td
+          ref: ${{ github.event.inputs.tdlib_commit }}
+          path: td
+
+      - name: Build TDLib with the Java interface
+        # example/android/Dockerfile is the context root: it COPYs fetch-sdk.sh and build-openssl.sh
+        # from its own directory, so `docker build .` from the repository top level has no Dockerfile
+        # to read. It also clones TDLib itself at COMMIT_HASH, which is why the pinned revision is
+        # passed here rather than taken from the checkout above.
+        run: |
+          set -euo pipefail
+          cd td/example/android
+          docker build \
+            --build-arg COMMIT_HASH="${{ github.event.inputs.tdlib_commit }}" \
+            --build-arg TDLIB_INTERFACE=Java \
+            --output "$GITHUB_WORKSPACE/tdlib-out" .
+          ls -la "$GITHUB_WORKSPACE/tdlib-out"
+
+      - name: Unpack the produced libraries
+        # The Dockerfile's final stage exports tdlib.zip and tdlib-debug.zip.
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/unpacked"
+          unzip -o "$GITHUB_WORKSPACE/tdlib-out/tdlib.zip" -d "$GITHUB_WORKSPACE/unpacked" >/dev/null
+          find "$GITHUB_WORKSPACE/unpacked" \( -name 'libtdjni.so' -o -name 'Client.java' -o -name 'TdApi.java' \) -printf '%p %s\n'
+
+      # No LumoVault JNI forwarder is built any more: TDLib's Java interface ships its own
+      # libtdjni.so with the matching native bindings generated alongside TdApi.java, so a hand-written
+      # shim over TDLib's JSON interface would be a second, competing Telegram implementation.
+      - name: Verify the artifacts match the interface they claim to be
+        run: |
+          set -euo pipefail
+          ABI="${{ matrix.abi }}"
+          # Everything is located with find rather than assumed paths: the zip's internal layout is
+          # TDLib's to change, and a wrong guess here only shows up 45 minutes into a build.
+          LIB="$(find "$GITHUB_WORKSPACE/unpacked" -name 'libtdjni.so' -path "*$ABI*" | head -n1)"
+          test -n "$LIB" || { echo "no libtdjni.so for $ABI"; exit 1; }
+          TDAPI="$(find "$GITHUB_WORKSPACE/unpacked" -name 'TdApi.java' | head -n1)"
+          test -n "$TDAPI" || { echo "TdApi.java missing - not the Java interface build"; exit 1; }
+          # ELF class and machine must match the ABI, or the APK fails to load the library at runtime.
+          python3 - "$LIB" "$ABI" <<'PY'
+          import struct, sys
+          path, abi = sys.argv[1], sys.argv[2]
+          data = open(path, 'rb').read(20)
+          assert data[:4] == b'\x7fELF', 'not an ELF file'
+          ei_class, machine = data[4], struct.unpack_from('<H', data, 18)[0]
+          expect = {'arm64-v8a': (2, 183), 'armeabi-v7a': (1, 40)}[abi]
+          print(f'{abi}: ELF class {ei_class} (want {expect[0]}), e_machine {machine} (want {expect[1]})')
+          assert (ei_class, machine) == expect, f'{abi}: wrong ELF architecture'
+          PY
+          mkdir -p "$GITHUB_WORKSPACE/out/$ABI"
+          cp "$LIB" "$GITHUB_WORKSPACE/out/$ABI/"
+          # No libc++_shared.so is copied: ANDROID_STL defaults to c++_static, so TDLib links the C++
+          # runtime in and there is nothing extra to package.
+          ls -la "$GITHUB_WORKSPACE/out/$ABI"
+
+      - name: Record checksums
+        # Checksums cover the Java sources too, not just the .so: the generated TdApi.java and the
+        # native library must be provably from the same TDLib revision, or they can disagree silently.
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/out"
+          mkdir -p java/org/drinkless/tdlib
+          find "$GITHUB_WORKSPACE/unpacked" -path "*org/drinkless/tdlib/*.java" \
+            -exec cp {} java/org/drinkless/tdlib/ \;
+          ls -la java/org/drinkless/tdlib
+          find . -type f \( -name '*.so' -o -name '*.java' \) -exec sha256sum {} \; | sort -k2 | tee SHA256SUMS
+          echo "TDLib revision: ${{ github.event.inputs.tdlib_commit }}" | tee -a SHA256SUMS
+          echo "TDLib interface: Java (libtdjni.so + generated TdApi.java)" | tee -a SHA256SUMS
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: tdlib-android-${{ matrix.abi }}
+          path: ${{ github.workspace }}/out/
+          retention-days: 365
+          if-no-files-found: error

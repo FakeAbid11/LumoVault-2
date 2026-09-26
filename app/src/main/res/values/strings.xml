@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LumoVault</string>
+
+    <string name="nav_photos">Photos</string>
+    <string name="nav_albums">Albums</string>
+    <string name="nav_cloud">Cloud</string>
+    <string name="nav_map">Map</string>
+
+
+    <!-- Photos library (Phase 3) -->
+    <string name="photos_empty_title">No photos yet</string>
+    <string name="photos_date_rail">Jump to a month in your library</string>
+    <string name="photos_empty_body">Photos, videos and GIFs on this device will appear here.</string>
+    <string name="photos_permission_title">Allow photo access</string>
+    <string name="photos_permission_body">LumoVault needs access to your photos and videos to show your library.</string>
+    <string name="photos_permission_action">Allow access</string>
+    <string name="photos_scanning_title">Scanning your library</string>
+    <string name="photos_scanning_progress">%1$d items found</string>
+    <string name="photos_error_title">Couldn\'t load your library</string>
+    <string name="photos_error_body">Something went wrong while reading your device media.</string>
+    <string name="photos_limited_access_notice">Only the photos you selected are shown.</string>
+    <string name="photos_limited_access_action">Choose more</string>
+    <string name="day_today">Today</string>
+    <string name="day_yesterday">Yesterday</string>
+    <string name="media_kind_photo">Photo</string>
+    <string name="media_kind_video">Video</string>
+    <string name="media_kind_gif">GIF</string>
+    <string name="media_badge_gif">GIF</string>
+
+    <string name="theme_toggle">Switch theme</string>
+    <string name="back">Back</string>
+
+    <!-- Screen 1: Welcome -->
+    <string name="welcome_tagline">Your photos.\nYour storage.</string>
+    <string name="welcome_description">Private photo, video and GIF backup using your Telegram account.</string>
+    <string name="welcome_action">Get started</string>
+
+    <!-- Screen 2: How it works -->
+    <string name="how_title">How LumoVault works</string>
+    <string name="how_your_phone">Your phone</string>
+    <string name="how_your_cloud">LumoVault Backup on Telegram</string>
+    <string name="how_point_local">Your media stays on this device.</string>
+    <string name="how_point_backup">LumoVault copies what you choose into your own Telegram storage.</string>
+    <string name="how_point_cloud">Cloud lets you browse that library from anywhere.</string>
+    <string name="how_point_originals">Originals download only when you ask for them.</string>
+    <string name="how_action">Continue</string>
+
+    <!-- Screen 3: Connect Telegram -->
+    <string name="connect_title">Connect Telegram</string>
+    <string name="connect_description">Connect your Telegram account to use it as your private cloud storage.</string>
+    <string name="connect_phone_label">Phone number</string>
+    <string name="connect_action">Continue</string>
+    <string name="connect_country_description">Choose your country</string>
+    <string name="connect_not_configured">This build cannot reach Telegram yet.</string>
+    <string name="connect_not_configured_detail">LumoVault was compiled without the Telegram library or API credentials, so signing in is unavailable. Setup can continue now and the account can be connected later.</string>
+    <string name="connect_restoring">Checking your Telegram session…</string>
+
+    <!-- Verification code -->
+    <string name="code_title">Enter verification code</string>
+    <string name="code_description">We sent a verification code to your Telegram account.</string>
+    <string name="code_description_destination">We sent a verification code to …%1$s.</string>
+    <string name="code_description_call">Telegram is calling you with a verification code.</string>
+    <string name="code_label">Code</string>
+    <string name="code_action">Confirm</string>
+    <string name="code_resend">Resend code</string>
+    <string name="code_change_number">Change number</string>
+
+    <!-- Two-step verification -->
+    <string name="password_title">Two-step verification</string>
+    <string name="password_description">Enter your Telegram password to continue.</string>
+    <string name="password_hint_label">Password</string>
+    <string name="password_action">Continue</string>
+
+    <!-- Authentication failures -->
+    <string name="error_phone_invalid">That phone number doesn\'t look right.</string>
+    <string name="error_phone_invalid_detail">Check the country code and number, then try again.</string>
+    <string name="error_code_invalid">That code is incorrect.</string>
+    <string name="error_code_invalid_detail">Please check the code and try again.</string>
+    <string name="error_code_expired">The code expired.</string>
+    <string name="error_code_expired_detail">Request a new code and try again.</string>
+    <string name="error_password_incorrect">That password is incorrect.</string>
+    <string name="error_password_incorrect_detail">Take a moment and try again, or reset it in Telegram.</string>
+    <string name="error_rate_limited">Too many attempts right now.</string>
+    <string name="error_rate_limited_detail">Telegram is asking you to wait about %1$s before trying again.</string>
+    <string name="error_network">Couldn\'t connect to Telegram.</string>
+    <string name="error_network_detail">Check your internet connection and try again.</string>
+    <string name="error_no_account">That number has no Telegram account.</string>
+    <string name="error_no_account_detail">LumoVault backs up to an existing Telegram account.</string>
+    <string name="error_session_invalid">Your Telegram session is no longer valid.</string>
+    <string name="error_session_invalid_detail">Sign in again to reconnect your cloud library.</string>
+    <string name="error_unexpected">Something went wrong.</string>
+    <string name="error_unexpected_detail">Telegram didn\'t finish the request. Please try again.</string>
+    <string name="error_retry">Try again</string>
+    <string name="code_length_hint">Enter the %1$d-digit code Telegram sent.</string>
+    <string name="duration_short">a moment</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_seconds">%1$d s</string>
+
+    <!-- Screen 4: Permissions and backup setup -->
+    <string name="setup_title">Set up LumoVault</string>
+    <string name="setup_description">Three quick things, and you can skip the optional ones.</string>
+    <string name="setup_media_title">Photos and videos</string>
+    <string name="setup_media_description">Allow LumoVault to access your photos, videos and GIFs so it can find and back them up.</string>
+    <string name="setup_media_action">Allow access</string>
+    <string name="setup_media_open_settings">Open settings</string>
+    <string name="setup_notifications_title">Notifications</string>
+    <string name="setup_notifications_description">Get notified when backup starts, finishes, or needs attention.</string>
+    <string name="setup_notifications_action">Allow notifications</string>
+    <string name="setup_notifications_not_now">Not now</string>
+    <string name="setup_notifications_not_required">This Android version doesn\'t ask for notification permission.</string>
+    <string name="setup_background_title">Background backup</string>
+    <string name="setup_background_description">For reliable automatic backup, LumoVault may need to run without battery restrictions.</string>
+    <string name="setup_background_action">Check settings</string>
+    <string name="setup_background_later">I\'ll do this later</string>
+    <string name="setup_background_unavailable">This device doesn\'t offer a battery setting LumoVault can open.</string>
+    <string name="setup_action">Continue</string>
+
+    <string name="status_done">Done</string>
+    <string name="status_allowed">Allowed</string>
+    <string name="status_partly_allowed">Partly allowed</string>
+    <string name="status_skipped">Skipped</string>
+    <string name="status_not_set">Not set</string>
+    <string name="status_unavailable">Unavailable</string>
+    <string name="status_restricted">Restricted</string>
+    <string name="status_unrestricted">Unrestricted</string>
+
+    <!-- Screen 5: Backup source -->
+    <string name="source_title">What should LumoVault back up?</string>
+    <string name="source_all">All photos, videos and GIFs</string>
+    <string name="source_folders">Select folders</string>
+    <string name="source_none">Not now</string>
+    <string name="source_none_detail">You can choose later in Settings.</string>
+    <string name="source_action">Continue</string>
+    <string name="source_selected_count">%1$d folders selected</string>
+
+    <string name="folders_title">Select folders</string>
+    <string name="folders_empty_title">No folders to list yet</string>
+    <string name="folders_empty_description">Folders come from the media already indexed on this device. Your selection is saved and applied to backup as soon as the library has been scanned.</string>
+    <string name="folders_action">Continue</string>
+
+    <!-- Screen 6: Ready -->
+    <string name="ready_title">You\'re ready</string>
+    <string name="ready_telegram">Telegram connected</string>
+    <string name="ready_media">Media access</string>
+    <string name="ready_notifications">Notifications</string>
+    <string name="ready_source">Backup source selected</string>
+    <string name="ready_description">LumoVault is ready to protect your memories.</string>
+    <string name="ready_action">Start backup</string>
+    <string name="ready_note">Backup itself begins once your library has been scanned.</string>
+
+    <!-- Country selector -->
+    <string name="country_picker_title">Select country</string>
+    <string name="country_search_label">Search country</string>
+    <string name="country_search_clear">Clear search</string>
+    <string name="country_no_results">No country matches that search.</string>
+    <string name="country_result_count">%1$d countries</string>
+    <!-- Cloud library (PRD sections 24-26). The copy never claims a sync happened, and never says
+         "no photos" for a library that is merely not indexed yet. -->
+    <string name="cloud_not_available_title">Telegram isn\'t available in this build</string>
+    <string name="cloud_not_available_body">Your synced cloud library will appear here once Telegram backup is enabled in this app.</string>
+    <string name="cloud_needs_signin_title">Connect Telegram to see your cloud</string>
+    <string name="cloud_needs_signin_body">Sign in to your Telegram account from onboarding to load your LumoVault Backup library.</string>
+    <string name="cloud_preparing_title">Setting up your cloud</string>
+    <string name="cloud_step_searching">Looking for your LumoVault Backup channel…</string>
+    <string name="cloud_step_validating">Checking your cloud channel…</string>
+    <string name="cloud_step_creating">Creating your LumoVault Backup channel…</string>
+    <string name="cloud_scanning_title">Reading your cloud library</string>
+    <string name="cloud_empty_title">Your cloud is empty</string>
+    <string name="cloud_empty_body">Photos and videos you back up to LumoVault will appear here.</string>
+    <string name="cloud_error_title">Couldn\'t load your cloud</string>
+    <string name="cloud_error_body">Something went wrong while reaching Telegram. Your device photos are unaffected.</string>
+    <string name="cloud_offline_notice">You\'re offline. Showing your last synced cloud library.</string>
+    <string name="cloud_refreshing_notice">Checking for new items…</string>
+    <string name="cloud_badge_on_device">On this device</string>
+    <string name="cloud_badge_cloud_only">In cloud</string>
+    <string name="cloud_viewer_unnamed">Untitled item</string>
+    <string name="cloud_viewer_size">%1$s</string>
+    <string name="cloud_viewer_dates_from_message">dated from Telegram</string>
+    <string name="cloud_viewer_preview_shown">Showing Telegram\'s preview. The original is still in your channel.</string>
+    <string name="cloud_viewer_no_preview">No preview available for this item.</string>
+    <string name="cloud_download_action">Download to device</string>
+    <string name="cloud_viewer_close">Close</string>
+    <plurals name="cloud_items_found">
+        <item quantity="one">%1$d item found</item>
+        <item quantity="other">%1$d items found</item>
+    </plurals>
+    <plurals name="cloud_items_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+
+    <!-- Phase 5: backup. The notification and the in-app progress line read from the same queue
+         counts, so the two can never tell the user different stories about the same upload. -->
+    <string name="backup_channel_name">Backup</string>
+    <string name="backup_channel_description">Shows the backup that is running right now.</string>
+    <string name="backup_progress_title">Backing up</string>
+    <string name="backup_progress_count">%1$d of %2$d</string>
+    <string name="backup_progress_percent">%1$d%%</string>
+    <string name="backup_progress_count_and_percent">%1$d of %2$d · %3$d%%</string>
+    <string name="backup_preparing">Preparing…</string>
+    <string name="backup_uploading">Uploading %1$s</string>
+    <string name="backup_action">Back Up</string>
+    <string name="backup_selected_count">%1$d selected</string>
+    <string name="backup_cell_selected">Selected</string>
+    <string name="backup_selection_clear">Clear</string>
+    <string name="backup_cancel">Cancel</string>
+    <string name="backup_retry_failed">Retry failed</string>
+    <string name="backup_state_backed_up">Backed up</string>
+    <string name="backup_state_uploading">Uploading</string>
+    <string name="backup_state_queued">Queued</string>
+    <string name="backup_state_failed">Failed</string>
+    <string name="backup_done_title">Backup finished</string>
+    <string name="backup_error_no_channel">Set up your Telegram storage channel first.</string>
+    <string name="backup_error_unavailable">Telegram is not available in this build.</string>
+    <string name="backup_error_offline">Waiting for a connection.</string>
+    <plurals name="backup_failed_count">
+        <item quantity="one">%1$d item couldn\'t be backed up</item>
+        <item quantity="other">%1$d items couldn\'t be backed up</item>
+    </plurals>
+
+    <!-- Each one names what the user can act on, and none of them repeats a TDLib error: a raw
+         reason can quote a file name or a chat, and it is kept out of everything a user reads. -->
+    <string name="backup_failure_source_missing">This file is no longer on the device.</string>
+    <string name="backup_failure_source_unreadable">This file could not be read.</string>
+    <string name="backup_failure_insufficient_space">Not enough free space to prepare this file.</string>
+    <string name="backup_failure_channel_unavailable">The backup channel is unavailable.</string>
+    <string name="backup_failure_not_authenticated">Sign in to Telegram to continue.</string>
+    <string name="backup_failure_network">Telegram connection was interrupted.</string>
+    <string name="backup_failure_rate_limited">Telegram asked to pause. It will retry shortly.</string>
+    <string name="backup_failure_rejected">Telegram refused this file.</string>
+    <string name="backup_failure_unknown">Backup couldn\'t finish.</string>
+
+    <!--
+        Phase 8: the viewer. The details rows are labels only, because a value the file does not hold is not
+        drawn at all (PRD section 28's "never invent metadata"), and the one place a missing answer is named is
+        location — where an empty space reads as a bug rather than as a fact about the photograph.
+    -->
+    <string name="viewer_close">Close</string>
+    <string name="viewer_more_actions">More actions</string>
+    <string name="viewer_info">About this file</string>
+    <string name="viewer_details_title">File information</string>
+    <string name="viewer_gone_title">This item is no longer here</string>
+    <string name="viewer_gone_body">The photo or video was removed from this device. Your backups are unaffected.</string>
+    <string name="viewer_gone_body_empty">This album is empty now. The photos themselves are untouched.</string>
+    <string name="viewer_image_unreadable">This file couldn\'t be displayed.</string>
+    <string name="viewer_video_unavailable">This device can\'t play this clip. Your backup of it is unaffected.</string>
+    <string name="viewer_video_failed_title">Can\'t play this video</string>
+    <string name="viewer_video_failed_body">The file may be in a format this phone cannot decode, or it may no longer be where the library remembers it. Your backup and the rest of the album are unaffected.</string>
+    <string name="viewer_play">Play</string>
+    <string name="viewer_pause">Pause</string>
+
+    <string name="viewer_backup_action">Back up</string>
+    <string name="viewer_uploading">Uploading…</string>
+    <string name="viewer_backed_up">Backed up</string>
+    <string name="viewer_retry_action">Retry</string>
+
+    <string name="viewer_add_to_album">Add to album</string>
+    <string name="viewer_trash_title">Move to Trash?</string>
+    <string name="viewer_trash_body">It leaves your library and stays here on this device. Your backup isn\'t deleted.</string>
+
+    <string name="viewer_field_taken">Taken</string>
+    <string name="viewer_field_added">Added on this device</string>
+    <string name="viewer_field_location">Location</string>
+    <string name="viewer_location_none">Location unavailable</string>
+    <string name="viewer_field_camera">Camera</string>
+    <string name="viewer_field_lens">Lens</string>
+    <string name="viewer_field_focal_length">Focal length</string>
+    <string name="viewer_field_aperture">Aperture</string>
+    <string name="viewer_field_iso">ISO</string>
+    <string name="viewer_field_shutter">Shutter</string>
+    <string name="viewer_field_dimensions">Dimensions</string>
+    <string name="viewer_field_name">Name</string>
+    <string name="viewer_field_size">Size</string>
+    <string name="viewer_field_type">Type</string>
+    <string name="viewer_field_duration">Length</string>
+    <string name="viewer_open_map">View on map</string>
+
+    <plurals name="viewer_position">
+        <item quantity="one">%1$d of %2$d</item>
+        <item quantity="other">%1$d of %2$d</item>
+    </plurals>
+
+    <!--
+        Phase 8: the map. The two notices are the two silences a map can have, and they are named apart on
+        purpose — "no photo has a location in it" and "the locations have not been read yet" want opposite
+        actions, and a single empty state would push someone to grant a permission that changes nothing.
+    -->
+    <string name="map_tiles_unconfigured">No map tiles are configured in this build, so the background is blank. Photo positions, clusters and previews all work.</string>
+    <string name="map_locations_title">Show where your photos were taken</string>
+    <string name="map_locations_body">LumoVault reads the location a photo carries inside it. It never asks where your phone is, and photos without a saved location are left off the map.</string>
+    <string name="map_locations_action">Allow photo locations</string>
+    <string name="map_no_positions">None of your photos record where they were taken.</string>
+    <string name="map_preview_open">View</string>
+    <string name="map_preview_close">Close</string>
+
+    <plurals name="map_finding_locations">
+        <item quantity="one">Finding photo locations — %1$d photo left to read</item>
+        <item quantity="other">Finding photo locations — %1$d photos left to read</item>
+    </plurals>
+    <plurals name="map_cluster_photos">
+        <item quantity="one">%1$d photo here</item>
+        <item quantity="other">%1$d photos here</item>
+    </plurals>
+
+    <plurals name="cloud_count_photos">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <plurals name="cloud_count_videos">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <plurals name="cloud_count_gifs">
+        <item quantity="one">%1$d GIF</item>
+        <item quantity="other">%1$d GIFs</item>
+    </plurals>
+
+    <!--
+        Phase 7: organisation. Every string here is about the user's library, not about Telegram: an
+        album, a favourite or a Trash entry is a decision about files on the device, and the copy says
+        nothing about backups that the backup state does not already say.
+    -->
+    <string name="album_system_camera">Camera</string>
+    <string name="album_system_screenshots">Screenshots</string>
+    <string name="album_system_downloads">Downloads</string>
+    <string name="album_system_videos">Videos</string>
+    <string name="album_system_favorites">Favorites</string>
+    <string name="album_system_archive">Archive</string>
+    <string name="album_system_trash">Trash</string>
+    <string name="album_system_recently_added">Recently Added</string>
+
+    <string name="albums_create_action">New album</string>
+    <string name="albums_section_system">Library</string>
+    <string name="albums_section_user">My albums</string>
+    <string name="albums_section_folders">On this device</string>
+    <string name="albums_empty_title">No albums yet</string>
+    <string name="albums_empty_body">Make an album to keep a trip, a project or a set of receipts together. The photos themselves stay where they are.</string>
+    <string name="albums_no_items">Nothing here yet</string>
+    <string name="album_name_label">Album name</string>
+    <string name="album_create_title">New album</string>
+    <string name="album_rename_title">Rename album</string>
+    <string name="album_create_action">Create</string>
+    <string name="album_rename_action">Rename</string>
+    <string name="album_cancel">Cancel</string>
+    <string name="album_delete_title">Delete album?</string>
+    <string name="album_delete_body">The album goes away. Your photos, your favourites and your backups are untouched.</string>
+    <string name="album_delete_action">Delete album</string>
+    <string name="album_add_media_action">Add photos</string>
+    <string name="album_remove_from_album_action">Remove from album</string>
+    <string name="album_cover_unavailable">Empty album</string>
+    <string name="album_selected_count">%1$d selected</string>
+    <string name="album_add_sheet_title">Add to %1$s</string>
+    <string name="album_add_sheet_add_action">Add %1$d</string>
+    <string name="album_already_in_album">Already in this album</string>
+    <string name="album_library_empty">Nothing to add yet. LumoVault lists what is on this device.</string>
+
+    <string name="organization_favorite_action">Favourite</string>
+    <string name="organization_unfavorite_action">Remove favourite</string>
+    <string name="organization_archive_action">Archive</string>
+    <string name="organization_unarchive_action">Unarchive</string>
+    <string name="organization_trash_action">Move to Trash</string>
+    <string name="organization_favorite_marked">Favourite</string>
+    <string name="organization_archive_hint">Archived items are hidden from your Photos timeline. Nothing is deleted.</string>
+
+    <string name="trash_restore_action">Restore</string>
+    <string name="trash_delete_forever_action">Delete forever</string>
+    <string name="trash_empty_action">Empty Trash</string>
+    <string name="trash_explainer">These items are hidden from your library. They are still on this device, and still in your cloud if you backed them up.</string>
+    <string name="trash_delete_confirm_title">Delete these files from this device?</string>
+    <string name="trash_delete_confirm_body">Android will ask you to confirm. Your LumoVault backups are not deleted — the copies in your Telegram channel stay where they are.</string>
+    <string name="trash_empty_confirm_title">Empty the Trash?</string>
+    <string name="trash_empty_confirm_body">Everything in Trash is deleted from this device, after Android asks you once more. Backups in your cloud are left alone.</string>
+    <string name="trash_delete_unsupported">This Android version does not let LumoVault delete these files. Remove them in your device\'s Photos app, then pull to refresh here.</string>
+    <string name="recently_added_explainer">Files that arrived on this device in the last 30 days, whatever date is on them.</string>
+    <string name="system_album_readonly">This album is built from what these files are, so nothing is added to it by hand.</string>
+    <string name="folder_album_readonly">This is a folder on your phone. LumoVault shows what is in it; files arrive here from the camera or the app that saved them, not from this screen.</string>
+
+    <plurals name="album_items_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="organization_moved_count">
+        <item quantity="one">%1$d item moved</item>
+        <item quantity="other">%1$d items moved</item>
+    </plurals>
+
+
+    <!-- Phase 9: restore, free up space, automatic backup, health and diagnostics. No apostrophes: AAPT2
+         reports an unescaped one as an invalid unicode escape, which sends the reader hunting for a
+         backslash that is not there. -->
+    <string name="backup_entry">Backup &amp; storage</string>
+    <string name="backup_hub_title">Backup &amp; storage</string>
+    <string name="backup_hub_section_backup">Backup</string>
+    <string name="backup_hub_section_status">Status</string>
+    <string name="backup_hub_section_storage">Storage</string>
+    <string name="backup_automatic">Automatic backup</string>
+    <string name="backup_automatic_note">New photos and videos are queued on their own. Nothing is sent before you choose a folder to back up.</string>
+    <string name="backup_wifi_only">Wi-Fi only</string>
+    <string name="backup_wifi_only_note">Unattended uploads wait for an unmetered network. A backup you start by hand does not.</string>
+    <string name="backup_charging_only">Charging only</string>
+    <string name="backup_charging_only_note">Unattended uploads also wait for a charger.</string>
+    <string name="backup_folders_title">Backup folders</string>
+    <string name="backup_folders_entry_all">All photos, videos and GIFs</string>
+    <string name="backup_folders_entry_none">No folders chosen, so nothing is backed up automatically</string>
+    <string name="backup_folders_entry_unanswered">Not chosen yet</string>
+    <string name="backup_folders_explainer">Backup takes media from these folders only — what is already inside them as soon as you save, and whatever you add later. Photos already in your LumoVault Backup stay recognized wherever they are.</string>
+    <string name="backup_folders_back_up_everything">Back up everything</string>
+    <string name="backup_folders_empty">No folders with photos or videos yet. They appear here after the library has been scanned.</string>
+    <plurals name="backup_folders_selected">
+        <item quantity="one">%d folder selected</item>
+        <item quantity="other">%d folders selected</item>
+    </plurals>
+
+    <string name="health_all_backed_up">%1$s items backed up. Nothing is waiting.</string>
+    <string name="health_backed_up">%1$s of %2$s backed up</string>
+    <string name="health_waiting">%1$s waiting</string>
+    <string name="health_failed">%1$s failed</string>
+    <string name="health_cloud_only">%1$s in the cloud only</string>
+    <string name="health_not_backed_up">%1$s local items are not proven to be stored yet.</string>
+    <string name="health_last_backup">Last backup: %1$s</string>
+    <string name="health_last_scan">Last scan: %1$s</string>
+    <string name="health_never">not yet</string>
+    <string name="health_view_issues">View details</string>
+    <string name="health_title">Backup health</string>
+    <string name="health_reclaimable">%1$s items, about %2$s, can be freed from this device.</string>
+    <string name="health_no_scan">Backup has not scanned this library yet.</string>
+    <string name="health_no_backup">Backup has not finished an item yet.</string>
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_entry_note">The numbers behind the backup, for when it does not move.</string>
+    <string name="diagnostics_secrets_note">This panel shows counts, settings and version numbers. It never shows a phone number, code, password or session value.</string>
+    <string name="diag_local_media">Local media</string>
+    <string name="diag_backed_up">Backed up</string>
+    <string name="diag_cloud_only">Cloud only</string>
+    <string name="diag_waiting">Waiting</string>
+    <string name="diag_uploading">Uploading now</string>
+    <string name="diag_failed">Failed</string>
+    <string name="diag_last_backup">Last successful backup</string>
+    <string name="diag_last_scan">Last scan</string>
+    <string name="diag_telegram">Telegram</string>
+    <string name="diag_telegram_connected">Connected</string>
+    <string name="diag_telegram_waiting">Not signed in</string>
+    <string name="diag_telegram_not_configured">Not configured in this build</string>
+    <string name="diag_telegram_unavailable">Connection unavailable</string>
+    <string name="diag_channel">LumoVault Backup channel</string>
+    <string name="diag_channel_available">Available</string>
+    <string name="diag_channel_missing">Not found yet</string>
+    <string name="diag_automatic">Automatic backup</string>
+    <string name="diag_constraints">Waiting for</string>
+    <string name="diag_constraints_wifi_charging">Wi-Fi and a charger</string>
+    <string name="diag_constraints_wifi">Wi-Fi</string>
+    <string name="diag_constraints_charging">A charger</string>
+    <string name="diag_constraints_any">A connection</string>
+    <string name="diag_database_version">Database version</string>
+    <string name="diag_staging_space">Free space for staging</string>
+    <string name="state_enabled">Enabled</string>
+    <string name="state_disabled">Disabled</string>
+
+    <string name="free_space_title">Free up space</string>
+    <string name="free_space_entry_note">Remove local copies that are proven to be stored in your channel.</string>
+    <string name="free_space_header">%1$s can be freed. %2$s photos and videos are safely backed up.</string>
+    <string name="free_space_none">No safely backed-up items are ready to remove.</string>
+    <string name="free_space_remains">Your cloud copies stay in LumoVault, and anything removed here can be downloaded again.</string>
+    <string name="free_space_selected">%1$s selected · %2$s</string>
+    <string name="free_space_action">Free up space</string>
+    <string name="free_space_review_refresh">Check again</string>
+    <string name="free_space_review_empty">Nothing safely backed up is ready to remove right now. Check again after a backup finishes.</string>
+    <string name="free_space_select_all">Select all</string>
+    <string name="free_space_clear_selection">Clear</string>
+    <string name="free_space_confirm_title">Remove these from this device?</string>
+    <string name="free_space_confirm_body">%1$s items, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</string>
+    <string name="free_space_confirm_action">Ask Android</string>
+    <string name="free_space_done">Removed %1$s items and freed about %2$s.</string>
+    <string name="free_space_nothing_left">Nothing was removed. These items changed before the deletion could happen.</string>
+    <string name="free_space_declined">Cancelled. Nothing was removed.</string>
+    <string name="free_space_unavailable">This Android version will not let LumoVault ask. Remove them with the photos app on this device.</string>
+    <string name="free_space_failed">Android did not allow the deletion. Nothing was removed.</string>
+    <string name="action_dismiss">Dismiss</string>
+
+    <string name="restore_again_action">Download again</string>
+    <string name="restore_preparing">Preparing…</string>
+    <string name="restore_downloading">%1$s of %2$s</string>
+    <string name="restore_downloading_unknown">Getting the file…</string>
+    <string name="restore_verifying">Checking the file…</string>
+    <string name="restore_saving">Saving to this device…</string>
+    <string name="restore_completed">Saved on this device.</string>
+    <string name="restore_cancel_action">Cancel</string>
+    <string name="restore_cloud_remains">The copy in LumoVault stays either way.</string>
+    <string name="restore_reason_gone">That file is no longer in your LumoVault channel.</string>
+    <string name="restore_reason_auth">Sign in to Telegram again to download it.</string>
+    <string name="restore_reason_network">Telegram connection was interrupted. Try again.</string>
+    <string name="restore_reason_rate">Telegram asked us to wait a moment. Try again shortly.</string>
+    <string name="restore_reason_space">Not enough free space on this device for this file.</string>
+    <string name="restore_reason_incomplete">The download did not finish intact. Try again.</string>
+    <string name="restore_reason_save">Android would not accept the file. Try again.</string>
+    <string name="restore_reason_cancelled">Download cancelled.</string>
+    <string name="restore_reason_unknown">Could not restore this item. Try again.</string>
+</resources>

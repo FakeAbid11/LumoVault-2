@@ -1,0 +1,15 @@
+* text=auto
+
+# The wrapper is executed by /bin/sh on the Linux CI runner; CRLF here breaks it outright.
+gradlew text eol=lf
+gradle/wrapper/gradle-wrapper.jar binary
+*.apk binary
+*.png binary
+*.webp binary
+
+*.kts text
+*.kt text
+*.xml text
+*.toml text
+*.yml text
+*.md text

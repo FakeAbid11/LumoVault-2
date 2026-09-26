@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12 and above. TDLib's session files never leave the device by either route: a cloud
+    backup would put an active Telegram session in a Google account, and device-to-device transfer
+    would hand a new phone a session database it cannot legitimately use.
+
+    LumoVault's own settings database is deliberately still transferable — it holds a theme choice
+    and setup flags, nothing sensitive.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="file"
+            path="tdlib_database" />
+        <exclude
+            domain="file"
+            path="tdlib_files" />
+    </cloud-backup>
+
+    <device-transfer>
+        <exclude
+            domain="file"
+            path="tdlib_database" />
+        <exclude
+            domain="file"
+            path="tdlib_files" />
+    </device-transfer>
+</data-extraction-rules>

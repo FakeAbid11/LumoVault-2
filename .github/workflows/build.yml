@@ -1,0 +1,265 @@
+name: Build
+
+# LumoVault is built in the cloud: no local Gradle compilation is expected on the
+# development machine. A successful run of this workflow is the build gate.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-apk:
+    name: Assemble debug APK (cloud build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # TDLib ships no Android binary and nothing on Maven, so it is built by hand from pinned upstream
+    # source by build-tdlib.yml — a ~1 hour Docker job, twice per ABI. Compiling it here as well would
+    # put that hour into every push for a library that only changes when the pin moves, so this build
+    # consumes that run's artifacts instead.
+    #
+    # Nothing about the pin is implicit: the commit, the run it came from and the SHA-256 of every
+    # file are recorded below, and the digests of the .so and of TdApi.java are checked together
+    # because a generated API and a native library that disagree is the silent failure worth
+    # preventing. Absent a digest, this job stops rather than building against whatever is newest.
+    env:
+      TDLIB_COMMIT: ea97bcdd3a15523c58ddfe772b4547187cf5bbeb
+      TDLIB_RUN: "36106556511"
+      TDLIB_SHA_CLIENT_JAVA: ea37f5c3f2cb894ad14381a22e1c6ca22affbaa25346669ff117e0b489e6eabe
+      TDLIB_SHA_TDAPI_JAVA: cf353017984b3bc4cb26f4a5792efdc8ec19cfd7db026d6c2c4a3f11ce6bae25
+      TDLIB_SHA_LIBTDJNI_ARM64_V8A: 53aa3e4af60770b4606b0082445b03a38b094824282c37ad3c38b3ffadb79d0d
+      TDLIB_SHA_LIBTDJNI_ARMEABI_V7A: 9c1c0c429953e66811e4e044ecb3dce5c0a59d7d3349897f0df73beb4b648249
+
+    # The artifacts are another workflow's, so this job needs read access to them; contents stays
+    # read-only because nothing here writes to the repository.
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The runner image ships an Android SDK, but not necessarily the platform this project
+      # compiles against; installing it here keeps the build reproducible on any runner.
+      - name: Install Android SDK components
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-37.0" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # One artifact per ABI, each carrying that ABI's libtdjni.so plus a copy of the Java sources and
+      # the run's SHA256SUMS. The Java is taken from the arm64 artifact only: both jobs generate it
+      # from the same revision, and pretending there are two authoritative copies would mean two
+      # digests to keep in step for no extra guarantee.
+      - name: Fetch the pinned TDLib binaries
+        uses: actions/download-artifact@v5
+        with:
+          name: tdlib-android-arm64-v8a
+          path: tdlib-arm64
+          run-id: ${{ env.TDLIB_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch the pinned TDLib binaries for 32-bit ARM
+        uses: actions/download-artifact@v5
+        with:
+          name: tdlib-android-armeabi-v7a
+          path: tdlib-armv7
+          run-id: ${{ env.TDLIB_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the artifacts and install them
+        run: |
+          set -euo pipefail
+
+          # Located with find rather than assumed: the directory layout inside an artifact belongs to
+          # the upload and download actions, not to this repository, and guessing it wrong costs a red
+          # build for a reason that has nothing to do with the code.
+          locate() {
+            found="$(find "$1" -path "$2" | head -n1)"
+            if [ -z "$found" ]; then echo "no $3 under $1"; exit 1; fi
+            echo "$found"
+          }
+
+          verify() {
+            echo "$2  $1" | sha256sum --check --status \
+              || { echo "checksum mismatch for $3"; exit 1; }
+            echo "verified $3"
+          }
+
+          CLIENT="$(locate tdlib-arm64 '*/org/drinkless/tdlib/Client.java' Client.java)"
+          TDAPI="$(locate tdlib-arm64 '*/org/drinkless/tdlib/TdApi.java' TdApi.java)"
+          SO_ARM64="$(locate tdlib-arm64 '*libtdjni.so' libtdjni.so for arm64-v8a)"
+          SO_ARMV7="$(locate tdlib-armv7 '*libtdjni.so' libtdjni.so for armeabi-v7a)"
+
+          verify "$CLIENT" "$TDLIB_SHA_CLIENT_JAVA" Client.java
+          verify "$TDAPI" "$TDLIB_SHA_TDAPI_JAVA" TdApi.java
+          verify "$SO_ARM64" "$TDLIB_SHA_LIBTDJNI_ARM64_V8A" "libtdjni.so[arm64-v8a]"
+          verify "$SO_ARMV7" "$TDLIB_SHA_LIBTDJNI_ARMEABI_V7A" "libtdjni.so[armeabi-v7a]"
+
+          # A checksum proves the bytes; the package line proves they belong where they are about to be
+          # copied. That is as far as this goes on purpose — the real assertion that the interface is
+          # TDLib's own generated Java is that the Kotlin compiles against it.
+          grep -q '^package org.drinkless.tdlib;' "$CLIENT"
+          grep -q '^package org.drinkless.tdlib;' "$TDAPI"
+
+          # TdApi.java carries the commit it was generated from, so the interface can be checked
+          # against the pin rather than trusted to it:
+          #   private static final String GIT_COMMIT_HASH = "ea97bcd...";
+          grep -q "GIT_COMMIT_HASH = \"$TDLIB_COMMIT\"" "$TDAPI" \
+            || { echo "$TDAPI was not generated from $TDLIB_COMMIT"; exit 1; }
+
+          # ELF class and machine must match the ABI, or the APK loads a library the device cannot run.
+          python3 - "$SO_ARM64" arm64-v8a "$SO_ARMV7" armeabi-v7a <<'PY'
+          import struct, sys
+          expect = {'arm64-v8a': (2, 183), 'armeabi-v7a': (1, 40)}
+          args = sys.argv[1:]
+          for i in range(0, len(args), 2):
+              path, abi = args[i], args[i + 1]
+              data = open(path, 'rb').read(20)
+              assert data[:4] == b'\x7fELF', f'{path}: not an ELF file'
+              got = (data[4], struct.unpack_from('<H', data, 18)[0])
+              print(f'{abi}: ELF class {got[0]}, e_machine {got[1]}')
+              assert got == expect[abi], f'{abi}: wrong ELF architecture {got}'
+          PY
+
+          # libtdjni.so links the C++ runtime statically (ANDROID_STL defaults to c++_static) and
+          # OpenSSL from TDLib's own build, so nothing else has to travel with it.
+          for so in "$SO_ARM64" "$SO_ARMV7"; do
+            if readelf -d "$so" | grep -qE 'libc\+\+_shared\.so'; then
+              echo "$so needs libc++_shared.so, which this build does not package"; exit 1
+            fi
+          done
+
+          mkdir -p app/src/tdlib/java/org/drinkless/tdlib \
+                   app/src/main/jniLibs/arm64-v8a \
+                   app/src/main/jniLibs/armeabi-v7a
+          cp "$CLIENT" "$TDAPI" app/src/tdlib/java/org/drinkless/tdlib/
+          cp "$SO_ARM64" app/src/main/jniLibs/arm64-v8a/libtdjni.so
+          cp "$SO_ARMV7" app/src/main/jniLibs/armeabi-v7a/libtdjni.so
+
+          # A stale jniLibs directory on a reused workspace would ship a library nothing built, and
+          # leftovers from the superseded JSON transport would ride along unnoticed.
+          stale="$(find app/src/main/jniLibs app/src/tdlib -type f \
+            ! -name 'libtdjni.so' ! -name 'Client.java' ! -name 'TdApi.java')"
+          if [ -n "$stale" ]; then
+            echo "unexpected files under app/src/main/jniLibs or app/src/tdlib:"
+            echo "$stale"
+            exit 1
+          fi
+          if find app/src -name 'libtdjson.so' -o -name 'liblumo_tdlib.so' -o -name '*_tdlib_jni.c' \
+            | grep -q .; then
+            echo "the JSON TDLib transport is still present somewhere in app/src"; exit 1
+          fi
+          # The check above only catches the file names. The transport itself is a set of C symbols, and a
+          # regression that called them from Kotlin or JNI source would leave the typed client looking
+          # intact while a JSON loop quietly came back underneath it.
+          if grep -rlE 'td_json_client|td_send|td_receive' app/src; then
+            echo "the TDLib JSON transport returned to the source tree"; exit 1
+          fi
+
+      - name: Build debug APK and run unit tests
+        env:
+          # Read by app/build.gradle.kts through the same Gradle property or environment variable, so
+          # nothing is hardcoded here. An absent secret stays absent, and the app then reports Telegram
+          # as not configured instead of crashing. These identify the *app*, not the user, and anything
+          # baked into an APK can be lifted out of it — a build with them set is a build of a client
+          # that is shareable, which is worth knowing before it is downloaded.
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
+
+      # The APK, not the download, is the evidence that the native library is integrated.
+      - name: Verify the APK's native libraries and Telegram classes
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+
+          for entry in \
+            lib/arm64-v8a/libtdjni.so \
+            lib/armeabi-v7a/libtdjni.so
+          do
+            unzip -l "$APK" | grep -qE " $entry\$" || { echo "APK is missing $entry"; exit 1; }
+          done
+          # Neither of these can be produced by this build any more; finding one means something was
+          # left behind, and a second Telegram implementation is exactly what the migration removed.
+          if unzip -l "$APK" | grep -qE 'lib/.*/lib(tdjson|lumo_tdlib)\.so'; then
+            echo "APK carries a superseded TDLib library"; unzip -l "$APK"; exit 1
+          fi
+
+          # That the Kotlin compiled is already proof it resolved org.drinkless.tdlib, but the classes
+          # have to survive into the artifact too — minify is off, so this should never be the place it
+          # goes wrong, and it is cheap enough to be worth knowing rather than assuming.
+          if ! (
+            for d in $(unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$'); do unzip -p "$APK" "$d"; done
+          ) | grep -qa 'Lorg/drinkless/tdlib/Client;'; then
+            echo "org.drinkless.tdlib.Client is not in the APK's dex"; exit 1
+          fi
+
+          unzip -l "$APK" | grep -E 'lib/.*\.so'
+
+      # Gradle's test task is silent about how much it ran, and nothing here can execute tests on the
+      # developer's machine, so the suite's size is read back from the report the task left behind.
+      # A count of zero passes the build just as loudly as a failure would.
+      - name: Report the unit test totals
+        run: |
+          set -euo pipefail
+          DIR=app/build/test-results/testDebugUnitTest
+          count() {
+            grep -oh "$1=\"[0-9]*\"" "$DIR"/*.xml | tr -d -c '0-9\n' | awk '{ s += $1 } END { print s + 0 }'
+          }
+          tests=$(count tests); failed=$(count failures); errors=$(count errors); skipped=$(count skipped)
+          echo "Unit tests: $tests run, $failed failed, $errors errors, $skipped skipped ($(ls "$DIR"/TEST-*.xml | wc -l) classes)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$((failed + errors))" -ne 0 ] || [ "$tests" -eq 0 ]; then
+            echo "the suite did not pass, or did not run"; exit 1
+          fi
+
+      - name: Report artifact to the run summary
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          if [ -n "${TELEGRAM_API_ID:-}" ] && [ -n "${TELEGRAM_API_HASH:-}" ]; then
+            credentials='present — this APK can attempt a real sign-in'
+          else
+            credentials='absent — this APK reports Telegram as not configured'
+          fi
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
+          {
+            echo "Built: $APK ($(du -h "$APK" | cut -f1))"
+            echo
+            echo "- TDLib commit: \`$TDLIB_COMMIT\` (Java interface, from run [$TDLIB_RUN](https://github.com/${{ github.repository }}/actions/runs/$TDLIB_RUN))"
+            echo "- ABIs packaged: arm64-v8a, armeabi-v7a"
+            echo "- Telegram api credentials: $credentials"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: LumoVault-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
