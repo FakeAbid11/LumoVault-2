@@ -141,6 +141,12 @@ Rules that have already caused a mistake here:
   `resume` extension on its continuation is `kotlin.coroutines`. Neither package is wrong-looking, so only
   the compiler says so — and it says so as five cascading errors whose first is "cannot infer type for value
   parameter", which reads like a body problem and is an import problem.
+- **`Arrangement.spacedBy(space, alignment)` wants `Alignment.Horizontal` or `Alignment.Vertical`, never
+  `Alignment.Center`.** In a `Column` the second argument is `Alignment.CenterVertically` and in a `Row` it is
+  `Alignment.CenterHorizontally`; `Alignment.Center` is a third type that fits neither, and the compiler reports
+  it as "None of the following candidates is applicable" against both `spacedBy` overloads — which reads like a
+  missing parameter rather than a wrong value. The UI pass hit this twice in one commit, on the two screens
+  whose empty state was rewritten from `Box(contentAlignment = Alignment.Center)` into a spaced `Column`.
 - **A claim that names an API is a claim to check.** Phase 10's audits asked for `MapView.destroy()` — which
   osmdroid 6.1.20 does not have (`onPause`, `onResume`, `onDetach`, `setDestroyMode` are the whole surface,
   read from the artifact's sources jar) — and for `combining(Iterable<Flow<T>>)`, which kotlinx-coroutines
