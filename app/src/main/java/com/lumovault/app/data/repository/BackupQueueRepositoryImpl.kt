@@ -83,22 +83,30 @@ class BackupQueueRepositoryImpl(
         if (mediaStoreIds.isEmpty()) return 0
         val now = nowSeconds()
 
-        // Two populations, because recognition may have met these items first. A tap on "Back Up" has to
-        // reach into both: rows that exist and are merely *known*, and items with no row at all yet.
-        val promoted = dao.promoteRecognized(
-            ids = mediaStoreIds,
-            queuedState = UploadState.Queued.storageKey,
-            fromState = UploadState.NotBackedUp.storageKey,
-            now = now,
-        )
+        // Chunked like every other id collection in this file: the tap that reaches here is a
+        // multi-select over the whole timeline, which has no ceiling, and each of the three statements
+        // below binds one placeholder per id — `insertMissing` is an `@Query INSERT…SELECT`, not an
+        // `@Insert`, so the one-statement-in-a-loop exemption does not apply to it. See
+        // [MAX_IDS_PER_QUERY]. The count is summed per chunk, which keeps the before/after difference
+        // honest even when recognition is inserting rows for *other* chunks concurrently.
+        return mediaStoreIds.chunked(MAX_IDS_PER_QUERY).sumOf { chunk ->
+            // Two populations, because recognition may have met these items first. A tap on "Back Up" has to
+            // reach into both: rows that exist and are merely *known*, and items with no row at all yet.
+            val promoted = dao.promoteRecognized(
+                ids = chunk,
+                queuedState = UploadState.Queued.storageKey,
+                fromState = UploadState.NotBackedUp.storageKey,
+                now = now,
+            )
 
-        // Room gives an INSERT no row count, so the difference across the statement is what "how many did
-        // you take" means for the rest — and it counts only ids that ended up with a row, so an item that
-        // left the media index between the tap and the query is reported as not queued rather than as
-        // queued and then failed.
-        val before = dao.countExisting(mediaStoreIds)
-        dao.insertMissing(mediaStoreIds, UploadState.Queued.storageKey, now)
-        return promoted + (dao.countExisting(mediaStoreIds) - before)
+            // Room gives an INSERT no row count, so the difference across the statement is what "how many did
+            // you take" means for the rest — and it counts only ids that ended up with a row, so an item that
+            // left the media index between the tap and the query is reported as not queued rather than as
+            // queued and then failed.
+            val before = dao.countExisting(chunk)
+            dao.insertMissing(chunk, UploadState.Queued.storageKey, now)
+            promoted + (dao.countExisting(chunk) - before)
+        }
     }
 
     override suspend fun identityCandidates(

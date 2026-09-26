@@ -9,6 +9,8 @@ import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreRepository
 import com.lumovault.app.domain.restore.RestoreState
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -25,8 +27,21 @@ class RestoreRepositoryImpl(
 ) : RestoreRepository {
 
     override fun observeForMessages(chatId: Long, messageIds: Collection<Long>): Flow<Map<Long, RestoreJob>> =
-        dao.observeForMessages(chatId, messageIds.take(MAX_IDS_PER_QUERY))
-            .map { rows -> rows.map { it.toJob() }.associateBy { it.messageId } }
+        // A cloud window grows past SQLite's parameter ceiling after a few screens of scrolling, so the
+        // ids are chunked and the per-chunk flows merged — `take` would have silently stopped observing
+        // every message past the first chunk. See [MAX_IDS_PER_QUERY].
+        messageIds.chunked(MAX_IDS_PER_QUERY).let { chunks ->
+            when {
+                // "Nothing loaded" is not a question, and `IN ()` is not SQL.
+                chunks.isEmpty() -> flowOf(emptyMap())
+                else -> combine(
+                    chunks.map { chunk ->
+                        dao.observeForMessages(chatId, chunk)
+                            .map { rows -> rows.map { it.toJob() }.associateBy { it.messageId } }
+                    },
+                ) { parts -> parts.flatMap { it.entries }.associate { (messageId, job) -> messageId to job } }
+            }
+        }
 
     override fun observeJob(chatId: Long, messageId: Long): Flow<RestoreJob?> =
         dao.observeJob(chatId, messageId).map { it?.toJob() }

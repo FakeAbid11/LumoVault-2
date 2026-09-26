@@ -25,6 +25,20 @@ class FakeBackupQueueDao : BackupQueueDao {
     private val trashed = mutableSetOf<Long>()
     private val tick = MutableStateFlow(0)
 
+    /**
+     * The largest id collection any single `IN (…)` statement was asked to bind.
+     *
+     * The fake has no SQLite under it, so the parameter ceiling a real statement would hit on API 29
+     * (999, and this project's own cap is lower) is invisible here — recording the batch size is what
+     * lets a test assert the repository chunked, instead of trusting it.
+     */
+    var largestIdBatch = 0
+        private set
+
+    private fun recordBatch(ids: Collection<Long>) {
+        if (ids.size > largestIdBatch) largestIdBatch = ids.size
+    }
+
     fun withMedia(vararg ids: Long) = put(ids, MediaType.Photo)
 
     fun withGif(vararg ids: Long) = put(ids, MediaType.Gif)
@@ -88,6 +102,7 @@ class FakeBackupQueueDao : BackupQueueDao {
     }
 
     override suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long) {
+        recordBatch(ids)
         ids.forEach { id ->
             if (id in media && id !in rows) {
                 rows[id] = BackupQueueEntity(
@@ -101,8 +116,10 @@ class FakeBackupQueueDao : BackupQueueDao {
         bump()
     }
 
-    override suspend fun countExisting(ids: Collection<Long>): Int =
-        rows.values.count { it.mediaStoreId in ids }
+    override suspend fun countExisting(ids: Collection<Long>): Int {
+        recordBatch(ids)
+        return rows.values.count { it.mediaStoreId in ids }
+    }
 
     /**
      * Mirrors the automatic-backup frontier: nothing recorded or a record that asserts nothing, not in
@@ -280,6 +297,7 @@ class FakeBackupQueueDao : BackupQueueDao {
         fromState: String,
         now: Long,
     ): Int {
+        recordBatch(ids)
         val matching = rows.values.filter { it.mediaStoreId in ids && it.state == fromState }
         matching.forEach {
             rows[it.mediaStoreId] = it.copy(state = queuedState, queuedAt = now, updatedAt = now)

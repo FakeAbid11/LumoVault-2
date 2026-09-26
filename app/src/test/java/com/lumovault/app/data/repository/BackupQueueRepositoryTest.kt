@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -38,6 +39,30 @@ class BackupQueueRepositoryTest {
         assertEquals(2, repository.enqueue(listOf(1L, 2L)))
         assertEquals("a second tap must not queue the same item twice", 0, repository.enqueue(listOf(1L, 2L)))
         assertEquals("an id the index does not know is not queueable", 0, repository.enqueue(listOf(99L)))
+    }
+
+    /**
+     * The multi-select that reaches `enqueue` has no ceiling, and the SQLite bundled with API 29 stops at
+     * 999 bound variables per statement — a "Back Up" tap on a thousand selected photos used to be a crash
+     * rather than a queue. Chunking against `MAX_IDS_PER_QUERY` (400) is the project-wide rule, and the
+     * fake records the largest batch any statement was asked to bind so the rule is proven here instead of
+     * trusted.
+     */
+    @Test
+    fun enqueueSplitsASelectionTooLargeForOneStatement() = runBlocking<Unit> {
+        val ids = (1L..900L).toList()
+        dao.withMedia(*ids.toLongArray())
+
+        assertEquals(900, repository.enqueue(ids))
+        assertEquals(
+            "every id in every chunk ended up with a row",
+            900,
+            repository.observeSummary().first().queued,
+        )
+        assertTrue(
+            "no single statement was asked to bind more ids than the cap allows",
+            dao.largestIdBatch <= 400,
+        )
     }
 
     /**
