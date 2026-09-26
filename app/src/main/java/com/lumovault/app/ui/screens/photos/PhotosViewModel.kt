@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -113,8 +114,14 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
         // The count already in the window is the only progress figure that is real; percentage
         // would be a guess, so the UI shows an indeterminate indicator plus this number.
-        items
-            .onEach { media -> if (scanning.value) _scanProgress.value = media.size }
+        //
+        // The subscription exists only while a scan is running: an unconditional collector on `items`
+        // would keep the Room window query hot for this ViewModel's whole life — including while the
+        // screen sits in the back stack — which is exactly what the WhileSubscribed policy everywhere
+        // else in this class exists to prevent.
+        scanning
+            .flatMapLatest { active -> if (active) items else flow { } }
+            .onEach { media -> _scanProgress.value = media.size }
             .launchIn(viewModelScope)
     }
 

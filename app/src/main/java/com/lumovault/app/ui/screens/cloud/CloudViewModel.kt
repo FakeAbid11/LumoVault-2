@@ -15,8 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -34,8 +32,6 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Grows as the user reaches the end of the timeline; see [WINDOW_START]. */
     private val loadedLimit = MutableStateFlow(WINDOW_START)
-
-    private val localMatches = MutableStateFlow(emptySet<Long>())
 
     /**
      * Re-entrancy guard only, deliberately not observable state.
@@ -62,14 +58,24 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         items,
         totalCount,
         counts,
-        localMatches,
-    ) { init, media, total, typeCounts, backedUp ->
+    ) { init, media, total, typeCounts ->
         deriveCloudState(
             init = init,
             items = media,
             totalCount = total,
             counts = typeCounts,
-            localMatches = backedUp,
+            // Which of these remote items also live on the device: one batched query over the loaded
+            // window, never a MediaStore or database round-trip per cell. Computed inside this transform
+            // rather than by a side collector on `items` — a side collector subscribes for the ViewModel's
+            // whole life and keeps the Room window query running while this screen sits in the back
+            // stack, defeating the WhileSubscribed policy below. Here the lookup runs exactly while the
+            // screen is watching. Room's suspend queries execute on its own executor, not on this
+            // collector's thread.
+            localMatches = if (media.isEmpty()) {
+                emptySet()
+            } else {
+                container.localPresenceLookup.backedUp(media)
+            },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
 
@@ -101,12 +107,6 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     init {
-        // Which of these remote items also live on the device: one batched query over the loaded
-        // window, never a MediaStore or database round-trip per cell.
-        items
-            .onEach { media -> localMatches.value = container.localPresenceLookup.backedUp(media) }
-            .launchIn(viewModelScope)
-
         synchronize()
     }
 
