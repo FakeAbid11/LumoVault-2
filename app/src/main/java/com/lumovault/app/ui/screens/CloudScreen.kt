@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -220,7 +221,10 @@ private fun CloudTimeline(
     // The same instrument the timeline uses, over the same arithmetic: the count-header above the cloud grid
     // is a rendered item, so it is carried into `firstItemIndex` rather than being quietly skipped.
     val scrubSlots = remember(state.days) {
-        ScrollScrubber.slots(state.days, firstItemIndex = 1)
+        ScrollScrubber.slotsOf(
+            state.days.map { day -> day.epochDay to day.items.size },
+            firstItemIndex = 1,
+        )
     }
     val firstVisibleItem = gridState.firstVisibleItemIndex
     val visibleItems = gridState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
@@ -334,13 +338,12 @@ private fun CloudDayHeader(epochDay: Long, itemCount: Int) {
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
         )
+        val countDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
         Surface(
             shape = MaterialTheme.shapes.extraSmall,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.semantics {
-                contentDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
-            },
+            modifier = Modifier.semantics { contentDescription = countDescription },
         ) {
             Text(
                 text = itemCount.toString(),

@@ -411,15 +411,15 @@ private fun DayHeader(epochDay: Long, itemCount: Int) {
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
         )
+        // The eye reads a bare number beside a date as a count; a screen reader would read it as a number
+        // with no noun, so the words are carried in the semantics and not on the screen. Resolved here
+        // rather than inside `semantics { }`, because reading a resource is a composition call.
+        val countDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
         Surface(
             shape = MaterialTheme.shapes.extraSmall,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            // The eye reads a bare number beside a date as a count; a screen reader would read it as a number
-            // with no noun, so the words are carried in the semantics and not on the screen.
-            modifier = Modifier.semantics {
-                contentDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
-            },
+            modifier = Modifier.semantics { contentDescription = countDescription },
         ) {
             Text(
                 text = itemCount.toString(),

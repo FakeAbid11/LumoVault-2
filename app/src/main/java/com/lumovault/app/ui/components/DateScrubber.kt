@@ -69,7 +69,8 @@ import kotlinx.coroutines.delay
  * @param itemCount how many grid items the list holds, including anything above the first day.
  * @param visibleItems roughly how many items fill the viewport; it sets the handle's height.
  * @param firstVisibleItemIndex the grid's current top item, which is where the handle sits at rest.
- * @param labelFor a day's own label, resolved by the caller because it is a string resource, not a number.
+ * @param labelFor a day's own label, resolved by the caller because it is a string resource, not a number. It
+ * is composable for the same reason: the caller reads those resources through the composition.
  * @param onScrub called with a grid index as the handle moves; the caller scrolls the real list.
  */
 @Composable
@@ -78,7 +79,7 @@ fun DateScrubber(
     itemCount: Int,
     visibleItems: Int,
     firstVisibleItemIndex: Int,
-    labelFor: (Long) -> String,
+    labelFor: @Composable (Long) -> String,
     onScrub: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -122,15 +123,15 @@ fun DateScrubber(
                     val fraction = (yPx / trackPx).coerceIn(0f, 1f)
                     val index = ScrollScrubber.indexFor(fraction, itemCount)
                     val epochDay = ScrollScrubber.epochDayFor(slots, index)
-                    val label = epochDay?.let(labelFor)
-                    if (label != null) {
-                        val previous = bubble
-                        // A click per *day* crossed, not per frame: the reference does this, and the reason is
-                        // that a tick per pixel is a buzz that tells you nothing you could not see.
-                        if (previous?.epochDay != epochDay) {
+                    if (epochDay != null) {
+                        // A click per *day* crossed, not per frame: the reference does this, and the reason
+                        // is that a tick per pixel is a buzz that tells you nothing you could not see. The
+                        // label itself is resolved where it is drawn, because reading a string resource is a
+                        // composition call and this is a gesture loop.
+                        if (bubble?.epochDay != epochDay) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
-                        bubble = Bubble(epochDay = epochDay, label = label, yPx = yPx)
+                        bubble = Bubble(epochDay = epochDay, yPx = yPx)
                     }
                     onScrub(index)
                 }
@@ -191,7 +192,7 @@ fun DateScrubber(
                     .padding(horizontal = SpaceMd, vertical = SpaceXs),
             ) {
                 Text(
-                    text = where.label,
+                    text = labelFor(where.epochDay),
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     softWrap = false,
@@ -203,6 +204,6 @@ fun DateScrubber(
 }
 
 /** The day being named, its label, and how far down the track the finger is. */
-private class Bubble(val epochDay: Long, val label: String, val yPx: Float)
+private class Bubble(val epochDay: Long, val yPx: Float)
 
 private val ScrubberBubbleHalf = 18.dp

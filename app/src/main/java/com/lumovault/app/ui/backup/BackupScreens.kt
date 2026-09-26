@@ -178,8 +178,11 @@ fun BackupHubScreen(
 private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
     Text(
         text = stringResource(label),
-        style = LumoVaultType.sectionHeader,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // The reference's settings section header: `titleSmall` in the accent, not a heading in the body
+        // colour. It reads as a label for the group under it rather than as the first item of that group,
+        // which is the difference between a settings screen and a list.
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = SpaceMd, bottom = SpaceXs),
     )
 }
@@ -198,7 +201,9 @@ private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
 private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(GroupCardCorner),
+        // The reference's card radius, 24 dp: softer than a photo tile's 12, because a card is a container the
+        // user reads rather than a thing they tap through to a picture.
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = SpaceLg, vertical = SpaceMd),

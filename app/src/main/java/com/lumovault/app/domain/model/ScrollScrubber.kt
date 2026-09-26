@@ -28,18 +28,30 @@ object ScrollScrubber {
      * limited-access notice — shifts every slot along by its own item count rather than being silently
      * ignored, and the scrubber stays honest about what the list can scroll to.
      */
-    fun slots(days: List<MediaDay>, firstItemIndex: Int = 0): List<ScrubSlot> {
-        if (days.isEmpty()) return emptyList()
+    fun slots(days: List<MediaDay>, firstItemIndex: Int = 0): List<ScrubSlot> =
+        slotsOf(days.map { day -> day.epochDay to day.items.size }, firstItemIndex)
+
+    /**
+     * The same slots from `(day, photo count)` pairs.
+     *
+     * The cloud grid groups its own day type, not [MediaDay] — and the scrubber needs nothing from either
+     * beyond those two numbers. A second entry point is the honest shape: the alternative was a cloud copy of
+     * this arithmetic, which is precisely the drift the two timelines have already been corrected for once.
+     */
+    fun slotsOf(daySizes: List<Pair<Long, Int>>, firstItemIndex: Int = 0): List<ScrubSlot> {
+        if (daySizes.isEmpty()) return emptyList()
+        val slots = ArrayList<ScrubSlot>(daySizes.size)
         var cursor = firstItemIndex
-        return days.map { day ->
+        daySizes.forEach { (epochDay, photos) ->
             val slot = ScrubSlot(
                 firstItemIndex = cursor,
-                itemCount = HEADER_ITEMS_PER_DAY + day.items.size,
-                epochDay = day.epochDay,
+                itemCount = HEADER_ITEMS_PER_DAY + photos,
+                epochDay = epochDay,
             )
             cursor += slot.itemCount
-            slot
+            slots += slot
         }
+        return slots
     }
 
     /** One day of a timeline is a header plus its photos. */
