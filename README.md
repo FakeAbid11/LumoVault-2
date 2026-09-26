@@ -308,9 +308,14 @@ media ──1:0..1── media_metadata    position · camera · lens · exposur
   not contain that photo* — the second case says so, instead of opening index 0 of some other picture.
 - **Three renderers, one pager.** A photo is zoomable; a GIF is handed to `coil-gif`, which is the only thing
   that makes an animated file move — without it a GIF is a still image that looks correct; a video plays
-  through `MediaPlayer` over a `SurfaceView`, with play/pause, seek, position and duration. No Media3: the
-  library is available at 1.11.1 but local `content://` playback does not need it, and it would have arrived
-  as seven AARs plus Guava plus RecyclerView. The bytes are never re-encoded, so what plays is the original.
+  through Media3's ExoPlayer over a `PlayerView` with the library's own control bar switched off, so the
+  transport on screen is still LumoVault's: play/pause, seek, position, duration, and one failure sentence.
+  Media3 was first declined here for the weight of it — `media3-exoplayer` arrives with six sibling modules,
+  Guava and RecyclerView — and it is now carried on purpose, because the thing being bought is not a feature,
+  it is a decoder lifecycle that does not throw `IllegalStateException` at a callback thread when a page is
+  swiped away mid-preparation. The bytes are never re-encoded and never copied into memory, so what plays is
+  the original, streamed from the content resolver. See
+  [Video playback is Media3, with LumoVault's own guards](#video-playback-is-media3-with-lumovaults-own-guards).
 - **The zoom arithmetic is pure** (`ViewerZoom`): 1×–5×, double-tap to 3× toward the point that was tapped,
   and a pan limited to the overhang the current scale actually has, so a photo cannot be dragged off into
   black. Pinch recognition itself cannot be tested off-device, which is why every *decision* the gesture
@@ -451,7 +456,9 @@ unattended sends shared one unique work name, so a hand-tapped backup could join
 the outcome the backup preferences promise is impossible; they have separate names now, and the automatic pass
 retries an absent media permission a bounded number of times instead of forever. A video page prepared its
 decoder when the pager composed it rather than when it was looked at, nothing paused playback when the screen
-went off, and a recreated player could be left with no surface at all.
+went off, and a recreated player could be left with no surface at all. (All three of those were
+`MediaPlayer`'s shape: the page has since moved to Media3, and the lifecycle rules added here — one active
+page, one player, pause on stop, a fresh session on return — are the ones the current code still enforces.)
 
 **What only shows up on the second visit or the fourth screen.** Four screens drew their own app bar while the
 shell drew another one titled after the tab they were not on. The map was built per visit and only ever paused.
@@ -562,6 +569,45 @@ and the code length arrives as `codeInfo.type.length` rather than a separate `co
 pin moves, re-check them against that revision; a renamed field is now a compile error rather than a
 login that silently never finishes.
 
+## Video playback is Media3, with LumoVault's own guards
+
+The viewer's video page used to drive `android.media.MediaPlayer` directly. That worked until it did not:
+`MediaPlayer` answers nearly every method with `IllegalStateException` when asked in the wrong state, including
+from the callbacks it delivers on its own thread, where no `runCatching` in a composable is anywhere near the
+stack. The crash fix that preceded this change added an application-level state machine to keep that from
+reaching a user; this change swaps the engine underneath it for AndroidX Media3 1.11.1's ExoPlayer and keeps
+the machine, because the machine was never the part that was wrong.
+
+Three files hold the playback path now, and each has one job:
+
+| | |
+| --- | --- |
+| `ui/viewer/VideoPlayback.kt` | The states a clip may be in — `Idle → Opening → Preparing → Ready → Playing → Paused → Failed → Released` — and which transition is legal from where. No Android types, so it is tested instead of hoped for. |
+| `ui/viewer/VideoSession.kt` | One page's controller. Commands go through the machine before they reach a player; every report the player makes carries the generation it was produced under, and one that does not match is dropped without touching state. |
+| `ui/viewer/ExoPlayerEngine.kt` | The only file in the app that names a Media3 type. Builds one `ExoPlayer` per visit, checks the `content://` URI before handing it over, maps `PlaybackException` codes into LumoVault's failure kinds, and releases once. |
+
+`ui/viewer/VideoStage.kt` is left holding what only Compose can hold: one session per `(clip, visit)`, the
+transport row, the poster for the page the user is not looking at, and the failure sentence.
+
+**What Media3 took over.** The surface. `PlayerView` plus `Player.setVideoSurfaceView` means the library
+registers the `SurfaceHolder.Callback` itself and detaches the video output before the surface is destroyed
+(`ExoPlayerImpl` does this at its own `surfaceDestroyed`), so the page no longer keeps a holder, no longer
+calls `setDisplay`, and no longer has a `SurfaceLost` failure to invent a word for. Everything else the old
+page guarded is guarded the same way: only the visible page owns a player, a released page that comes back
+gets a new one, an inactive pager page plays nothing, backgrounding pauses, and a source that will not open is
+a named failure with a Close button rather than an asynchronous native error.
+
+**What was traded.** `media3-exoplayer` brings six sibling modules, Guava and RecyclerView with it, which is
+exactly why Phase 8 declined the library. The purchase is a decoder lifecycle that reports its own state
+instead of exposing one that has to be handled carefully, and a playback path that behaves the same on devices
+nobody here can attach. GIF animation is still `coil-gif`, thumbnails are still `coil-video`, and the poster
+behind an offscreen page is still Coil — no GIF or photo code was touched, and no permission was added.
+
+**Not claimed.** Nothing in this change has run on a device. Whether a given clip actually draws frames,
+whether the aspect ratio looks right on a given screen, and whether a hardware decoder that misbehaves on one
+phone behaves better here than `MediaPlayer` did are all questions a phone has to answer. What is covered by
+tests is the state machine, the controller's rules about when a player may be touched, and the error mapping.
+
 ## Toolchain
 
 | Component | Version |
@@ -576,6 +622,7 @@ login that silently never finishes.
 | Coil | 3.6.3 (`coil-compose`, `coil-video`, `coil-gif`; no network artifact) |
 | androidx.exifinterface | 1.4.2 (not `android.media.ExifInterface`; reads a `FileDescriptor`) |
 | osmdroid | 6.1.20 (`org.osmdroid:osmdroid-android`, no transitive dependencies) |
+| Media3 | 1.11.1 (`media3-exoplayer`, `media3-ui`, `media3-common`; one version for all three) |
 | TDLib | pinned revision `ea97bcd`, Java interface (`libtdjni.so`) |
 | compileSdk / targetSdk / minSdk | 37 / 37 / 29 |
 
@@ -589,7 +636,9 @@ for `content://` URIs). TDLib contributes no dependency at all: its generated Ja
 three more, each for the same kind of reason: `coil-gif` (nothing else in Coil 3 animates a GIF, and a
 still GIF is a wrong answer that looks right), `androidx.exifinterface` (the platform class misses HEIF
 and PNG), and osmdroid (drawing slippy-map tiles well is a decade of cache, decode and gesture code that
-is not this app's subject). Media3 was considered for video and declined — see the Phase 8 section.
+is not this app's subject). Media3 was considered for video at Phase 8 and declined there for the weight of it;
+it was added later, for the decoder lifecycle — see
+[Video playback is Media3, with LumoVault's own guards](#video-playback-is-media3-with-lumovaults-own-guards).
 
 ## Architecture
 

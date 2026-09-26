@@ -179,6 +179,7 @@ message, a file path or a TDLib object.
 | Coil | 3.6.3 | `coil-compose` + `coil-video` + `coil-gif`; no network artifact. **Without `coil-gif` an animated GIF does not animate** — it registers `AnimatedImageDecoder` through ServiceLoader, so no ImageLoader setup is needed |
 | androidx.exifinterface | 1.4.2 | NOT `android.media.ExifInterface`: the platform class does not parse HEIF/HEIC or PNG containers. `ExifInterface(FileDescriptor)` reads a header, not a file |
 | osmdroid | 6.1.20 | `org.osmdroid:osmdroid-android`; its POM declares **no** dependencies. No clustering anywhere in the library, so pins are clustered in `domain/map/MapClustering.kt` |
+| Media3 | 1.11.1 | `media3-exoplayer` + `media3-ui` + `media3-common`, one version for all three. Everything the viewer uses is **stable** API (`ExoPlayer.Builder`, `Player.Listener`, `STATE_*`, `PlaybackException.ERROR_CODE_*`, `PlayerView.setPlayer`/`setUseController`) — no `@UnstableApi` is touched, so no opt-in marker or `-opt-in` flag is configured. `PlayerView.setPlayer` insists on a player built on the main thread and on the main looper, so the engine is only ever constructed from a composable's effect. It brings six sibling modules, Guava and RecyclerView transitively; that is the library's own dependency set, not a place to economise |
 | libphonenumber | 9.0.40 | country codes + E.164 |
 | WorkManager | 2.12.0 | `work-runtime`; CoroutineWorker + ForegroundInfo for the backup queue |
 | compileSdk / targetSdk / **minSdk** | 37 / 37 / **29** | see below |
