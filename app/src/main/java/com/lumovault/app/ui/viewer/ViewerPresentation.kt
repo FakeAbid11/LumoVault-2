@@ -31,14 +31,25 @@ object ViewerPresentation {
     }
 
     /**
-     * Where the pager opens.
+     * Where the pager opens: the position of the tapped id in the loaded window, or -1.
      *
-     * A route carries an id and the list comes from Room, so the two can disagree: the photo was deleted
-     * outside the app, or it fell outside the window the source loaded. Neither is a reason to show a blank
-     * screen, and neither is a reason to silently open a different photograph — so an id that is not in the
-     * list becomes a one-item viewer about that id, and the screen says the file is unavailable for it.
+     * A route carries an id and the list comes from Room, so the two can disagree. -1 is answered by the
+     * caller, not here — the window is widened to cover the tapped item first ([MediaViewerViewModel.open]
+     * probes for that), and only an id that survives every probe is genuinely absent, which the screen says
+     * out loud rather than silently opening a different photograph at index zero.
      */
     fun pageIndex(ids: List<Long>, mediaStoreId: Long): Int = ids.indexOf(mediaStoreId)
+
+    /**
+     * The id that takes the shown item's slot when archive or trash hides it from the source's query.
+     *
+     * [retiredIndex] is where the pager sits; [survivorIds] is the window after the item left, so the
+     * neighbour is simply the id now standing at that same index — clamped, because retiring the last
+     * item of the window moves the boundary up by one. Null means the list is empty: nothing can stay
+     * put in nothing, and the caller lets the honest "this album is empty" copy speak.
+     */
+    fun survivorAfterRetirement(survivorIds: List<Long>, retiredIndex: Int): Long? =
+        survivorIds.getOrNull(retiredIndex.coerceAtMost(survivorIds.size - 1))
 
     /** The backup control for one state. */
     fun backupAction(state: UploadState?): ViewerBackupAction =

@@ -68,6 +68,23 @@ class ViewerPresentationTest {
     }
 
     @Test
+    fun retiringAnItemKeepsThePagerInItsSlot() {
+        // The window after archive/trash hides one item: the neighbour now standing at the same index is
+        // what the viewer keeps page on, because the pager never moved.
+        assertEquals(9L, ViewerPresentation.survivorAfterRetirement(listOf(7L, 8L, 9L), retiredIndex = 1))
+        assertEquals(
+            "retiring the last item of the window moves the boundary up by one — clamp to the new last",
+            8L,
+            ViewerPresentation.survivorAfterRetirement(listOf(7L, 8L), retiredIndex = 2),
+        )
+        assertEquals(7L, ViewerPresentation.survivorAfterRetirement(listOf(7L), retiredIndex = 0))
+        assertNull(
+            "an empty survivor list stays put in nothing: the honest 'this album is empty' path",
+            ViewerPresentation.survivorAfterRetirement(emptyList(), retiredIndex = 0),
+        )
+    }
+
+    @Test
     fun theBackupControlSaysWhatTheQueueIsDoing() {
         assertEquals(ViewerBackupStatus.NotBackedUp, ViewerPresentation.backupAction(null).status)
         assertEquals(

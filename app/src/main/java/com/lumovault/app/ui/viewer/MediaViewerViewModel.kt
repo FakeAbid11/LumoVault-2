@@ -12,10 +12,12 @@ import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.ui.navigation.ViewerTarget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -42,6 +44,12 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     private val request = MutableStateFlow<OpenRequest?>(null)
     private val loadedLimit = MutableStateFlow(WINDOW_START)
     private val page = MutableStateFlow(0)
+
+    /** Set when archive/trash has been written and the source's query has not dropped the row yet. */
+    private var retiring = false
+
+    /** The pending window resolution; a new open replaces it rather than racing it. */
+    private var openJob: Job? = null
 
     /** Once per item per process, so "this file has no EXIF" is not discovered again on every visit. */
     private val metadataReadAttempted = mutableSetOf<Long>()
@@ -139,10 +147,60 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun open(mediaStoreId: Long, target: ViewerTarget) {
         if (request.value?.matches(mediaStoreId, target) == true) return
-        request.value = OpenRequest(mediaStoreId, target)
-        loadedLimit.value = WINDOW_START
+        retiring = false
         page.value = 0
+        openJob?.cancel()
+        // The tapped item can live deeper than the first window — the timeline holds thousands and the
+        // grid only loads 300 at a time, but the tap named an item at any depth. Resolving the window
+        // *before* publishing the request means the listing never opens as `Missing` for a photo that
+        // is plainly there: a first-window-only lookup was the bug that told people their photo had
+        // left the device because they had scrolled further than the viewer had loaded.
+        openJob = viewModelScope.launch {
+            val limit = windowCovering(target, mediaStoreId)
+            loadedLimit.value = limit
+            request.value = OpenRequest(mediaStoreId, target)
+        }
     }
+
+    init {
+        // The promise both retire actions make: when archive/trash hides the shown item, the pager stays
+        // at its index and the next photograph slides into place. `request` names the shown item, so the
+        // moment it names one that has left, it has to name the survivor at the same page — before
+        // `Missing` is ever reached for something the user still owns.
+        viewModelScope.launch {
+            listing.collect { state ->
+                if (!retiring || state !is Listing.Missing) return@collect
+                retiring = false
+                val list = rows.value ?: return@collect
+                val survivor = ViewerPresentation.survivorAfterRetirement(list.map(Media::id), page.value)
+                    ?: return@collect
+                request.value?.let { request.value = OpenRequest(survivor, it.target) }
+            }
+        }
+    }
+
+    /**
+     * The smallest doubling window that holds the id, or [WINDOW_START] when no probe up to the ceiling
+     * does — which is the honest `Missing` case: gone from the device, or from this album.
+     *
+     * Probing the source's own flow costs a handful of sequential queries on one tap (log2 of the
+     * depth) rather than a per-source rank count, which would mean a new member on every contents
+     * repository, every fake, and every hand-written SQL key comparison this file cannot exercise
+     * without a database. A ceiling bounds the worst case: deeper than it, the library's own paging
+     * (which `loadMore` widens from here) is the answer, not materialising a hundred-thousand-item
+     * window in memory.
+     */
+    private suspend fun windowCovering(target: ViewerTarget, mediaStoreId: Long): Int {
+        var limit = WINDOW_START
+        while (!sourceContains(target, mediaStoreId, limit)) {
+            if (limit >= WINDOW_PROBE_CEILING) return WINDOW_START
+            limit *= 2
+        }
+        return limit
+    }
+
+    private suspend fun sourceContains(target: ViewerTarget, mediaStoreId: Long, limit: Int): Boolean =
+        contentsOf(target, limit).first().any { it.id == mediaStoreId }
 
     fun pageSettled(index: Int) {
         page.value = index
@@ -184,18 +242,21 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     /**
-     * Archives the shown item, and does not touch the list.
-     *
-     * The source's own query hides archived items, so Room drops the row and the pager shrinks by one. Editing
-     * it here as well is how a viewer ends up showing a photograph that has already left.
+     * Archives the shown item and stays put: the source's own query hides archived items, the window
+     * arrives without it, and the retirement collector re-points the request at the neighbour in the
+     * same slot — see [init]. The write itself goes through the same organisation repository the
+     * selection bar uses.
      */
     fun archiveCurrent() {
         val id = currentItem.value?.id ?: return
+        retiring = true
         viewModelScope.launch { container.mediaOrganizationRepository.setArchived(listOf(id), true) }
     }
 
+    /** Trashed, not deleted: the item still exists, so the viewer keeps browsing. See [archiveCurrent]. */
     fun moveToTrashCurrent() {
         val id = currentItem.value?.id ?: return
+        retiring = true
         viewModelScope.launch { container.mediaOrganizationRepository.moveToTrash(listOf(id)) }
     }
 
@@ -234,6 +295,9 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     private companion object {
         const val WINDOW_START = 300
         const val WINDOW_STEP = 300
+
+        /** How deep one tap is allowed to materialise a window; beyond it, paging is the answer. */
+        const val WINDOW_PROBE_CEILING = 38_400
 
         /** No request yet, so nothing to look for — which resolves to [Listing.Loading] either way. */
         const val NO_ID = -1L

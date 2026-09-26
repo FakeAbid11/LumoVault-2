@@ -126,15 +126,29 @@ fun MediaViewerScreen(
         }
 
         // The list came back and does not hold the tapped photo. Say so, rather than opening some other
-        // photograph at index zero — which is the failure a pager with a fallback index always has.
-        is Listing.Missing -> PlaceholderScreen(
-            title = stringResource(R.string.viewer_gone_title),
-            description = stringResource(
-                if (state.listSize == 0) R.string.viewer_gone_body_empty else R.string.viewer_gone_body
-            ),
-            icon = Icons.Filled.Close,
-            modifier = modifier.fillMaxSize(),
-        )
+        // photograph at index zero — which is the failure a pager with a fallback index always has. The exit
+        // is drawn for the same reason the Loading branch draws one: with the system bars hidden, a screen
+        // whose only way out is an uninstructed gesture reads as a crash.
+        is Listing.Missing -> Box(modifier = modifier.fillMaxSize()) {
+            PlaceholderScreen(
+                title = stringResource(R.string.viewer_gone_title),
+                description = stringResource(
+                    if (state.listSize == 0) R.string.viewer_gone_body_empty else R.string.viewer_gone_body
+                ),
+                icon = Icons.Filled.Close,
+                modifier = Modifier.fillMaxSize(),
+            )
+            IconButton(
+                onClick = onNavigateUp,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.viewer_close),
+                    tint = OnMedia,
+                )
+            }
+        }
 
         is Listing.Ready -> ViewerPager(
             state = state,
