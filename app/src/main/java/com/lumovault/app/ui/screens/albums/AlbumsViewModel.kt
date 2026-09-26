@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.domain.model.LocalFolderAlbum
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.domain.organization.SystemAlbumCounts
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,14 @@ import kotlinx.coroutines.launch
 data class AlbumsUiState(
     val counts: SystemAlbumCounts = SystemAlbumCounts(emptyMap()),
     val userAlbums: List<Album> = emptyList(),
+    /**
+     * The device's own folders, derived from the index on every frame rather than cached here.
+     *
+     * Listed only when there is something to list: an empty section is a heading with nothing under it,
+     * and a phone whose media all lives in Camera and Screenshots has no folders left to show once those
+     * system albums have claimed them.
+     */
+    val localFolders: List<LocalFolderAlbum> = emptyList(),
 )
 
 /**
@@ -40,8 +49,11 @@ class AlbumsViewModel(application: Application) : AndroidViewModel(application) 
     private val userAlbums = container.albumRepository.observeAlbums()
         .stateIn(viewModelScope, STOP_POLICY, emptyList())
 
-    val uiState: StateFlow<AlbumsUiState> = combine(counts, userAlbums) { current, albums ->
-        AlbumsUiState(counts = current, userAlbums = albums)
+    private val localFolders = container.mediaOrganizationRepository.observeLocalFolders()
+        .stateIn(viewModelScope, STOP_POLICY, emptyList())
+
+    val uiState: StateFlow<AlbumsUiState> = combine(counts, userAlbums, localFolders) { current, albums, folders ->
+        AlbumsUiState(counts = current, userAlbums = albums, localFolders = folders)
     }.stateIn(viewModelScope, STOP_POLICY, AlbumsUiState())
 
     /**

@@ -7,6 +7,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.backup.BackupHealthScreen
 import com.lumovault.app.ui.backup.BackupHubScreen
@@ -64,6 +65,7 @@ fun LumoVaultNavHost(
                     when (target) {
                         is AlbumTarget.User -> navController.navigate(AlbumRoutes.user(target.albumId))
                         is AlbumTarget.System -> navController.navigate(AlbumRoutes.system(target.album))
+                        is AlbumTarget.LocalFolder -> navController.navigate(AlbumRoutes.local(target.relativePath))
                     }
                 },
             )
@@ -76,6 +78,27 @@ fun LumoVaultNavHost(
             ),
         ) { entry ->
             val target = AlbumTarget.User(entry.arguments?.getLong(AlbumRoutes.ARG_ALBUM_ID) ?: 0L)
+            AlbumDetailScreen(
+                target = target,
+                onNavigateUp = navController::navigateUp,
+                onOpenMedia = { mediaId ->
+                    navController.navigate(ViewerRoutes.of(mediaId, ViewerTarget.of(target)))
+                },
+            )
+        }
+
+        // A device folder, addressed by its path rather than by a row id — which is the whole point: no
+        // number in here can ever collide with an id in `albums`.
+        composable(
+            route = AlbumRoutes.LOCAL_PATTERN,
+            arguments = listOf(
+                navArgument(AlbumRoutes.ARG_PATH) { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { entry ->
+            val path = entry.arguments?.getString(AlbumRoutes.ARG_PATH)
+            val target = path?.takeIf { it.isNotBlank() }?.let {
+                AlbumTarget.LocalFolder(FolderPaths.normalize(it))
+            }
             AlbumDetailScreen(
                 target = target,
                 onNavigateUp = navController::navigateUp,

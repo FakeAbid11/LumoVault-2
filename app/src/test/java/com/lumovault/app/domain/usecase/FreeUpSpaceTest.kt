@@ -265,6 +265,16 @@ private class FakeOrganization : MediaOrganizationRepository {
         limit: Int,
     ): Flow<List<Media>> = flowOf(emptyList())
 
+    // Free Up Space asks which items are safely backed up; a folder view is not part of that question, so
+    // the fake answers with nothing rather than inventing a folder.
+    override fun observeLocalFolders(): Flow<List<com.lumovault.app.domain.model.LocalFolderAlbum>> =
+        flowOf(emptyList())
+
+    override fun observeLocalFolderContents(
+        relativePath: String,
+        limit: Int,
+    ): Flow<List<Media>> = flowOf(emptyList())
+
     override fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>> = flowOf(emptySet())
 
     override suspend fun setFavorite(mediaStoreIds: Collection<Long>, favorite: Boolean) = Unit

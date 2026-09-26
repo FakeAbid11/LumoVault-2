@@ -91,6 +91,38 @@ fun AlbumsScreen(
                 }
             }
 
+            if (state.localFolders.isNotEmpty()) {
+                item(key = "folders-header", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(R.string.albums_section_folders)
+                }
+
+                val repeatedNames = state.localFolders.groupingBy { it.displayName }.eachCount()
+
+                state.localFolders.forEach { folder ->
+                    item(key = "folder-${folder.relativePath}") {
+                        val count = pluralStringResource(
+                            R.plurals.album_items_count,
+                            folder.mediaCount,
+                            folder.mediaCount,
+                        )
+                        AlbumCard(
+                            title = folder.displayName,
+                            // The parent is only worth a place on the card when two folders share a name;
+                            // otherwise it is a path, and a path is not what the album is called.
+                            subtitle = if (repeatedNames.getValue(folder.displayName) > 1 &&
+                                folder.parentLabel.isNotBlank()
+                            ) {
+                                "$count · ${folder.parentLabel}"
+                            } else {
+                                count
+                            },
+                            coverUri = folder.coverUri,
+                            onClick = { onOpenAlbum(AlbumTarget.LocalFolder(folder.relativePath)) },
+                        )
+                    }
+                }
+            }
+
             item(key = "user-header", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(R.string.albums_section_user)
             }

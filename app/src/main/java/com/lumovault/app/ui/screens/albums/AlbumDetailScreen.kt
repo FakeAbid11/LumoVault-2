@@ -102,16 +102,18 @@ fun AlbumDetailScreen(
     Column(modifier = modifier.fillMaxSize()) {
         AlbumHeader(
             title = state.userAlbum?.name
-                ?: state.systemAlbum?.let { stringResource(it.titleRes) }.orEmpty(),
+                ?: state.systemAlbum?.let { stringResource(it.titleRes) }
+                ?: state.folderName.orEmpty(),
             itemCount = state.items.size,
             isUserAlbum = state.isUserAlbum,
-            explainer = when (state.systemAlbum) {
-                SystemAlbum.Trash -> stringResource(R.string.trash_explainer)
-                SystemAlbum.Archive -> stringResource(R.string.organization_archive_hint)
-                SystemAlbum.RecentlyAdded -> stringResource(R.string.recently_added_explainer)
-                is SystemAlbum -> stringResource(R.string.system_album_readonly)
-                null -> null
-            },
+            explainer = state.systemAlbum?.let { album ->
+                when (album) {
+                    SystemAlbum.Trash -> stringResource(R.string.trash_explainer)
+                    SystemAlbum.Archive -> stringResource(R.string.organization_archive_hint)
+                    SystemAlbum.RecentlyAdded -> stringResource(R.string.recently_added_explainer)
+                    else -> stringResource(R.string.system_album_readonly)
+                }
+            } ?: state.folderName?.let { stringResource(R.string.folder_album_readonly) },
             onAddMedia = { adding = true },
             onRename = { renaming = true },
             onDeleteAlbum = { confirming = Confirmation.DeleteAlbum },

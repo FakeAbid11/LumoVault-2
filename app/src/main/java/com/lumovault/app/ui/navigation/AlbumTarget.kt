@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.navigation
 
+import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.SystemAlbum
 
 /**
@@ -13,6 +14,16 @@ import com.lumovault.app.domain.model.SystemAlbum
 sealed interface AlbumTarget {
     data class User(val albumId: Long) : AlbumTarget
     data class System(val album: SystemAlbum) : AlbumTarget
+
+    /**
+     * A folder on the device.
+     *
+     * A path rather than a number, and deliberately so: `albumId` is a row id into `albums`, and inventing a
+     * folder id in the same space — a negative, a large constant, a hash — would eventually hand a folder
+     * screen an id that also names somebody's "Vacation" album, where the two screens read different tables
+     * and neither one is wrong.
+     */
+    data class LocalFolder(val relativePath: String) : AlbumTarget
 
     companion object {
         /**
@@ -42,6 +53,9 @@ object AlbumRoutes {
 
     const val USER_PATTERN = "albums/user/{albumId}"
     const val SYSTEM_PATTERN = "albums/system/{target}"
+    const val LOCAL_PATTERN = "albums/folder/{path}"
+
+    const val ARG_PATH = "path"
 
     /** Every album screen hangs under this prefix, including the tabs' own `albums` route. */
     const val DETAIL_PREFIX = "albums/"
@@ -49,4 +63,8 @@ object AlbumRoutes {
     fun user(albumId: Long): String = "albums/user/$albumId"
 
     fun system(album: SystemAlbum): String = "albums/system/${album.name}"
+
+    /** Percent-encoded, because `Pictures/WhatsApp/` is three route segments if it is not. */
+    fun local(relativePath: String): String =
+        "albums/folder/" + android.net.Uri.encode(FolderPaths.normalize(relativePath))
 }

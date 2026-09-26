@@ -36,10 +36,23 @@ sealed interface ViewerTarget {
         override val argument: String get() = album.name
     }
 
+    /**
+     * Swiping through one device folder.
+     *
+     * [argument] is percent-encoded because a folder path is made of the very separator the route is split
+     * on, and `Uri.encode` is the Android-side way of saying so — which keeps route construction a
+     * on-device act, never something a JVM test exercises.
+     */
+    data class Folder(val relativePath: String) : ViewerTarget {
+        override val kind: String get() = KIND_FOLDER
+        override val argument: String get() = android.net.Uri.encode(relativePath)
+    }
+
     companion object {
         const val KIND_PHOTOS = "photos"
         const val KIND_ALBUM = "album"
         const val KIND_SYSTEM = "system"
+        const val KIND_FOLDER = "folder"
 
         /** A path segment cannot be empty, so "this kind needs no argument" needs a word of its own. */
         const val NO_ARGUMENT = "-"
@@ -54,12 +67,18 @@ sealed interface ViewerTarget {
         fun of(albumTarget: AlbumTarget?): ViewerTarget = when (albumTarget) {
             is AlbumTarget.User -> Album(albumTarget.albumId)
             is AlbumTarget.System -> SystemAlbumView(albumTarget.album)
+            is AlbumTarget.LocalFolder -> Folder(albumTarget.relativePath)
             null -> Photos
         }
 
         fun decode(kind: String?, argument: String?): ViewerTarget = when (kind) {
             KIND_ALBUM -> argument?.toLongOrNull()?.let(::Album) ?: Photos
             KIND_SYSTEM -> SystemAlbum.entries.firstOrNull { it.name == argument }?.let(::SystemAlbumView) ?: Photos
+            KIND_FOLDER -> argument
+                ?.takeIf { it != NO_ARGUMENT }
+                ?.let { Folder(com.lumovault.app.domain.model.FolderPaths.normalize(android.net.Uri.decode(it))) }
+                ?: Photos
+
             else -> Photos
         }
     }

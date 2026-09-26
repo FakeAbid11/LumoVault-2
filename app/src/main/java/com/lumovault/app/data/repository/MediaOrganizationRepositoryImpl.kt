@@ -6,7 +6,10 @@ import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
+import com.lumovault.app.data.local.organization.LocalFolderRow
 import com.lumovault.app.data.local.organization.SystemAlbumDao
+import com.lumovault.app.domain.model.FolderPaths
+import com.lumovault.app.domain.model.LocalFolderAlbum
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
@@ -82,6 +85,13 @@ class MediaOrganizationRepositoryImpl(
         return rows.map { list -> list.map(MediaEntity::toMedia) }
     }
 
+    override fun observeLocalFolders(): Flow<List<LocalFolderAlbum>> =
+        systemAlbums.observeFolderAlbums().map { rows -> localFolderAlbums(rows) }
+
+    override fun observeLocalFolderContents(relativePath: String, limit: Int): Flow<List<Media>> =
+        systemAlbums.observeFolderContents(FolderPaths.normalize(relativePath), limit)
+            .map { list -> list.map(MediaEntity::toMedia) }
+
     override fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>> {
         // Guarded because an empty `IN ()` is not valid SQL, and a window with nothing in it yet is an
         // ordinary first frame on an empty device rather than an error.
@@ -146,4 +156,46 @@ class MediaOrganizationRepositoryImpl(
          */
         const val RECENTLY_ADDED_WINDOW_SECONDS = 30L * 24 * 60 * 60
     }
+}
+
+/**
+ * Rows in, albums out.
+ *
+ * Three decisions the query cannot make. Normalization, because MediaStore's spelling of a path is not a
+ * stable identity and `Pictures/WhatsApp` would otherwise be a different folder from `Pictures/WhatsApp/`,
+ * each with its own card and its own half of the count. Deduplication against the system albums, because
+ * `DCIM/Camera/` is already on screen as Camera and showing it twice is the bug this feature would
+ * otherwise introduce. And naming, because the last segment is what a person calls the folder while the
+ * whole path is what keeps `Pictures/Telegram/` and `DCIM/Telegram/` apart.
+ *
+ * A folder with nothing in it cannot appear, because the query groups over media rows — so the exclusion
+ * rule below has to be the thing that removes a folder from the list, and a card that would show zero is
+ * never left behind.
+ */
+internal fun localFolderAlbums(rows: List<LocalFolderRow>): List<LocalFolderAlbum> {
+    val counts = LinkedHashMap<String, Int>()
+    val covers = LinkedHashMap<String, String?>()
+
+    for (row in rows) {
+        val path = FolderPaths.normalize(row.relativePath)
+        if (path == FolderPaths.ROOT) continue
+        if (SystemAlbum.entries.any { album -> album.covers(path) }) continue
+
+        counts[path] = (counts[path] ?: 0) + row.itemCount
+        if (!covers.containsKey(path)) covers[path] = row.coverUri
+    }
+
+    return counts.map { (path, count) ->
+        LocalFolderAlbum(
+            relativePath = path,
+            displayName = FolderPaths.displayNameOf(path),
+            parentLabel = FolderPaths.parentOf(path),
+            mediaCount = count,
+            coverUri = covers[path],
+        )
+    }.sortedWith(
+        compareByDescending<LocalFolderAlbum> { it.mediaCount }
+            .thenBy { it.displayName.lowercase() }
+            .thenBy { it.relativePath },
+    )
 }

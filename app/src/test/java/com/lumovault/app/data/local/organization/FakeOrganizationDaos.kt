@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.media.LocalNameMatch
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.MediaTypeCount
+import com.lumovault.app.data.local.organization.LocalFolderRow
 import com.lumovault.app.domain.model.SystemAlbum
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -257,6 +258,34 @@ class FakeSystemAlbumDao(private val store: OrganizationStore) : SystemAlbumDao 
     override fun observeFavorites(limit: Int): Flow<List<MediaEntity>> = observeOrganized(limit) { it.favorite }
 
     override fun observeArchived(limit: Int): Flow<List<MediaEntity>> = observeOrganized(limit) { it.archived }
+
+    /**
+     * Grouped exactly the way the SQL groups it: by the raw `RELATIVE_PATH`, counting what is not in
+     * Trash — and, like the real query, leaving archived items in, because a folder album reports where the
+     * files are.
+     */
+    override fun observeFolderAlbums(): Flow<List<LocalFolderRow>> = store.tick.map {
+        store.media.values
+            .filter { row -> row.relativePath.isNotEmpty() && store.inAlbumView(row.mediaStoreId) }
+            .groupBy { row -> row.relativePath }
+            .map { (path, rows) ->
+                LocalFolderRow(
+                    relativePath = path,
+                    itemCount = rows.size,
+                    coverUri = store.newestFirst(rows.map { it.mediaStoreId }, 1).firstOrNull()?.contentUri,
+                )
+            }
+    }
+
+    override fun observeFolderContents(relativePath: String, limit: Int): Flow<List<MediaEntity>> =
+        store.tick.map {
+            store.newestFirst(
+                store.media.values
+                    .filter { row -> row.relativePath == relativePath && store.inAlbumView(row.mediaStoreId) }
+                    .map { row -> row.mediaStoreId },
+                limit,
+            )
+        }
 
     override fun observeTrashed(limit: Int): Flow<List<TrashedMediaRow>> = store.tick.map {
         store.organization.values.filter { it.trashedAt > 0L }

@@ -54,6 +54,25 @@ enum class SystemAlbum {
             else -> null
         }
 
+    /**
+     * Whether this album already shows everything in [normalizedPath], so a folder album must not show the
+     * same list a second time under the folder's own name.
+     *
+     * Asking the pattern rather than comparing folder names is the point: the rule cannot drift from the
+     * album's definition, because there is only one definition. `Videos` is not a folder album at all — it
+     * is a type, and its items live in whatever folders produced them — so it claims nothing here and a
+     * folder full of clips still appears on its own, which is what the user expects to find.
+     */
+    fun covers(normalizedPath: String): Boolean {
+        val pattern = pathLikePattern ?: return false
+        val core = pattern.trim('%')
+        return if (pattern.startsWith('%')) {
+            normalizedPath.contains("$core/")
+        } else {
+            normalizedPath.startsWith(core)
+        }
+    }
+
     /** The media type this album is defined by, if any. A GIF is its own type and so stays out of Videos. */
     val mediaType: MediaType?
         get() = when (this) {

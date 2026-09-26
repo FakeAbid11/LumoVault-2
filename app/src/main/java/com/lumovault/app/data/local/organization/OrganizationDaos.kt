@@ -338,6 +338,59 @@ interface SystemAlbumDao {
     )
     fun observeByPath(pattern: String, limit: Int): Flow<List<MediaEntity>>
 
+    /**
+     * Every folder the index holds media in, with its count and its newest item — one statement.
+     *
+     * Grouped in SQL rather than in Kotlin because the alternative is loading the library to draw a grid of
+     * numbers: 100,000 media become 100,000 `Media` objects on their way to a screen that shows a dozen
+     * names. The cover is a correlated subquery for the same reason — one read, not one per folder — and it
+     * repeats the trashed exclusion rather than trusting the outer row, because the newest file in a folder
+     * can be the one that is in Trash.
+     *
+     * Archived items stay in, exactly as they do in `observeByPath`: a folder album reports where the files
+     * are, and archiving is a statement about the library's front page rather than about the disk.
+     *
+     * Ordering is by size then name, so the folders a person actually uses come first and the list does not
+     * reorder itself every time a count changes.
+     */
+    @Query(
+        """
+        SELECT
+            m.relative_path AS relativePath,
+            COUNT(*) AS itemCount,
+            (
+                SELECT c.content_uri FROM media c
+                LEFT JOIN media_organization co ON co.media_store_id = c.media_store_id
+                WHERE c.relative_path = m.relative_path AND COALESCE(co.trashed_at, 0) = 0
+                ORDER BY c.date_added_seconds DESC, c.media_store_id DESC LIMIT 1
+            ) AS coverUri
+        FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.relative_path <> '' AND COALESCE(o.trashed_at, 0) = 0
+        GROUP BY m.relative_path
+        ORDER BY COUNT(*) DESC, m.relative_path COLLATE NOCASE ASC
+        """,
+    )
+    fun observeFolderAlbums(): Flow<List<LocalFolderRow>>
+
+    /**
+     * The media inside one folder.
+     *
+     * Equality, not `LIKE`: `RELATIVE_PATH` is the folder a file is filed in, so `Pictures/WhatsApp/` and
+     * `Pictures/WhatsApp/Stickers/` are two folders with two honest contents, and a prefix match would
+     * silently merge them into an album whose count no longer matches its list.
+     */
+    @Query(
+        """
+        SELECT m.* FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.relative_path = :relativePath AND COALESCE(o.trashed_at, 0) = 0
+        ORDER BY m.date_added_seconds DESC, m.media_store_id DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeFolderContents(relativePath: String, limit: Int): Flow<List<MediaEntity>>
+
     @Query(
         """
         SELECT m.* FROM media m
@@ -386,4 +439,17 @@ data class SystemAlbumCountsRow(
 data class TrashedMediaRow(
     @Embedded val media: MediaEntity,
     val trashedAt: Long,
+)
+
+/**
+ * One folder, its media count and the newest item's uri.
+ *
+ * [relativePath] arrives exactly as MediaStore wrote it and is normalized on the way out, so this row is
+ * the raw fact rather than the album — turning it into a [com.lumovault.app.domain.model.LocalFolderAlbum]
+ * is the repository's job, and it is the one place allowed to decide what counts as a folder.
+ */
+data class LocalFolderRow(
+    val relativePath: String,
+    val itemCount: Int,
+    val coverUri: String?,
 )

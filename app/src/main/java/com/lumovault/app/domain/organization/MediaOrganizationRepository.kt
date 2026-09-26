@@ -1,5 +1,6 @@
 package com.lumovault.app.domain.organization
 
+import com.lumovault.app.domain.model.LocalFolderAlbum
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,19 @@ interface MediaOrganizationRepository {
      * library of 100,000 screenshots must not be materialised to draw a screenful of them.
      */
     fun observeContents(album: SystemAlbum, limit: Int): Flow<List<Media>>
+
+    /**
+     * The device's own folders, as albums.
+     *
+     * Derived from what the index already holds and never stored: a folder is not something LumoVault
+     * created, so it gets no row in `albums` and no entry in `album_media`. Folders whose contents a system
+     * album already lists by path (Camera, Screenshots, Downloads) are left out here rather than in the
+     * screen, so the rule cannot be bypassed by a caller that forgot to filter.
+     */
+    fun observeLocalFolders(): Flow<List<LocalFolderAlbum>>
+
+    /** What is filed in one folder, by its normalized relative path. */
+    fun observeLocalFolderContents(relativePath: String, limit: Int): Flow<List<Media>>
 
     /** Which of [mediaStoreIds] are favourited, for the badge on a grid cell. */
     fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>>

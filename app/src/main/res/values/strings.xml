@@ -330,6 +330,7 @@
     <string name="albums_create_action">New album</string>
     <string name="albums_section_system">Library</string>
     <string name="albums_section_user">My albums</string>
+    <string name="albums_section_folders">On this device</string>
     <string name="albums_empty_title">No albums yet</string>
     <string name="albums_empty_body">Make an album to keep a trip, a project or a set of receipts together. The photos themselves stay where they are.</string>
     <string name="albums_no_items">Nothing here yet</string>
@@ -370,6 +371,7 @@
     <string name="trash_delete_unsupported">This Android version does not let LumoVault delete these files. Remove them in your device\'s Photos app, then pull to refresh here.</string>
     <string name="recently_added_explainer">Files that arrived on this device in the last 30 days, whatever date is on them.</string>
     <string name="system_album_readonly">This album is built from what these files are, so nothing is added to it by hand.</string>
+    <string name="folder_album_readonly">This is a folder on your phone. LumoVault shows what is in it; files arrive here from the camera or the app that saved them, not from this screen.</string>
 
     <plurals name="album_items_count">
         <item quantity="one">%1$d item</item>

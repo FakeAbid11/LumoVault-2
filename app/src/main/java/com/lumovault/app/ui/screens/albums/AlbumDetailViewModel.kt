@@ -6,6 +6,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.Album
@@ -38,11 +39,13 @@ data class AlbumDetailUiState(
     val favoriteIds: Set<Long> = emptySet(),
     val memberIds: Set<Long> = emptySet(),
     val selection: Set<Long> = emptySet(),
+    /** The folder's own name, when this is a device folder rather than an album of either kind. */
+    val folderName: String? = null,
 ) {
     val isUserAlbum: Boolean get() = userAlbum != null
 
     /** Nothing is known about this album yet — the route's arguments have not been applied. */
-    val isUnresolved: Boolean get() = userAlbum == null && systemAlbum == null
+    val isUnresolved: Boolean get() = userAlbum == null && systemAlbum == null && folderName == null
 }
 
 /**
@@ -98,6 +101,8 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         AlbumDetailUiState(
             userAlbum = album,
             systemAlbum = (target.value as? AlbumTarget.System)?.album,
+            folderName = (target.value as? AlbumTarget.LocalFolder)
+                ?.let { FolderPaths.displayNameOf(it.relativePath) },
             items = media,
             favoriteIds = favourites,
             memberIds = members,
@@ -273,6 +278,12 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun contentsOf(target: AlbumTarget?, limit: Int) = when (target) {
         is AlbumTarget.User -> container.albumRepository.observeContents(target.albumId, limit)
         is AlbumTarget.System -> container.mediaOrganizationRepository.observeContents(target.album, limit)
+
+        // Exact path, not a prefix: a folder's album is the files MediaStore files in *that* folder, and a
+        // nested folder is its own album with its own count.
+        is AlbumTarget.LocalFolder ->
+            container.mediaOrganizationRepository.observeLocalFolderContents(target.relativePath, limit)
+
         null -> flowOf<List<Media>>(emptyList())
     }
 
