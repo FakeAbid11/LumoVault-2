@@ -109,14 +109,16 @@ object TimelineRail {
      * reads as one month early. Weighted by items for the same reason [itemIndexFor] is — the rail's shape is
      * the library's shape, so a share of the items is the same share of the track.
      *
-     * Zero for a month that is not on the rail: callers pass what [monthFor] answered, and a month from a
-     * superseded list is the one case where drawing anything would be drawing a lie.
+     * Null for a month that is not on the rail: callers pass what [monthFor] answered, and a month from a
+     * superseded list is the one case where drawing anything would be drawing a lie. Zero was the old answer,
+     * and zero is exactly where the first month lives — an off-rail month was indistinguishable from the top
+     * of the track, so a stale label pinned itself to the newest month after the window grew.
      */
-    fun fractionFor(months: List<RailMonth>, month: RailMonth): Float {
+    fun fractionFor(months: List<RailMonth>, month: RailMonth): Float? {
         val total = months.sumOf { it.itemCount }
-        if (total <= 0) return 0f
+        if (total <= 0) return null
         val position = months.indexOf(month)
-        if (position < 0) return 0f
+        if (position < 0) return null
         val itemsBefore = months.subList(0, position).sumOf { it.itemCount }
         val centre = itemsBefore + month.itemCount / 2f
         return (centre / total).coerceIn(0f, 1f)

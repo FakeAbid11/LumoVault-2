@@ -45,6 +45,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -373,9 +374,13 @@ private fun Timeline(
         TimelineRail.months(state.days, firstItemIndex = if (state.limitedAccess) 1 else 0)
     }
 
-    // Reading the first visible index during composition is what makes the highlight follow a scroll: it is
-    // snapshot state on the grid, so the recomposition is the same one the day headers ride along with.
-    val activeMonth = TimelineRail.monthFor(railMonths, gridState.firstVisibleItemIndex)
+    // Reading the first visible index is what makes the highlight follow a scroll — but inside
+    // `derivedStateOf`, not directly in composition: the raw index changes with every scrolled item,
+    // while the month it answers for usually does not. Derived, a scroll within one month recomposes
+    // nothing; the dedup is by the month's own equality.
+    val activeMonth by remember(railMonths) {
+        derivedStateOf { TimelineRail.monthFor(railMonths, gridState.firstVisibleItemIndex) }
+    }
 
     LaunchedEffect(gridState, renderedRows, state.hasMoreToLoad) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }

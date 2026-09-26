@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.screens.photos
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,6 +89,28 @@ fun DateRail(
     var announced by remember { mutableStateOf<RailMonth?>(null) }
     var seen by remember { mutableStateOf<RailMonth?>(null) }
 
+    // The gestures below live in `pointerInput(Unit)` coroutines that outlive any single composition,
+    // so everything they read has to come through a state handle: a rebuild of `months` (which is what
+    // an auto load-more does) updates what a running drag sees instead of cancelling it, and a plain
+    // captured parameter would be the value from the composition that first installed the gesture.
+    val currentMonths = rememberUpdatedState(months)
+    val currentScrub = rememberUpdatedState(onScrub)
+
+    // Height to fraction, fraction to index: both steps are [TimelineRail]'s arithmetic, which the
+    // tests assert, so the only thing left in this file that can be wrong is the drawing.
+    fun scrubTo(yPx: Float) {
+        val track = trackPx
+        if (track <= 0f) return
+        val rail = currentMonths.value
+        if (rail.isEmpty()) return
+        val fraction = (yPx / track).coerceIn(0f, 1f)
+        val index = TimelineRail.itemIndexFor(rail, fraction)
+        val month = TimelineRail.monthFor(rail, index)
+        if (month != null) scrubbing = Scrubbing(month.yearMonth, yPx)
+        announced = null
+        currentScrub.value.invoke(index)
+    }
+
     // The pill outlives the finger by about a second: a drag that stops on a month is a decision about that
     // month, and it should be readable after the hand leaves the screen.
     LaunchedEffect(scrubbing) {
@@ -142,22 +166,20 @@ fun DateRail(
                 // the gesture also *claims* it, which matters for one reason — the grid under the rail would
                 // scroll on the same movement, and a scrubber whose own drag scrolls the list it is scrubbing
                 // moves the answer away from the question.
-                .pointerInput(months, trackPx) {
-                    // Nothing can be divided by a track that has not been measured yet, which is the first frame.
-                    if (trackPx <= 0f) return@pointerInput
-                    // Height to fraction, fraction to index: both steps are [TimelineRail]'s arithmetic, which
-                    // the tests assert, so the only thing left in this file that can be wrong is the drawing.
-                    fun scrubTo(yPx: Float) {
-                        val fraction = (yPx / trackPx).coerceIn(0f, 1f)
-                        val index = TimelineRail.itemIndexFor(months, fraction)
-                        val month = TimelineRail.monthFor(months, index)
-                        if (month != null) scrubbing = Scrubbing(month.yearMonth, yPx)
-                        announced = null
-                        onScrub(index)
-                    }
+                //
+                // Taps are claimed by a separate, equally keyless listener: a strip that looks like a
+                // scrollbar gets tapped like one, and `detectVerticalDragGestures` deliberately never reports
+                // a movement that stayed inside touch slop — a plain tap used to do nothing at all while the
+                // comment here promised it jumped. The drag that follows a tap cannot disagree with it: a
+                // tap only fires where a drag would have started, and scrubbing to the same pixel twice is
+                // the same scroll.
+                .pointerInput(Unit) {
+                    detectTapGestures { offset -> scrubTo(offset.y) }
+                }
+                .pointerInput(Unit) {
                     detectVerticalDragGestures(
-                        // The first touch jumps to the month it landed on rather than waiting for a movement the
-                        // user may not intend; every change after it keeps pill and grid in step with the finger.
+                        // The first touch of a drag jumps to the month it landed on; every change after it
+                        // keeps pill and grid in step with the finger.
                         onDragStart = { position -> scrubTo(position.y) },
                         onDragEnd = { scrubbing = null },
                         onDragCancel = { scrubbing = null },
@@ -249,7 +271,9 @@ private fun pillFor(
     val scrub = scrubbing
     if (scrub != null) return Pill(month = scrub.month, topPx = pillTop(scrub.yPx, trackPx, pillHeightPx))
     if (announced == null || trackPx <= 0f) return null
-    val centre = TimelineRail.fractionFor(months, announced) * trackPx
+    // Null here means the announced month has fallen off a rebuilt rail: naming nothing is the honest
+    // answer, where the old zero would have pinned its name to the top of the track.
+    val centre = TimelineRail.fractionFor(months, announced)?.times(trackPx) ?: return null
     return Pill(month = announced.yearMonth, topPx = pillTop(centre, trackPx, pillHeightPx))
 }
 

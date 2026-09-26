@@ -167,8 +167,8 @@ class TimelineRailTest {
         // has had longest.)
         val months = TimelineRail.months(library)
 
-        assertEquals(0.25, TimelineRail.fractionFor(months, months[0]).toDouble(), 0.001)
-        assertEquals(0.75, TimelineRail.fractionFor(months, months[1]).toDouble(), 0.001)
+        assertEquals(0.25, requireNotNull(TimelineRail.fractionFor(months, months[0])).toDouble(), 0.001)
+        assertEquals(0.75, requireNotNull(TimelineRail.fractionFor(months, months[1])).toDouble(), 0.001)
     }
 
     @Test
@@ -178,20 +178,18 @@ class TimelineRailTest {
         assertEquals(
             "one month on the rail is the whole rail",
             0.5,
-            TimelineRail.fractionFor(one, one[0]).toDouble(),
+            requireNotNull(TimelineRail.fractionFor(one, one[0])).toDouble(),
             0.001,
         )
-        assertEquals(
+        // Null, never zero: zero *is* the neighbourhood of the first month, and a caller that drew what it
+        // got would pin a stale month's name to the top of the track. Off the rail means no name at all.
+        assertNull(
             "a month from a list it is not in names nothing",
-            0.0,
-            TimelineRail.fractionFor(one, RailMonth(YearMonth.of(2020, 1), firstItemIndex = 0, itemCount = 1))
-                .toDouble(),
-            0.001,
+            TimelineRail.fractionFor(one, RailMonth(YearMonth.of(2020, 1), firstItemIndex = 0, itemCount = 1)),
         )
-        assertEquals(
-            0.0,
-            TimelineRail.fractionFor(emptyList(), RailMonth(YearMonth.of(2024, 3), 0, 0)).toDouble(),
-            0.001,
+        assertNull(
+            "an empty rail cannot host any month's announcement either",
+            TimelineRail.fractionFor(emptyList(), RailMonth(YearMonth.of(2024, 3), 0, 0)),
         )
     }
 
@@ -202,7 +200,7 @@ class TimelineRailTest {
         val months = TimelineRail.months(library)
 
         months.forEach { month ->
-            val centre = TimelineRail.fractionFor(months, month)
+            val centre = requireNotNull(TimelineRail.fractionFor(months, month))
             val index = TimelineRail.itemIndexFor(months, centre)
             assertEquals(month.yearMonth, TimelineRail.monthFor(months, index)?.yearMonth)
         }
