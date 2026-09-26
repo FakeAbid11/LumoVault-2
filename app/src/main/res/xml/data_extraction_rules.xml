@@ -4,8 +4,13 @@
     backup would put an active Telegram session in a Google account, and device-to-device transfer
     would hand a new phone a session database it cannot legitimately use.
 
-    LumoVault's own settings database is deliberately still transferable — it holds a theme choice
-    and setup flags, nothing sensitive.
+    LumoVault's own database is excluded by both routes too, matching the API 31-and-below rules in
+    backup_rules.xml. It is not the settings row an earlier comment claimed: at the current schema it
+    holds the whole media index — every file name and relative path on the device — the backup queue
+    and the restore rows, which is somebody's photo library described in text and does not belong in
+    a Google account. A transferred copy is also a stale one: the session it would reference is
+    excluded above, so the new device re-authenticates regardless, and the index rebuilds itself on
+    the first scan. Excluding loses setup flags and re-asks them; including would leak the library.
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -15,6 +20,9 @@
         <exclude
             domain="file"
             path="tdlib_files" />
+        <exclude
+            domain="database"
+            path="lumovault.db" />
     </cloud-backup>
 
     <device-transfer>
@@ -24,5 +32,8 @@
         <exclude
             domain="file"
             path="tdlib_files" />
+        <exclude
+            domain="database"
+            path="lumovault.db" />
     </device-transfer>
 </data-extraction-rules>
