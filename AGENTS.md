@@ -144,6 +144,14 @@ Rules that have already caused a mistake here:
   `ViewerTarget.Folder` costs one branch in `MediaViewerViewModel.contentsOf` and one in
   `AlbumDetailViewModel.contentsOf`, and CI only names the first. Nothing in the local checks can see it.
 
+- **Two kinds of album, two identities, never one table.** A user album is a stored list — `albums` plus
+  `album_media`, keyed by a row id. A device folder is a derivation — `GROUP BY media.relative_path`, keyed
+  by the normalized relative path, with `SystemAlbum.covers` deciding which folders the Library section
+  already claims. Inserting a folder into `albums` because it exists, giving one a synthetic `albumId`
+  (negative, huge, hashed), or addressing a folder by a `LIKE` prefix instead of equality — which would
+  merge `Pictures/WhatsApp/` with `Pictures/WhatsApp/Images/` — each break a different one of those
+  invariants, and all three look like a shortcut.
+
 - **Grep back every `R.string` you add; an unreferenced one is usually an unwired feature.** AAPT does not
   complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
   build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was

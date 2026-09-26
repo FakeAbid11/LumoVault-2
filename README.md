@@ -243,6 +243,19 @@ system albums = queries over the two tables above, never rows of their own
   every organisation predicate is indexed, and each screen reads a window (`LIMIT 300`, widened on
   scroll) instead of a materialised library.
 
+**Device folders, kept a separate idea.** Alongside the albums above, the Albums screen lists a section
+called "On this device": every folder MediaStore files supported media into — `Pictures/WhatsApp/`,
+`Movies/ScreenRecordings/`, a folder created yesterday — grouped from the existing index in one
+`GROUP BY relative_path` statement, with each folder's newest photo as its cover. They are read, never
+registered: no row in `albums`, none in `album_media`, and no id that could be confused with a user album's
+row id, because a folder is addressed by its normalized relative path (`FolderPaths.normalize`, one
+spelling per physical folder, trailing separator included). Two folders called `Telegram` under different
+parents stay two albums, and the card says which is which only then. A folder already listed by a path
+system album — Camera, Screenshots, Downloads — is left out, using `SystemAlbum.covers`, so the same files
+are never offered twice under two counts. A folder whose last photo goes to Trash disappears from the list,
+and opening one goes through the same detail grid and viewer as any album, with the same backup badge,
+because it is the same `Media` records.
+
 **What this does not do.** No album reordering, no per-album cover choice, no pull-to-refresh on the
 album grid, and no undo snackbar — the confirmation dialogs are the only safety net. Trash has no
 automatic expiry: `trashed_at` records how long an item has been sitting, and nothing acts on it yet.
