@@ -205,6 +205,8 @@
     <string name="backup_cell_selected">Selected</string>
     <string name="backup_selection_clear">Clear</string>
     <string name="backup_cancel">Cancel</string>
+    <string name="backup_cancel_confirm_title">Cancel pending backup?</string>
+    <string name="backup_cancel_confirm_body">Items still waiting are withdrawn. What already uploaded stays in your channel, and anything withdrawn can be queued again.</string>
     <string name="backup_retry_failed">Retry failed</string>
     <string name="backup_state_backed_up">Backed up</string>
     <string name="backup_state_uploading">Uploading</string>
@@ -348,6 +350,8 @@
     <string name="album_delete_action">Delete album</string>
     <string name="album_add_media_action">Add photos</string>
     <string name="album_remove_from_album_action">Remove from album</string>
+    <string name="album_remove_confirm_title">Remove from album?</string>
+    <string name="album_remove_confirm_body">The photos stay in your library and in your backup. Only this album loses them.</string>
     <string name="album_cover_unavailable">Empty album</string>
     <string name="album_selected_count">%1$d selected</string>
     <string name="album_add_sheet_title">Add to %1$s</string>
@@ -407,6 +411,9 @@
     <string name="backup_folders_explainer">Backup takes media from these folders only — what is already inside them as soon as you save, and whatever you add later. Photos already in your LumoVault Backup stay recognized wherever they are.</string>
     <string name="backup_folders_back_up_everything">Back up everything</string>
     <string name="backup_folders_empty">No folders with photos or videos yet. They appear here after the library has been scanned.</string>
+    <string name="folders_discard_title">Discard folder changes?</string>
+    <string name="folders_discard_body">The folders ticked here are not saved yet. Leaving now discards them.</string>
+    <string name="folders_discard_action">Discard</string>
     <plurals name="backup_folders_selected">
         <item quantity="one">%d folder selected</item>
         <item quantity="other">%d folders selected</item>

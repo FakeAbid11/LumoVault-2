@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,6 +46,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -103,6 +107,15 @@ fun PhotosScreen(
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Trashing a selection and withdrawing the queue are both bulk acts with no undo from the bar, so
+    // both confirm — the viewer already confirms the same trash action for one item.
+    var confirmingTrash by remember { mutableStateOf(false) }
+    var confirmingCancel by remember { mutableStateOf(false) }
+
+    // Photos is the root tab: back with the selection bar up used to leave the app mid-gesture.
+    // Back now means "stop selecting", which is what every other gallery does.
+    BackHandler(enabled = selected.isNotEmpty()) { viewModel.clearSelection() }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -184,15 +197,57 @@ fun PhotosScreen(
                 onBackUp = viewModel::backUpSelected,
                 onFavorite = { viewModel.setFavoriteSelected(true) },
                 onArchive = viewModel::archiveSelected,
-                onTrash = viewModel::moveToTrashSelected,
+                onTrash = { confirmingTrash = true },
                 onClear = viewModel::clearSelection,
-                onCancel = viewModel::cancelPending,
+                onCancel = { confirmingCancel = true },
                 onRetryFailed = viewModel::retryFailed,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(),
             )
         }
+    }
+
+    if (confirmingTrash) {
+        AlertDialog(
+            onDismissRequest = { confirmingTrash = false },
+            title = { Text(stringResource(R.string.viewer_trash_title)) },
+            text = { Text(stringResource(R.string.viewer_trash_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingTrash = false
+                        viewModel.moveToTrashSelected()
+                    },
+                ) { Text(stringResource(R.string.organization_trash_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingTrash = false }) {
+                    Text(stringResource(R.string.album_cancel))
+                }
+            },
+        )
+    }
+
+    if (confirmingCancel) {
+        AlertDialog(
+            onDismissRequest = { confirmingCancel = false },
+            title = { Text(stringResource(R.string.backup_cancel_confirm_title)) },
+            text = { Text(stringResource(R.string.backup_cancel_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingCancel = false
+                        viewModel.cancelPending()
+                    },
+                ) { Text(stringResource(R.string.backup_cancel)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingCancel = false }) {
+                    Text(stringResource(R.string.album_cancel))
+                }
+            },
+        )
     }
 }
 

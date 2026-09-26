@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.backup
 
 import android.app.Application
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +28,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -58,6 +63,8 @@ data class BackupFoldersUiState(
     /** What is saved, in the same words the Backup & storage hub uses for it. */
     val sourceLine: BackupSourceLine = BackupSourceLine(null, 0),
     val loading: Boolean = true,
+    /** Ticks exist that Save has not written; leaving now would drop them. */
+    val hasUnsavedChanges: Boolean = false,
 )
 
 /**
@@ -90,6 +97,7 @@ class BackupFoldersViewModel(application: Application) : AndroidViewModel(applic
             selected = pending ?: current.selectedFolders.toSet(),
             sourceLine = BackupSourceLine(current.backupSource, current.selectedFolders.size),
             loading = available.isEmpty() && current.backupSource == null,
+            hasUnsavedChanges = pending != null,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), BackupFoldersUiState())
 
@@ -140,13 +148,20 @@ fun BackupFoldersScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // This screen is a draft with a Save, unlike the onboarding picker that writes per tap: back with
+    // unsaved ticks used to drop them silently. Both exits — the gesture and the arrow — ask first.
+    var confirmDiscard by remember { mutableStateOf(false) }
+    BackHandler(enabled = state.hasUnsavedChanges) { confirmDiscard = true }
+
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.backup_folders_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
+                    IconButton(onClick = {
+                        if (state.hasUnsavedChanges) confirmDiscard = true else onNavigateUp()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
@@ -251,5 +266,27 @@ fun BackupFoldersScreen(
                 }
             }
         }
+    }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.folders_discard_title)) },
+            text = { Text(stringResource(R.string.folders_discard_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDiscard = false
+                        viewModel.cancel()
+                        onNavigateUp()
+                    },
+                ) { Text(stringResource(R.string.folders_discard_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) {
+                    Text(stringResource(R.string.album_cancel))
+                }
+            },
+        )
     }
 }
