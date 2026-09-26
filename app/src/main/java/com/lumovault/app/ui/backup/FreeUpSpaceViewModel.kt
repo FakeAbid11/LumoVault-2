@@ -55,6 +55,9 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
     /** True while the review has never come back, so the screen can say "loading" rather than guess. */
     private val loading = MutableStateFlow(true)
 
+    /** True while [confirm] is hashing and asking the resolver — the window a second tap would restart. */
+    private val confirming = MutableStateFlow(false)
+
     private val plan = container.freeUpSpace.plan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), FreeUpSpacePlan(0, 0L))
 
@@ -68,7 +71,11 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
                 loading = busy,
                 selectedBytes = listed.filter { it.mediaStoreId in chosen }.sumOf { it.sizeBytes },
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), FreeUpSpaceState())
+        }
+            // The sixth value rides separately: the typed `combine` covers five flows, and the vararg
+            // overload would silently turn the five above into an untyped array.
+            .combine(confirming) { base, busy -> base.copy(confirming = busy) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), FreeUpSpaceState())
 
     init {
         loadReview()
@@ -79,14 +86,24 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
     private fun loadReview() {
         viewModelScope.launch {
             loading.value = true
-            val listed = container.freeUpSpace.review(REVIEW_LIMIT)
-            review.value = listed
-            loading.value = false
-            // Selection is clamped to what is still offered. An id the user ticked that is no longer on the
-            // list would ride into the confirmation only to be refused there, and a refusal the user never
-            // saw is a surprise rather than a safety net.
-            val still = listed.map { it.mediaStoreId }.toSet()
-            selected.value = selected.value.intersect(still)
+            try {
+                val listed = container.freeUpSpace.review(REVIEW_LIMIT)
+                review.value = listed
+                // Selection is clamped to what is still offered. An id the user ticked that is no longer on the
+                // list would ride into the confirmation only to be refused there, and a refusal the user never
+                // saw is a surprise rather than a safety net.
+                val still = listed.map { it.mediaStoreId }.toSet()
+                selected.value = selected.value.intersect(still)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // An empty list plus the screen's own "nothing to review" copy is the honest failure state;
+                // a spinner that never stops would promise an answer that is not coming.
+                Log.w(TAG, "free-up-space review failed: ${error.javaClass.simpleName}")
+                review.value = emptyList()
+            } finally {
+                loading.value = false
+            }
         }
     }
 
@@ -117,6 +134,7 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
         val ids = selected.value.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
+            confirming.value = true
             // Preparing reads and hashes real files and the request goes to the resolver: a uri whose
             // grant died, or storage that vanished mid-read, throws. Nothing has been deleted at this
             // point, so the honest outcome is the screen's own "failed" sentence rather than a crash.
@@ -140,6 +158,8 @@ class FreeUpSpaceViewModel(application: Application) : AndroidViewModel(applicat
                 Log.w(TAG, "free-up-space confirm failed: ${error.javaClass.simpleName}")
                 pending.value = null
                 outcome.value = DeletionOutcome.Failed
+            } finally {
+                confirming.value = false
             }
         }
     }
@@ -216,6 +236,8 @@ data class FreeUpSpaceState(
     val outcome: DeletionOutcome = DeletionOutcome.None,
     val selectedBytes: Long = 0L,
     val loading: Boolean = false,
+    /** A confirmation is being prepared; the button that starts one must not start a second. */
+    val confirming: Boolean = false,
 ) {
     val nothingEligible: Boolean
         get() = plan.eligibleCount == 0

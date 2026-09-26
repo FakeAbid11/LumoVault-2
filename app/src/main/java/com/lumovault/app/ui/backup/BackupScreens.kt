@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
@@ -522,10 +523,19 @@ fun FreeUpSpaceScreen(
                     )
                     Button(
                         onClick = { confirmShown = true },
-                        enabled = state.selected.isNotEmpty(),
+                        // Preparing hashes files and asks the resolver, which takes seconds on a large
+                        // selection: a button that stays live through it starts the work twice.
+                        enabled = state.selected.isNotEmpty() && !state.confirming,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.free_space_action))
+                        if (state.confirming) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(stringResource(R.string.free_space_action))
+                        }
                     }
                 }
             }
