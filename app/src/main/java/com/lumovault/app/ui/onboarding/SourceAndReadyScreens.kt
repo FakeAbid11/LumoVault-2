@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.onboarding
 
+import com.lumovault.app.domain.model.LocalFolder
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,13 +113,16 @@ private fun SourceOption(
 }
 
 /**
- * The folder picker. The list is deliberately empty: reading folders means querying MediaStore,
- * which is Phase 3's scanner, and inventing plausible-looking folder names here would be a lie the
- * user could act on. Selection persists against the folder keys the scanner will later emit.
+ * The folder picker, shared with Settings by the record behind it.
+ *
+ * Rows are labelled by the folder's own name — with its parent when two folders share one — and ticked by
+ * their normalized `RELATIVE_PATH`, which is the value `autoBackupCandidates` compares with. The earlier
+ * shape stored the label it showed, so a folder chosen here could match no row in the index at all.
+ * Nothing is invented: an unscanned device has no folders to list and says so.
  */
 @Composable
 fun FolderSelectionScreen(
-    folders: List<String>,
+    folders: List<LocalFolder>,
     selectedFolders: List<String>,
     onToggle: (String) -> Unit,
     onBack: () -> Unit,
@@ -162,17 +166,36 @@ fun FolderSelectionScreen(
             }
         } else {
             folders.forEach { folder ->
-                val checked = folder in selectedFolders
+                val repeated = folders.count { it.displayName == folder.displayName } > 1
+                val checked = folder.relativePath in selectedFolders
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle(folder) })
+                        .toggleable(
+                            value = checked,
+                            role = Role.Checkbox,
+                            onValueChange = { onToggle(folder.relativePath) },
+                        )
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Checkbox(checked = checked, onCheckedChange = null)
-                    Text(text = folder, style = MaterialTheme.typography.bodyLarge)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = folder.displayName, style = MaterialTheme.typography.bodyLarge)
+                        if (repeated && folder.parentLabel.isNotBlank()) {
+                            Text(
+                                text = folder.parentLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Text(
+                        text = folder.mediaCount.toString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

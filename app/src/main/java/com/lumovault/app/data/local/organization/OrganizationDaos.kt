@@ -445,7 +445,7 @@ data class TrashedMediaRow(
  * One folder, its media count and the newest item's uri.
  *
  * [relativePath] arrives exactly as MediaStore wrote it and is normalized on the way out, so this row is
- * the raw fact rather than the album — turning it into a [com.lumovault.app.domain.model.LocalFolderAlbum]
+ * the raw fact rather than the album — turning it into a [com.lumovault.app.domain.model.LocalFolder]
  * is the repository's job, and it is the one place allowed to decide what counts as a folder.
  */
 data class LocalFolderRow(

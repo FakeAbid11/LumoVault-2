@@ -1,7 +1,12 @@
 package com.lumovault.app.domain.model
 
 /**
- * A folder on the device, offered as an album.
+ * A folder on the device, offered as an album and as a backup source.
+ *
+ * One record for both questions, because both ask the same one: what is filed at this path. The album grid
+ * hides folders the Library already lists; the backup picker must not — `DCIM/Camera/` is the folder people
+ * most often want backed up, and letting an album-screen rule decide that would be a backup decision made
+ * by the wrong screen.
  *
  * Deliberately not an [com.lumovault.app.domain.organization.Album]: a folder is not a list LumoVault
  * owns. It has no row in `albums`, no entry in `album_media`, and nothing can be added to it or taken from
@@ -13,7 +18,7 @@ package com.lumovault.app.domain.model
  * called the same thing: `Pictures/Telegram/` and `DCIM/Telegram/` are not one album, and an id built from
  * the last segment would quietly merge them into a list that is neither.
  */
-data class LocalFolderAlbum(
+data class LocalFolder(
     /** Normalized, always with the trailing separator: see [FolderPaths.normalize]. */
     val relativePath: String,
     val displayName: String,

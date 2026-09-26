@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.onboarding
 
+import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.model.BackgroundBackupStatus
 import com.lumovault.app.domain.model.Country
 import com.lumovault.app.domain.model.MediaAccessStatus
@@ -42,7 +43,7 @@ data class OnboardingUiState(
     /** Which part of the sign-in flow the user is looking at. */
     val telegramPanel: TelegramPanel = TelegramPanel.Phone,
     /** Folders present in the media index; empty until the library has been scanned. */
-    val availableFolders: List<String> = emptyList(),
+    val availableFolders: List<LocalFolder> = emptyList(),
 ) {
     /** The sub-step Telegram's latest state implies, or the previous one while an error is showing. */
     val panel: TelegramPanel

@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
-import com.lumovault.app.domain.model.LocalFolderAlbum
+import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.domain.organization.SystemAlbumCounts
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +29,7 @@ data class AlbumsUiState(
      * and a phone whose media all lives in Camera and Screenshots has no folders left to show once those
      * system albums have claimed them.
      */
-    val localFolders: List<LocalFolderAlbum> = emptyList(),
+    val localFolders: List<LocalFolder> = emptyList(),
 )
 
 /**

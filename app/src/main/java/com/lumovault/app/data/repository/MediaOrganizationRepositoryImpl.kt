@@ -9,7 +9,7 @@ import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.data.local.organization.LocalFolderRow
 import com.lumovault.app.data.local.organization.SystemAlbumDao
 import com.lumovault.app.domain.model.FolderPaths
-import com.lumovault.app.domain.model.LocalFolderAlbum
+import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
@@ -85,8 +85,11 @@ class MediaOrganizationRepositoryImpl(
         return rows.map { list -> list.map(MediaEntity::toMedia) }
     }
 
-    override fun observeLocalFolders(): Flow<List<LocalFolderAlbum>> =
-        systemAlbums.observeFolderAlbums().map { rows -> localFolderAlbums(rows) }
+    override fun observeLocalFolders(): Flow<List<LocalFolder>> =
+        systemAlbums.observeFolderAlbums().map { rows -> localFolders(rows, includeClaimed = false) }
+
+    override fun observeBackupFolders(): Flow<List<LocalFolder>> =
+        systemAlbums.observeFolderAlbums().map { rows -> localFolders(rows, includeClaimed = true) }
 
     override fun observeLocalFolderContents(relativePath: String, limit: Int): Flow<List<Media>> =
         systemAlbums.observeFolderContents(FolderPaths.normalize(relativePath), limit)
@@ -172,21 +175,28 @@ class MediaOrganizationRepositoryImpl(
  * rule below has to be the thing that removes a folder from the list, and a card that would show zero is
  * never left behind.
  */
-internal fun localFolderAlbums(rows: List<LocalFolderRow>): List<LocalFolderAlbum> {
+/**
+ * [includeClaimed] decides who the list is for.
+ *
+ * False is the album grid, which must not show Camera twice. True is the backup folder picker, where
+ * `DCIM/Camera/` is the single most likely folder a person wants to back up and hiding it because the
+ * Library already lists it would be an album rule leaking into a backup decision.
+ */
+internal fun localFolders(rows: List<LocalFolderRow>, includeClaimed: Boolean = false): List<LocalFolder> {
     val counts = LinkedHashMap<String, Int>()
     val covers = LinkedHashMap<String, String?>()
 
     for (row in rows) {
         val path = FolderPaths.normalize(row.relativePath)
         if (path == FolderPaths.ROOT) continue
-        if (SystemAlbum.entries.any { album -> album.covers(path) }) continue
+        if (!includeClaimed && SystemAlbum.entries.any { album -> album.covers(path) }) continue
 
         counts[path] = (counts[path] ?: 0) + row.itemCount
         if (!covers.containsKey(path)) covers[path] = row.coverUri
     }
 
     return counts.map { (path, count) ->
-        LocalFolderAlbum(
+        LocalFolder(
             relativePath = path,
             displayName = FolderPaths.displayNameOf(path),
             parentLabel = FolderPaths.parentOf(path),
@@ -194,7 +204,7 @@ internal fun localFolderAlbums(rows: List<LocalFolderRow>): List<LocalFolderAlbu
             coverUri = covers[path],
         )
     }.sortedWith(
-        compareByDescending<LocalFolderAlbum> { it.mediaCount }
+        compareByDescending<LocalFolder> { it.mediaCount }
             .thenBy { it.displayName.lowercase() }
             .thenBy { it.relativePath },
     )

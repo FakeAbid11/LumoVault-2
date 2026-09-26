@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.backup
 
+import androidx.annotation.StringRes
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +15,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.lumovault.app.R
+import com.lumovault.app.domain.model.BackupSource
+import kotlinx.coroutines.flow.map
 
 /**
  * The backup screen: the three decisions the user makes, and the numbers that show what they did.
@@ -37,6 +41,18 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
      * Not a cosmetic choice: a seeded [BackupDiagnostics] would show `Database version 0` and `0 B` free on
      * a screen whose whole job is reporting facts, and there is no version-0 database to report.
      */
+    /**
+     * What the Backup & storage section says about the source, which is the same answer the folder screen
+     * shows and the same two columns onboarding wrote.
+     *
+     * A count and a source rather than the folder list itself: the entry line has room for one sentence,
+     * and the sentence a person needs is whether anything at all is chosen — `SelectedFolders` with no
+     * folders is the setting that stops automatic backup, and it must not read like "everything".
+     */
+    val source: StateFlow<BackupSourceLine> = container.onboardingRepository.progress
+        .map { BackupSourceLine(it.backupSource, it.selectedFolders.size) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupSourceLine(null, 0))
+
     val diagnostics: StateFlow<BackupDiagnostics?> = diagnosticsFlow(container)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
@@ -116,3 +132,15 @@ private fun diagnosticsFlow(container: com.lumovault.app.AppContainer): Flow<Bac
             stagingSpaceFreeBytes = container.backupFreeSpaceBytes(),
         )
     }
+
+/** The hub's one-line summary of the backup source. */
+data class BackupSourceLine(val source: BackupSource?, val folderCount: Int) {
+    @get:StringRes
+    val labelRes: Int
+        get() = when {
+            source == null -> R.string.backup_folders_entry_unanswered
+            source == BackupSource.AllMedia -> R.string.backup_folders_entry_all
+            folderCount == 0 -> R.string.backup_folders_entry_none
+            else -> R.plurals.backup_folders_selected
+        }
+}

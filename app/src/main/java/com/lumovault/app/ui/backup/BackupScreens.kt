@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,6 +67,7 @@ import java.time.format.FormatStyle
 @Composable
 fun BackupHubScreen(
     onNavigateUp: () -> Unit,
+    onOpenFolders: () -> Unit,
     onOpenFreeUpSpace: () -> Unit,
     onOpenHealth: () -> Unit,
     onOpenDiagnostics: () -> Unit,
@@ -123,6 +125,22 @@ fun BackupHubScreen(
                     checked = preferences.chargingOnly,
                     enabled = preferences.automatic,
                     onChange = viewModel::setChargingOnly,
+                )
+            }
+
+            // The source lives here as well as in setup, because the answer changes: a folder the camera
+            // created last week cannot be chosen without opening onboarding again otherwise, and this is
+            // the screen a person is already on.
+            item {
+                val line = viewModel.source.collectAsStateWithLifecycle().value
+                EntryRow(
+                    title = stringResource(R.string.backup_folders_title),
+                    subtitle = if (line.labelRes == R.plurals.backup_folders_selected) {
+                        pluralStringResource(line.labelRes, line.folderCount, line.folderCount)
+                    } else {
+                        stringResource(line.labelRes)
+                    },
+                    onClick = onOpenFolders,
                 )
             }
 

@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.AppSettingsEntity
 import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.OnboardingProgress
+import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.OptionalStepDecision
 import com.lumovault.app.domain.repository.OnboardingRepository
 import kotlinx.coroutines.flow.Flow
@@ -34,7 +35,11 @@ class OnboardingRepositoryImpl(
                 // Only a real selection can enable automatic backup; "Not now" cannot.
                 backupEnabled = source.enablesBackup,
                 selectedFolders = if (source == BackupSource.SelectedFolders) {
-                    folders.joinToString(FOLDER_SEPARATOR)
+                    // Stored as the identity the queue matches on, not as the label the picker showed.
+                    // These two columns are read back by `autoBackupCandidates`, whose SQL compares
+                    // `relative_path` exactly — a value with its trailing separator trimmed matches
+                    // nothing, which is how a folder selection could silently stop backing up.
+                    folders.map(FolderPaths::normalize).distinct().joinToString(FOLDER_SEPARATOR)
                 } else {
                     ""
                 },
@@ -55,7 +60,12 @@ private fun AppSettingsEntity.toProgress(): OnboardingProgress = OnboardingProgr
     backupSource = BackupSource.fromStorageKey(sourceSelection),
     selectedFolders = selectedFolders
         .split(FOLDER_SEPARATOR)
-        .filter { it.isNotBlank() },
+        .filter { it.isNotBlank() }
+        // Normalized on the way out too, so a value stored before the writer did it is read as the
+        // folder it meant rather than as a path that matches nothing. Idempotent, so this costs nothing
+        // for the ones that were already written correctly.
+        .map(FolderPaths::normalize)
+        .distinct(),
     backgroundBackup = OptionalStepDecision.fromStorageKey(backgroundBackupPreference),
 )
 

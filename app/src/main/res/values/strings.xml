@@ -397,6 +397,17 @@
     <string name="backup_wifi_only_note">Unattended uploads wait for an unmetered network. A backup you start by hand does not.</string>
     <string name="backup_charging_only">Charging only</string>
     <string name="backup_charging_only_note">Unattended uploads also wait for a charger.</string>
+    <string name="backup_folders_title">Backup folders</string>
+    <string name="backup_folders_entry_all">All photos, videos and GIFs</string>
+    <string name="backup_folders_entry_none">No folders chosen, so nothing is backed up automatically</string>
+    <string name="backup_folders_entry_unanswered">Not chosen yet</string>
+    <string name="backup_folders_explainer">Automatic backup takes new media from these folders only. Photos already in your LumoVault Backup stay recognized wherever they are.</string>
+    <string name="backup_folders_back_up_everything">Back up everything</string>
+    <string name="backup_folders_empty">No folders with photos or videos yet. They appear here after the library has been scanned.</string>
+    <plurals name="backup_folders_selected">
+        <item quantity="one">%d folder selected</item>
+        <item quantity="other">%d folders selected</item>
+    </plurals>
 
     <string name="health_all_backed_up">%1$s items backed up. Nothing is waiting.</string>
     <string name="health_backed_up">%1$s of %2$s backed up</string>
@@ -413,6 +424,7 @@
     <string name="health_no_scan">Backup has not scanned this library yet.</string>
     <string name="health_no_backup">Backup has not finished an item yet.</string>
     <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
 
     <string name="diagnostics_title">Diagnostics</string>
     <string name="diagnostics_entry_note">The numbers behind the backup, for when it does not move.</string>

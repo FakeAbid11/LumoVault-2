@@ -1,6 +1,6 @@
 package com.lumovault.app.domain.organization
 
-import com.lumovault.app.domain.model.LocalFolderAlbum
+import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +35,16 @@ interface MediaOrganizationRepository {
      * album already lists by path (Camera, Screenshots, Downloads) are left out here rather than in the
      * screen, so the rule cannot be bypassed by a caller that forgot to filter.
      */
-    fun observeLocalFolders(): Flow<List<LocalFolderAlbum>>
+    fun observeLocalFolders(): Flow<List<LocalFolder>>
+
+    /**
+     * Every folder holding media, including the ones the Library section already lists.
+     *
+     * This is the backup source's question, not the album grid's: `DCIM/Camera/` is what most people mean
+     * when they choose a folder to back up, and the deduplication that keeps it off the Albums screen has
+     * nothing to say about it.
+     */
+    fun observeBackupFolders(): Flow<List<LocalFolder>>
 
     /** What is filed in one folder, by its normalized relative path. */
     fun observeLocalFolderContents(relativePath: String, limit: Int): Flow<List<Media>>

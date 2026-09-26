@@ -6,13 +6,14 @@ import com.lumovault.app.data.local.organization.LocalFolderRow
 import com.lumovault.app.data.local.organization.OrganizationStore
 import com.lumovault.app.data.local.organization.FakeMediaRow
 import com.lumovault.app.domain.model.FolderPaths
-import com.lumovault.app.domain.model.LocalFolderAlbum
+import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.model.SystemAlbum
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,15 +26,15 @@ import org.junit.Test
  * alone with: that "in a folder" means the folder and not its children, and that deriving a folder album
  * leaves the tables holding a person's own albums exactly as they were.
  */
-class LocalFolderAlbumsTest {
+class LocalFoldersTest {
     private fun row(path: String, count: Int, cover: String? = "content://media/$path") =
         LocalFolderRow(relativePath = path, itemCount = count, coverUri = cover)
 
-    private fun List<LocalFolderAlbum>.paths(): List<String> = map { it.relativePath }
+    private fun List<LocalFolder>.paths(): List<String> = map { it.relativePath }
 
     @Test
     fun aFolderHoldingMediaBecomesAnAlbumNamedAfterTheFolderNotThePath() {
-        val albums = localFolderAlbums(listOf(row("Pictures/WhatsApp/", 12)))
+        val albums = localFolders(listOf(row("Pictures/WhatsApp/", 12)))
 
         assertEquals(1, albums.size)
         val whatsapp = albums.single()
@@ -46,7 +47,7 @@ class LocalFolderAlbumsTest {
 
     @Test
     fun severalFoldersAreSeveralAlbumsAndTheBiggestComesFirst() {
-        val albums = localFolderAlbums(
+        val albums = localFolders(
             listOf(row("Pictures/Instagram/", 4), row("Pictures/WhatsApp/", 12), row("Movies/ScreenRecordings/", 12)),
         )
 
@@ -66,7 +67,7 @@ class LocalFolderAlbumsTest {
      */
     @Test
     fun foldersTheLibraryAlreadyListsDoNotAppearAgainUnderTheirOwnName() {
-        val albums = localFolderAlbums(
+        val albums = localFolders(
             listOf(
                 row("DCIM/Camera/", 30),
                 row("Pictures/Screenshots/", 4),
@@ -104,7 +105,7 @@ class LocalFolderAlbumsTest {
 
     @Test
     fun typeAndStateAlbumsClaimNoFoldersSoAFolderOfVideosStillShowsUp() {
-        val albums = localFolderAlbums(listOf(row("Movies/ScreenRecordings/", 3), row("Pictures/Camera/", 1)))
+        val albums = localFolders(listOf(row("Movies/ScreenRecordings/", 3), row("Pictures/Camera/", 1)))
 
         assertEquals("Videos is a type, not a place; its clips stay in the folders that hold them", 2, albums.size)
         assertFalse(SystemAlbum.Videos.covers("Movies/ScreenRecordings/"))
@@ -115,7 +116,7 @@ class LocalFolderAlbumsTest {
 
     @Test
     fun twoFoldersWithTheSameNameStayTwoAlbums() {
-        val albums = localFolderAlbums(listOf(row("Pictures/Telegram/", 3), row("DCIM/Telegram/", 5)))
+        val albums = localFolders(listOf(row("Pictures/Telegram/", 3), row("DCIM/Telegram/", 5)))
 
         assertEquals(
             "one album named Telegram would be a merged list that opens into neither folder",
@@ -128,7 +129,7 @@ class LocalFolderAlbumsTest {
 
     @Test
     fun oneFolderIsNeverTwoAlbumsBecauseOfHowThePathWasSpelled() {
-        val albums = localFolderAlbums(
+        val albums = localFolders(
             listOf(
                 row("Pictures/WhatsApp", 4),
                 row("Pictures/WhatsApp/", 3),
@@ -141,14 +142,50 @@ class LocalFolderAlbumsTest {
         assertEquals("the counts are one folder's, added", 10, albums.single().mediaCount)
     }
 
+    /**
+     * The same rows, two questions.
+     *
+     * The album grid must not show Camera twice; the backup picker must not hide it. Both read one grouping
+     * query, so the only difference allowed between them is this flag — and a picker that quietly inherited
+     * the album rule would make the most common folder impossible to choose for backup.
+     */
+    @Test
+    fun theBackupPickerSeesTheFoldersTheAlbumGridHides() {
+        val rows = listOf(row("DCIM/Camera/", 30), row("Pictures/WhatsApp/", 7))
+
+        assertEquals(listOf("Pictures/WhatsApp/"), localFolders(rows, includeClaimed = false).paths())
+        assertEquals(
+            listOf("DCIM/Camera/", "Pictures/WhatsApp/"),
+            localFolders(rows, includeClaimed = true).paths(),
+        )
+    }
+
+    /**
+     * The identity the queue matches on, not the label the picker showed.
+     *
+     * `autoBackupCandidates` compares `relative_path` exactly, and MediaStore's value always carries the
+     * trailing separator. Storing the trimmed label — which is what the picker used to display — matched no
+     * row at all, so a folder-scoped backup silently queued nothing.
+     */
+    @Test
+    fun aStoredFolderMatchesMediaStoreOnlyInTheNormalizedSpelling() {
+        val shown = "Pictures/WhatsApp"
+        val storedByMediaStore = "Pictures/WhatsApp/"
+
+        assertEquals(storedByMediaStore, FolderPaths.normalize(shown))
+        assertNotEquals("the label is not the identity", shown, FolderPaths.normalize(shown))
+        assertEquals("re-normalizing a stored value changes nothing", storedByMediaStore,
+            FolderPaths.normalize(FolderPaths.normalize(shown)))
+    }
+
     @Test
     fun theRootOfAVolumeIsNotAnAlbum() {
-        assertTrue(localFolderAlbums(listOf(row("/", 4), row("", 2), row("///", 1))).isEmpty())
+        assertTrue(localFolders(listOf(row("/", 4), row("", 2), row("///", 1))).isEmpty())
     }
 
     @Test
     fun aNestedFolderIsItsOwnAlbumRatherThanPartOfItsParent() {
-        val albums = localFolderAlbums(listOf(row("Pictures/WhatsApp/", 6), row("Pictures/WhatsApp/Images/", 40)))
+        val albums = localFolders(listOf(row("Pictures/WhatsApp/", 6), row("Pictures/WhatsApp/Images/", 40)))
 
         assertEquals(listOf("Pictures/WhatsApp/Images/", "Pictures/WhatsApp/"), albums.paths())
         assertEquals(listOf("Pictures/WhatsApp", "Pictures"), albums.map { it.parentLabel })
@@ -221,7 +258,7 @@ class LocalFolderAlbumsTest {
         store.index(FakeMediaRow(1, relativePath = "Pictures/WhatsApp/"))
         val before = store.albums.toMap() to store.members.toSet()
 
-        val derived = localFolderAlbums(FakeSystemAlbumDao(store).observeFolderAlbums().first())
+        val derived = localFolders(FakeSystemAlbumDao(store).observeFolderAlbums().first())
 
         assertEquals(1, derived.size)
         assertEquals(

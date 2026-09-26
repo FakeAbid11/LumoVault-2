@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.backup.BackupFoldersScreen
 import com.lumovault.app.ui.backup.BackupHealthScreen
 import com.lumovault.app.ui.backup.BackupHubScreen
 import com.lumovault.app.ui.backup.DiagnosticsScreen
@@ -39,6 +40,9 @@ object BackupRoutes {
     const val HEALTH = PREFIX + "health"
     const val DIAGNOSTICS = PREFIX + "diagnostics"
     const val FREE_SPACE = PREFIX + "free-space"
+
+    /** Which folders automatic backup may read, shared with onboarding's two columns. */
+    const val FOLDERS = PREFIX + "folders"
 }
 
 @Composable
@@ -134,7 +138,11 @@ fun LumoVaultNavHost(
                 onOpenFreeUpSpace = { navController.navigate(BackupRoutes.FREE_SPACE) },
                 onOpenHealth = { navController.navigate(BackupRoutes.HEALTH) },
                 onOpenDiagnostics = { navController.navigate(BackupRoutes.DIAGNOSTICS) },
+                onOpenFolders = { navController.navigate(BackupRoutes.FOLDERS) },
             )
+        }
+        composable(BackupRoutes.FOLDERS) {
+            BackupFoldersScreen(onNavigateUp = navController::navigateUp)
         }
         composable(BackupRoutes.HEALTH) {
             BackupHealthScreen(
