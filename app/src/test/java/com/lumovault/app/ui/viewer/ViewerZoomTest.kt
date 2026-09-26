@@ -48,6 +48,39 @@ class ViewerZoomTest {
         assertTrue(ViewerZoom.isZoomed(1.4f))
     }
 
+    /**
+     * `isZoomed` is not a label: it is the argument `Modifier.transformable(state, canPan = …)` is called
+     * with, and it decides whether a horizontal drag is a pan or a page turn.
+     *
+     * Compose's transformable gate is `zoomMotion > slop || rotationMotion > slop || (panMotion > slop &&
+     * canPan(pan))`, and a single finger's movement *is* pan motion — so without this predicate the modifier
+     * consumes a plain swipe at any scale, the pager's `awaitDragOrCancellation` sees a consumed change and
+     * stops, and the viewer cannot be turned by dragging at all. The two assertions below are therefore the
+     * swipe bug, expressed as the one function that can be tested without a finger.
+     */
+    @Test
+    fun onlyAnActuallyMagnifiedPhotoClaimsTheDragFromThePager() {
+        assertFalse(
+            "at 1x the drag belongs to the pager, and the photo has nowhere to pan to anyway",
+            ViewerZoom.isZoomed(ViewerZoom.MIN_SCALE),
+        )
+        assertTrue("magnified, the photo takes it", ViewerZoom.isZoomed(ViewerZoom.DOUBLE_TAP_SCALE))
+    }
+
+    @Test
+    fun theBoundsOfTheZoomAreTheBoundsOfTheDrag() {
+        // Whatever scale a pinch lands on, `isZoomed` must agree with the clamp that produced it: a photo at
+        // the ceiling panning, and one pulled back to the floor handing the drag back.
+        (1..20).forEach { step ->
+            val scale = ViewerZoom.clampScale(1f + step * 0.5f)
+            assertEquals(
+                "at $scale, which is $(ViewerZoom.clampScale(scale)) once clamped",
+                scale > ViewerZoom.MIN_SCALE + 0.01f,
+                ViewerZoom.isZoomed(scale),
+            )
+        }
+    }
+
     @Test
     fun panReachIsTheOverhangAndNeverTheViewport() {
         // A 2,000 px photo in a 1,080 px column: at 2x it overhangs 920 px each way, so the centre may move

@@ -19,3 +19,14 @@ internal val MediaBadgeCorner = 3.dp
 internal val MediaBadgeInset = 6.dp
 internal val MediaBadgePadding = 4.dp
 internal val MediaBadgeIconSize = 18.dp
+
+/**
+ * The timeline's date rail. Its width is also the padding the grid gives up to it, so the two cannot drift
+ * apart and leave the rail sitting on top of the rightmost column of photos — the strip is reserved, not
+ * overlaid.
+ */
+internal val RailWidth = 26.dp
+internal val RailTickWidth = 2.dp
+
+/** The shortest slice of track a month label may occupy; below this, labels are thinned rather than stacked. */
+internal val RailLabelMinHeight = 22.dp

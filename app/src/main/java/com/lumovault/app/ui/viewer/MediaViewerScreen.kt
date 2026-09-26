@@ -165,7 +165,6 @@ private fun ViewerPager(
     var showingDetails by remember { mutableStateOf(false) }
     var choosingAlbum by remember { mutableStateOf(false) }
     var confirmingTrash by remember { mutableStateOf(false) }
-    var zoomedPage by remember { mutableStateOf<Int?>(null) }
 
     // The pager owns "which item". Reading the settled page back is what keeps the action row, the details
     // sheet and the on-demand EXIF read from ever disagreeing with the picture on screen.
@@ -188,9 +187,11 @@ private fun ViewerPager(
     ) {
         HorizontalPager(
             state = pagerState,
-            // A zoomed image pans under the finger. The two gestures share the horizontal axis, and this is the
-            // single line that decides which of them a drag belongs to.
-            userScrollEnabled = zoomedPage != pagerState.settledPage,
+            // Scrolling is left enabled unconditionally, which is the opposite of how this line used to read.
+            // A page that knows its own zoom is the one that decides whether a horizontal drag is its business
+            // — see the `canPan` gate in [ZoomableImage] — and a flag up here could only ever be a *copy* of
+            // that fact, held by the wrong object: a page resets to 1× without announcing it, and a stale copy
+            // naming the page you are standing on turns every swipe into nothing.
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val item = items.getOrNull(page) ?: return@HorizontalPager
@@ -198,7 +199,6 @@ private fun ViewerPager(
                 media = item,
                 isCurrentPage = page == pagerState.settledPage,
                 onTap = { chromeVisible = !chromeVisible },
-                onZoomChanged = { zoomed -> zoomedPage = if (zoomed) page else null },
                 onClose = onNavigateUp,
             )
         }
@@ -290,7 +290,6 @@ private fun ViewerPage(
     media: Media,
     isCurrentPage: Boolean,
     onTap: () -> Unit,
-    onZoomChanged: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     when (ViewerPresentation.rendererFor(media.type)) {
@@ -308,7 +307,6 @@ private fun ViewerPage(
             contentUri = media.contentUri,
             contentDescription = media.displayName,
             onTap = onTap,
-            onZoomChanged = onZoomChanged,
         )
     }
 }

@@ -50,9 +50,22 @@ import com.lumovault.app.ui.theme.OnMedia
  * GIF right up until it failed to move.
  *
  * Zoom and pan are one gesture each and both end in [ViewerZoom]: a pinch that would take the image to 0.4× or
- * 12× is clamped, and a drag that would leave the photo floating off-screen is clamped to the overhang. The
- * screen is told when this page is zoomed, so a horizontal drag on a 3× photo pans the photo instead of
- * turning the page.
+ * 12× is clamped, and a drag that would leave the photo floating off-screen is clamped to the overhang.
+ *
+ * The `canPan` argument on the modifier below is what lets a swipe turn the page at all. `Modifier.transformable`
+ * decides whether a gesture is "a transform" from the motion it sees, and a **single finger moving past the
+ * touch slop is pan motion** — so once it has decided that, it consumes every subsequent position change, and
+ * the pager upstream asks `awaitDragOrCancellation`, which returns nothing at all once the change is consumed.
+ * Without this gate, therefore, a photo page swallows every horizontal swipe at every zoom level, including
+ * 1×, and the viewer cannot be paged by dragging. `canPan` is the overload Compose provides for a transformable
+ * inside a scrollable: pan is allowed only while the image is actually magnified, so at 1× nothing is consumed
+ * and the drag belongs to the pager, while a zoomed photo keeps panning under the finger instead of turning
+ * the page mid-detail. A two-finger pinch is a zoom, not a pan, and is still consumed at any scale.
+ *
+ * The zoom and pan state is keyed on the image, so a new page starts at 1× and centred by construction — the
+ * one thing the previous paragraph depends on. Nothing outside this composable has to be told about it: the
+ * gate reads the same `scale` the gesture writes, so there is no second copy of "is this page zoomed" that
+ * could disagree with the page that is.
  *
  * One detail is the whole reason `onTap` is a parameter rather than a handler here: this page needs
  * double-tap-to-zoom, and the screen needs single-tap-to-toggle-chrome. Two tap detectors stacked on the same
@@ -64,7 +77,6 @@ fun ZoomableImage(
     contentUri: String,
     contentDescription: String?,
     onTap: () -> Unit,
-    onZoomChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -94,7 +106,6 @@ fun ZoomableImage(
             )
         }
         scale = newScale
-        onZoomChanged(ViewerZoom.isZoomed(newScale))
     }
 
     val request = remember(contentUri) { originalSizeRequest(context, contentUri) }
@@ -109,7 +120,7 @@ fun ZoomableImage(
                 translationX = offset.x
                 translationY = offset.y
             }
-            .transformable(state = transformable)
+            .transformable(state = transformable, canPan = { ViewerZoom.isZoomed(scale) })
             .pointerInput(contentUri) {
                 detectTapGestures(
                     onTap = { onTap() },
@@ -122,7 +133,6 @@ fun ZoomableImage(
                             scale = target
                             offset = centredToward(point, viewport, target)
                         }
-                        onZoomChanged(ViewerZoom.isZoomed(scale))
                     },
                 )
             },

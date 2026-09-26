@@ -27,7 +27,8 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   the timeline actually runs, and a v2→v3 migration
 - Incremental sync: rows are tagged with a scan id, upserted in chunks, and rows the scan did not see
   are removed — no rebuild, and no `NOT IN (…)` list a large library would overflow
-- The Photos screen: day-grouped lazy grid, windowed loading instead of one in-memory list, Coil
+- The Photos screen: day-grouped lazy grid with a month-per-tick date rail down its right edge, windowed
+  loading instead of one in-memory list, Coil
   thumbnails decoded to the cell's size, video play/duration and GIF badges
 - One sealed `PhotosUiState`, so "this device has no media" and "the index is not built yet" cannot
   be confused; permission, scanning, empty, error and pull-to-refresh states
@@ -353,7 +354,12 @@ media ──1:0..1── media_metadata    position · camera · lens · exposur
 - **The zoom arithmetic is pure** (`ViewerZoom`): 1×–5×, double-tap to 3× toward the point that was tapped,
   and a pan limited to the overhang the current scale actually has, so a photo cannot be dragged off into
   black. Pinch recognition itself cannot be tested off-device, which is why every *decision* the gesture
-  makes lives in that one file.
+  makes lives in that one file. One of those decisions is the swipe: `Modifier.transformable` treats a single
+  finger moving past the touch slop as pan motion and then consumes the drag, which starves the pager above it
+  — so the page passes `canPan = { isZoomed(scale) }`, the overload Compose documents for a transformable
+  inside a scrollable, and a photo at 1× hands the drag to the pager instead of eating it. Nothing up here
+  keeps a copy of "is this page zoomed": the gate reads the page's own scale, and the scale is keyed to the
+  image, so a new page starts at 1× with nothing to synchronise.
 - **The details sheet shows only what exists.** A camera, lens, focal length, aperture, ISO or shutter line
   appears if and only if the read found that tag; dimensions and file size come from the MediaStore columns
   the scanner already reads, so nothing decodes an image to describe it. The one absence the sheet names is

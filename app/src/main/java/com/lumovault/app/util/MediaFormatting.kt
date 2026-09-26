@@ -2,6 +2,7 @@ package com.lumovault.app.util
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -45,12 +46,22 @@ fun formatDay(day: LocalDate, distance: DayDistance, locale: Locale = Locale.get
     return day.format(DateTimeFormatter.ofPattern(pattern, locale))
 }
 
+/**
+ * Month text for the timeline's date rail, in the same "show a year only when it is not this one" shape as
+ * [formatDay]. Abbreviated because the rail is a strip of pixels a finger wide and a label that pushes the
+ * thumbnails aside is the one thing a scrubber may not do.
+ */
+fun formatMonth(month: YearMonth, showYear: Boolean, locale: Locale = Locale.getDefault()): String =
+    month.format(DateTimeFormatter.ofPattern(if (showYear) PATTERN_MONTH_YEAR else PATTERN_MONTH, locale))
+
 /** Day number for an epoch-second timestamp, in the given zone. */
 fun localDateOf(epochSeconds: Long, zone: ZoneId = ZoneId.systemDefault()): LocalDate =
     Instant.ofEpochSecond(epochSeconds).atZone(zone).toLocalDate()
 
 private const val PATTERN_DAY_MONTH = "MMMM d"
 private const val PATTERN_FULL = "MMMM d, yyyy"
+private const val PATTERN_MONTH = "MMM"
+private const val PATTERN_MONTH_YEAR = "MMM yyyy"
 private const val MILLIS_PER_SECOND = 1000L
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3600L
