@@ -29,6 +29,13 @@ sealed interface TelegramAuthState {
         val channel: AuthCodeChannel,
         /** Code length Telegram asked for, so the entry field is neither hardcoded nor guessed. */
         val codeLength: Int?,
+        /**
+         * Seconds before Telegram allows this code to be re-sent — `authenticationCodeInfo.timeout`
+         * in the pinned scheme, which is a wait the server enforces whether or not the client shows
+         * it. Null when the answer carried none (0 is the Java default for "absent", never "now"),
+         * and the resend control then behaves as it did before: always offered.
+         */
+        val timeoutSeconds: Int? = null,
     ) : TelegramAuthState
 
     data object VerifyingCode : TelegramAuthState
@@ -49,3 +56,20 @@ sealed interface TelegramAuthState {
 /** True only for a confirmed session; drives both the onboarding checklist and launch decisions. */
 val TelegramAuthState.isAuthenticated: Boolean
     get() = this is TelegramAuthState.Authenticated
+
+/**
+ * True for the states that are a request in flight or a refusal of the last one — everything that is
+ * not Telegram's *answer* about what comes next.
+ *
+ * The sign-in panel follows the answers, never the transitions: a resend passes through [SendingCode]
+ * on its way back to [WaitingForCode], and a panel that flipped to the phone field for the round trip
+ * would tear the code entry out from under the user mid-typing. [Failed] belongs here for the same
+ * reason — the panel the user was on is the one the retry has to appear in.
+ */
+val TelegramAuthState.isInFlight: Boolean
+    get() = this is TelegramAuthState.Unknown ||
+        this is TelegramAuthState.Initializing ||
+        this is TelegramAuthState.SendingCode ||
+        this is TelegramAuthState.VerifyingCode ||
+        this is TelegramAuthState.Authenticating ||
+        this is TelegramAuthState.Failed

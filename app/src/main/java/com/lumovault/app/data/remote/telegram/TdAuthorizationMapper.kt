@@ -54,6 +54,9 @@ internal object TdAuthorizationMapper {
             TelegramAuthState.WaitingForCode(
                 channel = channelOf(state.codeInfo?.type),
                 codeLength = state.codeInfo?.type.codeLength(),
+                // The scheme's "timeout before the code can be re-sent, in seconds". 0 is the Java
+                // default and means no answer arrived, not "resend now" — so it maps to null.
+                timeoutSeconds = state.codeInfo?.timeout?.takeIf { it > 0 },
             ),
         )
 

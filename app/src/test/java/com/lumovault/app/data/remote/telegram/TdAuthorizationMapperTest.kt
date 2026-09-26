@@ -58,6 +58,37 @@ class TdAuthorizationMapperTest {
     }
 
     @Test
+    fun `the resend timeout arrives in seconds, as Telegram stated it`() {
+        val waiting = value(
+            TdApi.AuthorizationStateWaitCode().apply {
+                codeInfo = TdApi.AuthenticationCodeInfo().apply {
+                    timeout = 30
+                    type = TdApi.AuthenticationCodeTypeCall().apply { length = 6 }
+                }
+            },
+        )
+
+        assertEquals(TelegramAuthState.WaitingForCode(AuthCodeChannel.Call, 6, 30), waiting)
+    }
+
+    @Test
+    fun `a timeout of zero means Telegram stated none, not that resending is open`() {
+        val waiting = value(
+            TdApi.AuthorizationStateWaitCode().apply {
+                codeInfo = TdApi.AuthenticationCodeInfo().apply {
+                    type = TdApi.AuthenticationCodeTypeSms()
+                }
+            },
+        )
+
+        assertEquals(
+            "0 is the Java default of the field; read as a real answer it would offer an instant resend",
+            null,
+            (waiting as TelegramAuthState.WaitingForCode).timeoutSeconds,
+        )
+    }
+
+    @Test
     fun `a code type that was never given a length leaves the field unconstrained`() {
         val waiting = value(
             TdApi.AuthorizationStateWaitCode().apply {
