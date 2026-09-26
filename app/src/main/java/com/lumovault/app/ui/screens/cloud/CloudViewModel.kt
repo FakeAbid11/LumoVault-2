@@ -7,6 +7,7 @@ import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.restore.CloudRestoreTarget
 import com.lumovault.app.domain.restore.RestoreJob
+import com.lumovault.app.domain.telegram.CloudFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,14 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
      */
     private var syncing = false
 
+    /**
+     * An exception escaped the sync itself — thrown before the state machine ever left `Idle`, say.
+     * The machine cannot report what it never reached, so this flag is the only record that a pass was
+     * attempted and did not answer. It exists because the alternative was a Cloud tab that stayed
+     * blank forever with the failure written only to the log.
+     */
+    private val syncFailed = MutableStateFlow(false)
+
     private val items: StateFlow<List<CloudMedia>> = loadedLimit
         .flatMapLatest { limit -> container.cloudIndexRepository.observeWindow(limit) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
@@ -58,8 +67,9 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         items,
         totalCount,
         counts,
-    ) { init, media, total, typeCounts ->
-        deriveCloudState(
+        syncFailed,
+    ) { init, media, total, typeCounts, failed ->
+        val derived = deriveCloudState(
             init = init,
             items = media,
             totalCount = total,
@@ -77,6 +87,13 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
                 container.localPresenceLookup.backedUp(media)
             },
         )
+        // "Nothing has happened yet" plus "the one attempt threw" is a failure with a retry, not a
+        // blank tab. Any other derived state already says something truer than this flag could.
+        if (failed && derived is CloudUiState.Idle) {
+            CloudUiState.Failed(CloudFailure(CloudFailure.Kind.RequestFailed))
+        } else {
+            derived
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
 
     /**
@@ -162,6 +179,7 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
+                syncFailed.value = false
                 // Repeated calls are safe, and needed: the Cloud tab can be opened without onboarding
                 // having touched TDLib, and a chat request before a session is meaningless.
                 container.telegramAuthRepository.connect()
@@ -178,6 +196,7 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 // Class name only — a TDLib error string can carry a chat title.
                 android.util.Log.w(TAG, "cloud sync failed: ${error.javaClass.simpleName}")
+                syncFailed.value = true
             } finally {
                 syncing = false
             }
