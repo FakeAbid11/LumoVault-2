@@ -336,7 +336,10 @@ fun MapScreen(
                         // "Don't ask again" makes the system dialog permanently invisible; the request
                         // button would be a dead end that keeps promising a dialog. Settings is the
                         // page that can still act — the same switch the limited-access photo card makes.
-                        val activity = LocalContext.current as? Activity
+                        // Read here, not in the click: a composable call inside an onClick lambda is a
+                        // compile error, and `LocalContext.current` is a composable accessor.
+                        val context = LocalContext.current
+                        val activity = context as? Activity
                         val systemWillAskAgain = !askedAndRefused ||
                             activity?.shouldShowRequestPermissionRationale(viewModel.permissionToRequest()) == true
                         Button(
@@ -344,7 +347,7 @@ fun MapScreen(
                                 if (systemWillAskAgain) {
                                     permissionLauncher.launch(viewModel.permissionToRequest())
                                 } else {
-                                    LocalContext.current.openAppDetailsSettings()
+                                    context.openAppDetailsSettings()
                                 }
                             },
                         ) {

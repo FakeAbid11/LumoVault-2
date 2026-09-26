@@ -12,7 +12,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,9 +27,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImagePainter
 import coil3.compose.SubcomposeAsyncImage
-import coil3.compose.SubcomposeAsyncImageContent
 import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Size
@@ -184,17 +181,15 @@ fun ZoomableImage(
                     modifier = Modifier.padding(24.dp),
                 )
             },
-            content = { state ->
+            // A callback, not a slot: the `loading`/`error` form of this overload has no `content`
+            // parameter, and passing one is what makes every argument below it fail to resolve.
+            onSuccess = { state ->
                 // What Coil actually painted, in pixels: the gesture math clamps by this once it is
                 // known, and by the viewport until then.
-                val loaded = (state as? AsyncImagePainter.State.Success)?.painter
-                LaunchedEffect(loaded) {
-                    val size = loaded?.intrinsicSize ?: return@LaunchedEffect
-                    if (size.width > 0f && size.height > 0f) {
-                        imageSize = Offset(size.width, size.height)
-                    }
+                val painted = state.painter.intrinsicSize
+                if (painted.width > 0f && painted.height > 0f) {
+                    imageSize = Offset(painted.width, painted.height)
                 }
-                SubcomposeAsyncImageContent()
             },
         )
     }
