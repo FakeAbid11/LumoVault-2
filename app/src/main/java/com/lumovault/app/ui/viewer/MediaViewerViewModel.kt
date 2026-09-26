@@ -220,6 +220,11 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
         null, is ViewerTarget.Photos -> container.mediaRepository.observeWindow(limit)
         is ViewerTarget.Album -> container.albumRepository.observeContents(target.albumId, limit)
         is ViewerTarget.SystemAlbumView -> container.mediaOrganizationRepository.observeContents(target.album, limit)
+
+        // The same list the folder's album screen drew, so swiping left and right inside a folder stays
+        // inside that folder.
+        is ViewerTarget.Folder ->
+            container.mediaOrganizationRepository.observeLocalFolderContents(target.relativePath, limit)
     }
 
     private data class OpenRequest(val mediaStoreId: Long, val target: ViewerTarget) {

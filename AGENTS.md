@@ -139,6 +139,11 @@ Rules that have already caused a mistake here:
   `if (x) TdApi.SearchChatsOnServer() else TdApi.SearchChats()` and then setting `.query` does not compile,
   because the inferred type is `Function` and `Function` has no fields.
 
+- **A new case in a sealed interface is a compile error at every `when` that reads it.** Kotlin reports the
+  first one and stops, so the fix is to grep the type's name for `when (` before pushing — adding
+  `ViewerTarget.Folder` costs one branch in `MediaViewerViewModel.contentsOf` and one in
+  `AlbumDetailViewModel.contentsOf`, and CI only names the first. Nothing in the local checks can see it.
+
 - **Grep back every `R.string` you add; an unreferenced one is usually an unwired feature.** AAPT does not
   complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
   build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was
