@@ -8,11 +8,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -21,13 +21,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.R
+import com.lumovault.app.ui.components.FloatingNavBar
 import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.navigation.navigateToTab
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
 import com.lumovault.app.ui.navigation.viewerRouteActive
-import com.lumovault.app.ui.navigation.icon
 import com.lumovault.app.ui.navigation.label
 
 /**
@@ -75,20 +75,17 @@ fun LumoVaultApp(
             }
         },
         bottomBar = {
-            if (isViewer) Unit else NavigationBar {
-                LumoVaultDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = destination == currentDestination,
-                        onClick = { navController.navigateToTab(destination) },
-                        icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = null,
-                            )
-                        },
-                        label = { Text(destination.label()) },
-                    )
-                }
+            if (isViewer) {
+                Unit
+            } else {
+                // The capsule, not a bar. It is drawn in the scaffold's bottom slot rather than floated over
+                // the content with `extendBody`, which keeps the promise the reference makes by other means:
+                // every screen gets its 96 dp of clearance from `innerPadding` without having to remember to
+                // add it, so no screen can end up with somebody's photograph under the navigation.
+                FloatingNavBar(
+                    selected = currentDestination,
+                    onSelect = { destination -> navController.navigateToTab(destination) },
+                )
             }
         },
     ) { innerPadding ->
@@ -111,7 +108,23 @@ private fun TopBar(
     showNavigateUp: Boolean,
 ) {
     TopAppBar(
-        title = { Text(destination.label()) },
+        title = {
+            Text(
+                text = destination.label(),
+                // `titleLarge` at weight 600, left-aligned — the reference's app-bar title. The default
+                // `titleLarge` here was Material's 400 weight, which is the difference between a screen that
+                // announces itself and one that merely has a word at the top of it.
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
         navigationIcon = {
             // The nested screens are the only ones with somewhere to go back to, and an arrow that
             // appeared on a tab would be a control that does nothing.

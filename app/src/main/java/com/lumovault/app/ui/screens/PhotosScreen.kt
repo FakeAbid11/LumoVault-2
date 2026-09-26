@@ -52,6 +52,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -62,9 +64,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.backup.BackupQueueSummary
-import com.lumovault.app.domain.model.TimelineRail
+import com.lumovault.app.domain.model.ScrollScrubber
+import com.lumovault.app.ui.components.DateScrubber
 import com.lumovault.app.ui.components.MediaCell
-import com.lumovault.app.ui.screens.photos.DateRail
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.photos.BackupOverview
 import com.lumovault.app.ui.screens.photos.PhotosUiState
@@ -74,11 +76,15 @@ import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.formatDay
 import java.time.LocalDate
 import kotlinx.coroutines.launch
-import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.DayHeaderHorizontal
+import com.lumovault.app.ui.theme.DayHeaderVertical
 import com.lumovault.app.ui.theme.LumoVaultType
-import com.lumovault.app.ui.theme.RailWidth
+import com.lumovault.app.ui.theme.GridColumnsMedium
 import com.lumovault.app.ui.theme.GridSpacing
 import com.lumovault.app.ui.theme.GroupCardCorner
+import com.lumovault.app.ui.theme.ScreenEdge
+import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaBadgePaddingVertical
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
@@ -305,22 +311,18 @@ private fun Timeline(
     val renderedRows = state.days.sumOf { it.items.size } + state.days.size +
         if (state.limitedAccess) 1 else 0
 
-    /**
-     * The rail's shape: one entry per month, each knowing where it starts in the grid.
-     *
-     * Derived from the days that are already in memory for the grid itself, so the scrubber adds no query, no
-     * second copy of the library and no work proportional to the photos — a ten-year library is a hundred and
-     * twenty months, not a hundred and twenty thousand rows. The limited-access notice above the timeline is a
-     * rendered item too, and passing its index in is what keeps every month pointing at the row the grid will
-     * actually find it on.
-     */
-    val railMonths = remember(state.days, state.limitedAccess) {
-        TimelineRail.months(state.days, firstItemIndex = if (state.limitedAccess) 1 else 0)
+    // The scrubber's slots are derived from the days already in memory for the grid, so it adds no query, no
+    // second copy of the library and no work proportional to the photos. `firstItemIndex` carries the
+    // limited-access notice into the arithmetic, which is what keeps every day pointing at the row the grid
+    // will actually find it on.
+    val scrubSlots = remember(state.days, state.limitedAccess) {
+        ScrollScrubber.slots(state.days, firstItemIndex = if (state.limitedAccess) 1 else 0)
     }
 
-    // Reading the first visible index during composition is what makes the highlight follow a scroll: it is
+    // Reading the first visible index during composition is what makes the handle follow a scroll: it is
     // snapshot state on the grid, so the recomposition is the same one the day headers ride along with.
-    val activeMonth = TimelineRail.monthFor(railMonths, gridState.firstVisibleItemIndex)
+    val firstVisibleItem = gridState.firstVisibleItemIndex
+    val visibleItems = gridState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
 
     LaunchedEffect(gridState, renderedRows, state.hasMoreToLoad) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
@@ -333,16 +335,12 @@ private fun Timeline(
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = GridCellMinSize),
+            columns = GridCells.Fixed(GridColumnsMedium),
             state = gridState,
-            // The rail's width is reserved beside the grid rather than drawn over it: a scrubber that covers
-            // the rightmost column of photos has taken the thing it is there to help the user reach.
-            contentPadding = PaddingValues(
-                start = GridSpacing,
-                top = GridSpacing,
-                end = GridSpacing + RailWidth,
-                bottom = bottomInset,
-            ),
+            // Edge to edge, with the reference's 2 dp gutter: the timeline is the one place in the app where
+            // content rather than chrome touches the glass, and a side margin is what made the native grid
+            // read as a spreadsheet of pictures instead of a wall of them.
+            contentPadding = PaddingValues(top = GridSpacing, bottom = bottomInset),
             horizontalArrangement = Arrangement.spacedBy(GridSpacing),
             verticalArrangement = Arrangement.spacedBy(GridSpacing),
             modifier = Modifier.fillMaxSize(),
@@ -355,7 +353,7 @@ private fun Timeline(
 
             state.days.forEach { day ->
                 item(key = "day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
-                    DayHeader(epochDay = day.epochDay)
+                    DayHeader(epochDay = day.epochDay, itemCount = day.items.size)
                 }
                 items(items = day.items, key = { media -> media.id }) { media ->
                     MediaCell(
@@ -370,17 +368,77 @@ private fun Timeline(
             }
         }
 
-        DateRail(
-            months = railMonths,
-            activeMonth = activeMonth,
+        DateScrubber(
+            slots = scrubSlots,
+            itemCount = renderedRows,
+            visibleItems = visibleItems,
+            firstVisibleItemIndex = firstVisibleItem,
+            labelFor = { epochDay -> dayLabel(epochDay) },
             onScrub = { index ->
                 // A jump, not an animation. A drag delivers a position per frame, and an animation per frame
                 // is a queue of flights the finger keeps interrupting — which reads as lag, then as a stuck
-                // rail. `scrollToItem` lands where the finger is and is done.
+                // scrubber. `scrollToItem` lands where the finger is and is done.
                 scrollScope.launch { gridState.scrollToItem(index) }
             },
             modifier = Modifier.align(Alignment.CenterEnd),
         )
+    }
+}
+
+/**
+ * A day's heading: the date, and how many things are in it.
+ *
+ * The count is the part the reference adds and the native app lacked. It is drawn as a pill rather than a
+ * sentence because it is read per group, in a column of them, and a "42 items" in running text next to every
+ * date makes a timeline look like a list of paragraphs.
+ */
+@Composable
+private fun DayHeader(epochDay: Long, itemCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(
+                horizontal = DayHeaderHorizontal,
+                vertical = DayHeaderVertical,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+    ) {
+        Text(
+            text = dayLabel(epochDay),
+            style = LumoVaultType.sectionHeader,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The eye reads a bare number beside a date as a count; a screen reader would read it as a number
+            // with no noun, so the words are carried in the semantics and not on the screen.
+            modifier = Modifier.semantics {
+                contentDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
+            },
+        ) {
+            Text(
+                text = itemCount.toString(),
+                style = LumoVaultType.pillLabel,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = MediaBadgePaddingVertical),
+            )
+        }
+    }
+}
+
+/** The date a day header shows and the scrubber names — one rule, so the two can never disagree. */
+@Composable
+private fun dayLabel(epochDay: Long): String {
+    val day = LocalDate.ofEpochDay(epochDay)
+    return when (val distance = dayDistance(day, LocalDate.now())) {
+        DayDistance.Today -> stringResource(R.string.day_today)
+        DayDistance.Yesterday -> stringResource(R.string.day_yesterday)
+        else -> formatDay(day, distance)
     }
 }
 
@@ -395,7 +453,7 @@ private fun LimitedAccessNotice() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = GridSpacing, end = RailWidth, top = SpaceSm, bottom = SpaceSm)
+            .padding(start = ScreenEdge, end = ScreenEdge, top = SpaceSm, bottom = SpaceSm)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant,
                 RoundedCornerShape(GroupCardCorner),
@@ -430,30 +488,6 @@ private fun Context.openAppDetailsSettings() = runCatching {
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", packageName, null),
         ),
-    )
-}
-
-@Composable
-private fun DayHeader(epochDay: Long) {
-    val day = LocalDate.ofEpochDay(epochDay)
-    val distance = dayDistance(day, LocalDate.now())
-    val text = when (distance) {
-        DayDistance.Today -> stringResource(R.string.day_today)
-        DayDistance.Yesterday -> stringResource(R.string.day_yesterday)
-        else -> formatDay(day, distance)
-    }
-
-    // The header shares the grid's gutter rather than its own, so the "T" of "Today" lines up with the left
-    // edge of the first thumbnail under it: a row of photos and a row of labels that start at different
-    // x-positions read as two unrelated lists. The type is smaller and heavier than the `titleMedium` it
-    // replaces, which is what makes the pictures the largest thing on the screen.
-    Text(
-        text = text,
-        style = LumoVaultType.sectionHeader,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = GridSpacing, end = RailWidth, top = SpaceLg, bottom = SpaceSm),
     )
 }
 

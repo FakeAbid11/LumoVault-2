@@ -10,7 +10,7 @@
 
     <!-- Photos library (Phase 3) -->
     <string name="photos_empty_title">No photos yet</string>
-    <string name="photos_date_rail">Jump to a month in your library</string>
+    <string name="photos_date_rail">Jump to a day in your library</string>
     <string name="photos_empty_body">Photos, videos and GIFs on this device will appear here.</string>
     <string name="photos_permission_title">Allow photo access</string>
     <string name="photos_permission_body">LumoVault needs access to your photos and videos to show your library.</string>

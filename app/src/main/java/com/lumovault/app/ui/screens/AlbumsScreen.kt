@@ -60,7 +60,7 @@ fun AlbumsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = CardMinSize),
+            columns = GridCells.Fixed(AlbumColumns),
             state = rememberLazyGridState(),
             contentPadding = PaddingValues(horizontal = SectionPadding, vertical = SpaceSm),
             horizontalArrangement = Arrangement.spacedBy(CardGap),
@@ -199,6 +199,6 @@ private fun SectionHeader(@StringRes label: Int, modifier: Modifier = Modifier) 
     )
 }
 
-private val CardMinSize = 150.dp
-private val CardGap = 8.dp
+private val AlbumColumns = 2
+private val CardGap = 12.dp
 private val SectionPadding = 12.dp

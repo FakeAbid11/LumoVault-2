@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -63,6 +66,8 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.restore.RestoreJob
+import com.lumovault.app.domain.model.ScrollScrubber
+import com.lumovault.app.ui.components.DateScrubber
 import com.lumovault.app.ui.components.MediaGlyph
 import com.lumovault.app.ui.components.MediaPill
 import com.lumovault.app.ui.components.PlaceholderScreen
@@ -76,8 +81,12 @@ import com.lumovault.app.util.formatDay
 import com.lumovault.app.util.formatDuration
 import java.time.LocalDate
 import com.lumovault.app.ui.theme.FullScreenScrim
-import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.GridColumnsMedium
+import com.lumovault.app.ui.theme.DayHeaderHorizontal
+import com.lumovault.app.ui.theme.DayHeaderVertical
 import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaBadgePaddingVertical
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MediaBadgeCorner
 import com.lumovault.app.ui.theme.MediaBadgeInset
@@ -85,8 +94,9 @@ import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
 import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.SpaceLg
-import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
+import kotlinx.coroutines.launch
+import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 
@@ -204,7 +214,16 @@ private fun CloudTimeline(
     restoreJobs: Map<Long, RestoreJob>,
 ) {
     val gridState = rememberLazyGridState()
+    val scrollScope = rememberCoroutineScope()
     val renderedRows = state.days.sumOf { it.items.size } + state.days.size + 1
+
+    // The same instrument the timeline uses, over the same arithmetic: the count-header above the cloud grid
+    // is a rendered item, so it is carried into `firstItemIndex` rather than being quietly skipped.
+    val scrubSlots = remember(state.days) {
+        ScrollScrubber.slots(state.days, firstItemIndex = 1)
+    }
+    val firstVisibleItem = gridState.firstVisibleItemIndex
+    val visibleItems = gridState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
 
     LaunchedEffect(gridState, renderedRows, state.hasMoreToLoad) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
@@ -213,32 +232,44 @@ private fun CloudTimeline(
             }
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = GridCellMinSize),
-        state = gridState,
-        contentPadding = PaddingValues(GridSpacing),
-        horizontalArrangement = Arrangement.spacedBy(GridSpacing),
-        verticalArrangement = Arrangement.spacedBy(GridSpacing),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        item(key = "cloud-header", span = { GridItemSpan(maxLineSpan) }) {
-            CloudHeader(state = state)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(GridColumnsMedium),
+            state = gridState,
+            contentPadding = PaddingValues(top = GridSpacing, bottom = SpaceLg),
+            horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+            verticalArrangement = Arrangement.spacedBy(GridSpacing),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item(key = "cloud-header", span = { GridItemSpan(maxLineSpan) }) {
+                CloudHeader(state = state)
+            }
+
+            state.days.forEach { day ->
+                item(key = "cloud-day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
+                    CloudDayHeader(epochDay = day.epochDay, itemCount = day.items.size)
+                }
+                items(items = day.items, key = { item -> "cloud-${item.messageId}" }) { item ->
+                    CloudMediaCell(
+                        item = item,
+                        onDevice = item.messageId in state.localMatches,
+                        onClick = { onSelect(item) },
+                        previewPathFor = previewPathFor,
+                        restoring = restoreJobs[item.messageId]?.state?.isLive == true,
+                    )
+                }
+            }
         }
 
-        state.days.forEach { day ->
-            item(key = "cloud-day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
-                CloudDayHeader(epochDay = day.epochDay)
-            }
-            items(items = day.items, key = { item -> "cloud-${item.messageId}" }) { item ->
-                CloudMediaCell(
-                    item = item,
-                    onDevice = item.messageId in state.localMatches,
-                    onClick = { onSelect(item) },
-                    previewPathFor = previewPathFor,
-                    restoring = restoreJobs[item.messageId]?.state?.isLive == true,
-                )
-            }
-        }
+        DateScrubber(
+            slots = scrubSlots,
+            itemCount = renderedRows,
+            visibleItems = visibleItems,
+            firstVisibleItemIndex = firstVisibleItem,
+            labelFor = { epochDay -> cloudDayLabel(epochDay) },
+            onScrub = { index -> scrollScope.launch { gridState.scrollToItem(index) } },
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
     }
 }
 
@@ -256,7 +287,7 @@ private fun CloudHeader(state: CloudUiState.Library) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = GridSpacing, vertical = SpaceSm),
+            .padding(horizontal = DayHeaderHorizontal, vertical = DayHeaderVertical),
         verticalArrangement = Arrangement.spacedBy(SpaceXs),
     ) {
         Text(
@@ -286,26 +317,50 @@ private fun CloudHeader(state: CloudUiState.Library) {
 }
 
 @Composable
-private fun CloudDayHeader(epochDay: Long) {
+private fun CloudDayHeader(epochDay: Long, itemCount: Int) {
+    // The timeline's header, drawn the same way on purpose: two grids of the same library, one on this
+    // device and one in the channel, that differ in their chrome are two apps.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = DayHeaderHorizontal, vertical = DayHeaderVertical),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+    ) {
+        Text(
+            text = cloudDayLabel(epochDay),
+            style = LumoVaultType.sectionHeader,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.semantics {
+                contentDescription = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount)
+            },
+        ) {
+            Text(
+                text = itemCount.toString(),
+                style = LumoVaultType.pillLabel,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = MediaBadgePaddingVertical),
+            )
+        }
+    }
+}
+
+/** The date a cloud day header shows and the scrubber names — the same rule as the local timeline. */
+@Composable
+private fun cloudDayLabel(epochDay: Long): String {
     val day = LocalDate.ofEpochDay(epochDay)
-    val distance = dayDistance(day, LocalDate.now())
-    val text = when (distance) {
+    return when (val distance = dayDistance(day, LocalDate.now())) {
         DayDistance.Today -> stringResource(R.string.day_today)
         DayDistance.Yesterday -> stringResource(R.string.day_yesterday)
         else -> formatDay(day, distance)
     }
-
-    // The same header the local timeline draws, because the two screens are the same library seen from two
-    // ends of a cable, and a day that is 15 sp semi-bold on one and 16 sp regular on the other reads as two
-    // different apps.
-    Text(
-        text = text,
-        style = LumoVaultType.sectionHeader,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = GridSpacing, end = GridSpacing, top = SpaceLg, bottom = SpaceSm),
-    )
 }
 
 /**
