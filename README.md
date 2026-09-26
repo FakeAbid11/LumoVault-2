@@ -37,6 +37,14 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
 release or signing work. Phase 10 was the hardening pass, and it is recorded below. Every earlier phase is
 recorded in the sections above, in order.
 
+**Video playback on Media3 ExoPlayer:** complete and CI-verified (run
+[36222746776](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36222746776) — 475 unit tests, 0 failed,
+debug APK built with both TDLib ABIs packaged). The viewer's video page plays through `media3-exoplayer`
+1.11.1 with a `PlayerView`, replacing `MediaPlayer`; the application-level state machine, the generation
+guard on every player callback and the failure screen are the ones the crash fix introduced, adapted rather
+than removed. Playback on hardware is **not** verified — see
+[Video playback is Media3, with LumoVault's own guards](#video-playback-is-media3-with-lumovaults-own-guards).
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
