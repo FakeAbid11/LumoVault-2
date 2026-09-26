@@ -55,7 +55,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     }
 
                     // "An account was linked" is a setup fact; whether it still works comes from TDLib.
-                    if (telegram.isAuthenticated) {
+                    // Written only on the transition, never on every emission: this collector's own
+                    // `progress` input is fed by the `app_settings` row the write lands in, so an
+                    // unconditional upsert invalidates the table that re-triggers the collector — a
+                    // write loop that spins for as long as the screen is open and the account is linked.
+                    if (telegram.isAuthenticated && !progress.telegramLinked) {
                         container.onboardingRepository.setTelegramLinked(true)
                     }
                 }
