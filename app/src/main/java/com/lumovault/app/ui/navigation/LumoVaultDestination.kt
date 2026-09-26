@@ -39,6 +39,8 @@ enum class LumoVaultDestination(val route: String) {
             route == Cloud.route -> Cloud
             route == Map.route -> Map
             route == Albums.route || route.startsWith(AlbumRoutes.DETAIL_PREFIX) -> Albums
+            // Reconnecting Telegram is the cloud tab's work, wherever it was opened from.
+            route == AccountRoutes.CONNECT_TELEGRAM -> Cloud
             // Backup, health, diagnostics and free-up-space all belong to the cloud tab's work.
             route?.startsWith(BackupRoutes.PREFIX) == true -> Cloud
             else -> Start

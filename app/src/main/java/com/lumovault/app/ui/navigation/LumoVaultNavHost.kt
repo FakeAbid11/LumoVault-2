@@ -17,6 +17,7 @@ import com.lumovault.app.ui.backup.FreeUpSpaceScreen
 import com.lumovault.app.ui.screens.AlbumsScreen
 import com.lumovault.app.ui.screens.CloudScreen
 import com.lumovault.app.ui.map.MapScreen
+import com.lumovault.app.ui.onboarding.ConnectTelegramDestination
 import com.lumovault.app.ui.screens.PhotosScreen
 import com.lumovault.app.ui.screens.albums.AlbumDetailScreen
 import com.lumovault.app.ui.viewer.MediaViewerScreen
@@ -43,6 +44,17 @@ object BackupRoutes {
 
     /** Which folders automatic backup may read, shared with onboarding's two columns. */
     const val FOLDERS = PREFIX + "folders"
+}
+
+/**
+ * The sign-in route kept outside onboarding.
+ *
+ * A lapsed Telegram session must be reconnectable in place — the root screen's own comment promises
+ * it — and the credential panels live in the onboarding graph, which the completed app never
+ * re-enters. This route hosts the same panels over the same view model, reached from the Cloud tab.
+ */
+object AccountRoutes {
+    const val CONNECT_TELEGRAM = "connect-telegram"
 }
 
 @Composable
@@ -130,7 +142,13 @@ fun LumoVaultNavHost(
             )
         }
 
-        composable(LumoVaultDestination.Cloud.route) { CloudScreen() }
+        composable(LumoVaultDestination.Cloud.route) {
+            CloudScreen(onConnectTelegram = { navController.navigate(AccountRoutes.CONNECT_TELEGRAM) })
+        }
+
+        composable(AccountRoutes.CONNECT_TELEGRAM) {
+            ConnectTelegramDestination(onNavigateUp = navController::navigateUp)
+        }
 
         composable(BackupRoutes.HUB) {
             BackupHubScreen(

@@ -73,6 +73,8 @@ fun ConnectTelegramScreen(
     onPhoneChange: (String) -> Unit,
     onBack: () -> Unit,
     onContinueWithoutTelegram: () -> Unit,
+    /** True when hosted outside the setup flow — which drops the step counter, correctly. */
+    standalone: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -103,7 +105,7 @@ fun ConnectTelegramScreen(
     }
 
     OnboardingScaffold(
-        step = 3,
+        step = if (standalone) null else 3,
         totalSteps = ONBOARDING_STEPS,
         title = stringResource(panel.titleRes()),
         description = when (panel) {

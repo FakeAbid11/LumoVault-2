@@ -46,7 +46,9 @@ import com.lumovault.app.ui.theme.SpaceXs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScaffold(
-    step: Int,
+    /** Null outside the setup flow: a "step 3 of 7" bar above a lone reconnect screen is a lie about
+     * where the user is. */
+    step: Int?,
     totalSteps: Int,
     title: String,
     primaryLabel: String,
@@ -88,7 +90,6 @@ fun OnboardingScaffold(
                 .padding(horizontal = SpaceXl),
         ) {
             StepProgress(step = step, totalSteps = totalSteps)
-
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -160,7 +161,8 @@ fun OnboardingScaffold(
  * question, and a row that answers it once leaves the answer and the room for the content both.
  */
 @Composable
-private fun StepProgress(step: Int, totalSteps: Int) {
+private fun StepProgress(step: Int?, totalSteps: Int) {
+    if (step == null) return
     Row(
         modifier = Modifier
             .fillMaxWidth()

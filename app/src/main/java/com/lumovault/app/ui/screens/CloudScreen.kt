@@ -100,6 +100,7 @@ import com.lumovault.app.ui.theme.SpaceXs
  */
 @Composable
 fun CloudScreen(
+    onConnectTelegram: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: CloudViewModel = viewModel(),
 ) {
@@ -136,10 +137,18 @@ fun CloudScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
+            // Sign-in is a state with a door, not a sentence: the button reaches the same credential
+            // panels onboarding used, because the onboarding flow itself is gone once setup finished
+            // and copy that pointed at it described a screen the app could no longer reach.
             CloudUiState.NeedsSignIn -> PlaceholderScreen(
                 title = stringResource(R.string.cloud_needs_signin_title),
                 description = stringResource(R.string.cloud_needs_signin_body),
                 icon = Icons.Filled.Cloud,
+                action = {
+                    Button(onClick = onConnectTelegram) {
+                        Text(stringResource(R.string.cloud_connect_action))
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
 

@@ -171,7 +171,8 @@
     <string name="cloud_not_available_title">Telegram isn\'t available in this build</string>
     <string name="cloud_not_available_body">Your synced cloud library will appear here once Telegram backup is enabled in this app.</string>
     <string name="cloud_needs_signin_title">Connect Telegram to see your cloud</string>
-    <string name="cloud_needs_signin_body">Sign in to your Telegram account from onboarding to load your LumoVault Backup library.</string>
+    <string name="cloud_needs_signin_body">Sign in to your Telegram account to load your LumoVault Backup library.</string>
+    <string name="cloud_connect_action">Connect Telegram</string>
     <string name="cloud_preparing_title">Setting up your cloud</string>
     <string name="cloud_step_searching">Looking for your LumoVault Backup channel…</string>
     <string name="cloud_step_validating">Checking your cloud channel…</string>
