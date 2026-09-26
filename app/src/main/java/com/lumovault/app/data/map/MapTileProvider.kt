@@ -18,12 +18,18 @@ import org.osmdroid.util.MapTileIndex
  * reason: an absent value has to mean a clearly reported "not configured", never a placeholder that looks real
  * and never a crash.
  *
- * With no template, [tileSource] is null and the map still draws its markers on a plain canvas — every photo
- * position, the clusters, the strip and the whole viewer hand-off work without a single tile. That is the
- * difference between a build that cannot show tiles and a feature that does not exist, and the screen says
+ * The defaults live beside those properties in `app/build.gradle.kts`, and the tile host one of them names is
+ * chosen under that policy rather than around it: a descriptive agent, one viewport at a time from the map tab
+ * only, an on-disk cache in app-private storage, and attribution drawn on the map. Anyone building this for
+ * more than themselves passes their own `MAP_TILE_URL` — a third-party provider or a server they run — which
+ * is what the policy asks of an app that grows.
+ *
+ * With no template at all, [tileSource] is null and the map still draws its markers on a plain canvas — every
+ * photo position, the clusters, the strip and the whole viewer hand-off work without a single tile. That is
+ * the difference between a build that cannot show tiles and a feature that does not exist, and the screen says
  * which one it is showing. The caller must then turn osmdroid's data connection off: its *own* default source
- * is Mapnik at tile.openstreetmap.org, so leaving the tile source unset would fetch from the public servers
- * rather than from nothing. See MapScreen's factory.
+ * is Mapnik, so leaving the tile source unset would fetch from a server nobody configured rather than from
+ * nothing. See MapScreen's factory.
  *
  * osmdroid's own configuration is global and read when the first `MapView` is constructed, which is why
  * [configure] is idempotent and must run before that: setting a user agent afterwards is a value the library

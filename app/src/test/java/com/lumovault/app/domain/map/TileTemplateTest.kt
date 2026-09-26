@@ -45,6 +45,22 @@ class TileTemplateTest {
     }
 
     @Test
+    fun theTileHostThisBuildShipsWithCanActuallyAddressTiles() {
+        // The default lives in `app/build.gradle.kts` as `MAP_TILE_URL`, and a Kotlin test cannot read it
+        // without going through BuildConfig — so this is the copy that may drift. It is kept because the
+        // failure it guards is silent in both directions: a default that answers `null` here gives every
+        // build a blank basemap and a notice nobody thinks to remove, and every test in this file stays green
+        // while that happens.
+        val shipped = TileTemplate.of("https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+
+        assertEquals(
+            "the standard slippy-map address, with no reordering of the parts",
+            "https://tile.openstreetmap.org/12/3/4.png",
+            requireNotNull(shipped).urlFor(zoom = 12, x = 3, y = 4),
+        )
+    }
+
+    @Test
     fun aTemplateHasToBeAnAddress() {
         // Not a policy lecture, a filter: the value comes from a build property, and `example/{z}/{x}/{y}`
         // would be asked for over cleartext with a path that has no host — which fails as a blank map.

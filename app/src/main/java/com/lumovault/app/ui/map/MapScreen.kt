@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.map
 
+import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,7 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,15 +54,19 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.lumovault.app.data.map.MapTileProvider
 import com.lumovault.app.domain.map.MapClustering
 import com.lumovault.app.domain.model.MapBounds
+import com.lumovault.app.domain.map.MapPlacement
 import com.lumovault.app.domain.map.MapPin
 import com.lumovault.app.domain.model.MapPhoto
 import java.text.DateFormat
 import java.util.Date
+import kotlin.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.launch
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -82,6 +88,13 @@ import com.lumovault.app.ui.theme.OnMedia
  * of pixels while the world grows fourfold per level, the same code separates a city into its streets. That is
  * the whole reason clustering lives in pure Kotlin — see [MapClustering] — rather than in a library that would
  * not show its work here.
+ *
+ * Two things about the first frame of a map are only visible when they are wrong, so both are done here and
+ * neither is left to chance. The viewport is published as soon as the map has been **laid out**, because
+ * osmdroid's bounding box is a field rather than a nullable and before a layout pass it is a rectangle with no
+ * area — a query given that rectangle finds no photos, and the screen stays empty for the rest of the visit
+ * however many positions the library holds. And the map is moved **once**, to where [MapFraming] says the
+ * photos are, because a map that recentres whenever the viewport changes is a map the user cannot move.
  */
 @Composable
 fun MapScreen(
@@ -89,15 +102,26 @@ fun MapScreen(
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pins by viewModel.pins.collectAsStateWithLifecycle()
     val strip by viewModel.strip.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val focus by viewModel.focusLocation.collectAsStateWithLifecycle()
+    val placement by viewModel.placement.collectAsStateWithLifecycle()
 
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var previews by remember { mutableStateOf<List<MapPhoto>>(emptyList()) }
+
+    /**
+     * Bumped on every resume, because osmdroid clears what it was given.
+     *
+     * `MapView.onDetach` empties the listener list and the overlay manager's list, and a Compose subtree
+     * leaving and coming back is this app's normal navigation. Without a key that changes, the second visit
+     * to the map is a picture of the library with no listener attached to it, no tap receiver, and no markers
+     * — the effects below would not re-run, because the view object is the same one.
+     */
+    var visit by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { viewModel.onPermissionResult() }
@@ -107,7 +131,10 @@ fun MapScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.resume()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.resume()
+                visit += 1
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -145,7 +172,7 @@ fun MapScreen(
         // itself stays reachable only through the composition that just went away.
     )
 
-    DisposableEffect(mapView) {
+    DisposableEffect(mapView, visit) {
         val map = mapView ?: return@DisposableEffect onDispose { }
         map.onResume()
         // osmdroid reports one scroll event per frame and its events carry no usable coordinates, so the
@@ -183,17 +210,64 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(mapView, pins) {
+    LaunchedEffect(mapView, visit, pins) {
         val map = mapView ?: return@LaunchedEffect
         drawPins(map, pins, viewModel)
     }
 
-    LaunchedEffect(mapView, focus) {
+    /**
+     * Put the map where the library is, once, and then tell the model what it is looking at.
+     *
+     * Both halves have to wait for a layout: osmdroid's bounding box is a field rather than a nullable, so
+     * before the first layout it is a rectangle with no area — published as a viewport, the query answers
+     * nothing and the screen looks empty for the rest of the visit; and fitting a box to a view whose size is
+     * not known yet picks a zoom for a screen of zero pixels. [awaitMapMeasured] is what makes "after the
+     * layout" a fact instead of a hope.
+     *
+     * A focus request from the viewer wins over the framing. It is the answer to a tap on one photograph, and
+     * dropping a pending frame at the same time is what stops the map jumping away from the photo the user
+     * just asked for, one recomposition later.
+     */
+    LaunchedEffect(mapView, visit, placement, focus) {
         val map = mapView ?: return@LaunchedEffect
-        val location = focus ?: return@LaunchedEffect
-        map.controller.setCenter(GeoPoint(location.latitude, location.longitude))
-        if (map.zoomLevelDouble < FOCUS_ZOOM) map.setZoomLevel(FOCUS_ZOOM)
-        viewModel.focusConsumed()
+        if (placement == null && focus == null) return@LaunchedEffect
+        awaitMapMeasured(map)
+        val location = focus
+        // Copied out of the delegated properties before the `when`: a `by`-delegated value cannot be
+        // smart-cast, and the two branches below need the concrete placement's own fields.
+        val framing = placement
+        when {
+            location != null -> {
+                map.controller.setCenter(GeoPoint(location.latitude, location.longitude))
+                if (map.zoomLevelDouble < FOCUS_ZOOM) map.setZoomLevel(FOCUS_ZOOM)
+                viewModel.focusConsumed()
+                viewModel.placementConsumed()
+            }
+
+            framing is MapPlacement.Fit -> {
+                val bounds = framing.bounds
+                // North, east, south, west — the order `BoundingBox` takes, which is not the order
+                // `MapBounds` holds (min/max), and swapping either one silently frames the wrong quarter of
+                // the planet.
+                map.zoomToBoundingBox(
+                    BoundingBox(
+                        bounds.maxLatitude, bounds.maxLongitude,
+                        bounds.minLatitude, bounds.minLongitude,
+                    ),
+                    false,
+                    with(density) { FIT_BORDER.toPx().toInt() },
+                )
+                viewModel.placementConsumed()
+            }
+
+            framing is MapPlacement.Centre -> {
+                map.controller.setCenter(GeoPoint(framing.at.latitude, framing.at.longitude))
+                map.setZoomLevel(framing.zoom)
+                viewModel.placementConsumed()
+            }
+
+            else -> Unit
+        }
         publishViewport(map, viewModel)
     }
 
@@ -372,6 +446,37 @@ private fun publishViewport(map: MapView, viewModel: MapViewModel) {
     }
     viewModel.viewportChanged(bounds = bounds, zoomLevel = zoom)
 }
+
+/**
+ * Suspend until the map has been measured, because nothing about a map can be decided before then.
+ *
+ * `View.post` is not enough and osmdroid says so itself: its own `zoomToBoundingBox` documentation warns that
+ * it must be called after the layout is complete, and the view's bounding box is a field that holds a
+ * zero-span rectangle until `onLayout` has reset the projection with a real size. A posted runnable can be
+ * dispatched at attach, which is before that happens — so this waits for a global layout in which the map
+ * actually has a width, and takes its listener back off whether it resolved or was cancelled.
+ */
+private suspend fun awaitMapMeasured(map: MapView) {
+    if (map.width > 0 && map.height > 0) return
+    suspendCancellableCoroutine<Unit> { continuation ->
+        val observer = map.viewTreeObserver
+        val listener = object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (map.width <= 0 || map.height <= 0) return
+                if (observer.isAlive) observer.removeOnGlobalLayoutListener(this)
+                continuation.resume(Unit)
+            }
+        }
+        observer.addOnGlobalLayoutListener(listener)
+        // A composition that goes away mid-wait must not leave a listener on a view tree it no longer owns.
+        continuation.invokeOnCancellation {
+            if (observer.isAlive) observer.removeOnGlobalLayoutListener(listener)
+        }
+    }
+}
+
+/** How long to leave between the photos and the edge of the screen when the map frames them. */
+private val FIT_BORDER = 28.dp
 
 @Composable
 private fun MapPreviewCard(

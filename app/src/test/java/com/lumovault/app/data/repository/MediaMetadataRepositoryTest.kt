@@ -243,6 +243,69 @@ class MediaMetadataRepositoryTest {
         assertEquals(1, repository.pendingExtractionCount())
     }
 
+    @Test
+    fun theFramingAggregateSpansEveryPositionedPhoto() = runBlocking {
+        store.index(FakeMediaRow(1L), FakeMediaRow(2L), FakeMediaRow(3L))
+        position(1L, 52.5, 13.4)
+        position(2L, 48.85, 2.35)
+        position(3L, -33.86, 151.21)
+
+        val bounds = requireNotNull(repository.locatedBounds())
+
+        // Named by which edge of the world they are, not by which photo came first: the map reads these as
+        // north/east/south/west, and a min/max swap is a map that opens in the wrong hemisphere.
+        assertEquals(-33.86, requireNotNull(bounds.minLatitude), 0.0)
+        assertEquals(52.5, requireNotNull(bounds.maxLatitude), 0.0)
+        assertEquals(2.35, requireNotNull(bounds.minLongitude), 0.0)
+        assertEquals(151.21, requireNotNull(bounds.maxLongitude), 0.0)
+        assertEquals(3, bounds.count)
+    }
+
+    @Test
+    fun anEmptyLibraryFramesNothingRatherThanTheOrigin() = runBlocking {
+        store.index(FakeMediaRow(1L))
+        repository.record(1L, metadata = null, extractedAtSeconds = 3L)
+
+        val bounds = repository.locatedBounds()
+
+        assertEquals("the query ran, and the answer is that there is nothing to frame", 0, bounds?.count)
+        assertNull("and no edges are invented for it", bounds?.minLatitude)
+    }
+
+    @Test
+    fun anImpossiblePositionIsNoPositionForEveryMapRead() = runBlocking {
+        store.index(FakeMediaRow(1L), FakeMediaRow(2L))
+        // A latitude of 120 has no north edge to frame, and a longitude of -700 is a wrap nobody asked for.
+        position(1L, 120.0, 13.4)
+        position(2L, 52.5, -700.0)
+
+        val bounds = repository.locatedBounds()
+
+        assertEquals(0, bounds?.count)
+        assertNull(
+            "and the viewer's 'view on map' answers the same way instead of throwing on the row",
+            repository.locationFor(1L),
+        )
+    }
+
+    @Test
+    fun onePositionedPhotoAmongBadOnesStillFramesTheMap() = runBlocking {
+        store.index(FakeMediaRow(1L), FakeMediaRow(2L))
+        position(1L, 120.0, 13.4)
+        position(2L, 52.5, 13.4)
+
+        val bounds = requireNotNull(repository.locatedBounds())
+
+        assertEquals("one usable row is a frame, not an empty map", 1, bounds.count)
+        assertEquals(52.5, requireNotNull(bounds.minLatitude), 0.0)
+        assertEquals(52.5, requireNotNull(bounds.maxLatitude), 0.0)
+        assertEquals(
+            "and it is still answerable through the same guard the framing test reads",
+            MediaLocation(52.5, 13.4),
+            repository.locationFor(2L),
+        )
+    }
+
     private fun indexAPhoto(id: Long) {
         store.index(FakeMediaRow(id, dateAddedSeconds = id))
         position(id, 52.5, 13.4)

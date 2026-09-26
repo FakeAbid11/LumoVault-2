@@ -1,9 +1,11 @@
 package com.lumovault.app.data.repository
 
 import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
+import com.lumovault.app.data.local.metadata.LocatedBoundsRow
 import com.lumovault.app.data.local.metadata.MapPhotoRow
 import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.metadata.MediaMetadataEntity
+import com.lumovault.app.domain.map.LocatedBounds
 import com.lumovault.app.domain.metadata.MetadataCandidate
 import com.lumovault.app.domain.model.MapBounds
 import com.lumovault.app.domain.model.MapPhoto
@@ -47,6 +49,8 @@ class MediaMetadataRepositoryImpl(
     }
 
     override fun observeLocatedCount(): Flow<Int> = mediaMetadata.observeLocatedCount()
+
+    override suspend fun locatedBounds(): LocatedBounds? = mediaMetadata.locatedBounds()?.toLocatedBounds()
 
     override suspend fun locationFor(mediaStoreId: Long): MediaLocation? =
         mediaMetadata.coordinatesFor(mediaStoreId)?.let { MediaLocation(it.latitude, it.longitude) }
@@ -102,6 +106,14 @@ class MediaMetadataRepositoryImpl(
         /** Comfortably under SQLite's parameter ceiling, and far more than a preview strip can draw. */
     }
 }
+
+private fun LocatedBoundsRow.toLocatedBounds(): LocatedBounds = LocatedBounds(
+    minLatitude = minLatitude,
+    maxLatitude = maxLatitude,
+    minLongitude = minLongitude,
+    maxLongitude = maxLongitude,
+    count = placedCount,
+)
 
 private fun MapPhotoRow.toMapPhoto(): MapPhoto = MapPhoto(
     mediaStoreId = mediaStoreId,

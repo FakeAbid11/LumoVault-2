@@ -1,5 +1,6 @@
 package com.lumovault.app.domain.repository
 
+import com.lumovault.app.domain.map.LocatedBounds
 import com.lumovault.app.domain.metadata.MetadataCandidate
 import com.lumovault.app.domain.model.MapBounds
 import com.lumovault.app.domain.model.MapPhoto
@@ -32,6 +33,15 @@ interface MediaMetadataRepository {
 
     /** How many positioned photos exist, which is how the map tells "nothing here" from "not read yet". */
     fun observeLocatedCount(): Flow<Int>
+
+    /**
+     * The rectangle that holds every positioned photo in the library, or null when there are none to place.
+     *
+     * What the map opens on. Reading it costs one aggregate, so the answer is available before the map widget
+     * has been laid out — which is the only moment at which framing a map is free: after that, moving it is
+     * the user's, not the app's.
+     */
+    suspend fun locatedBounds(): LocatedBounds?
 
     /** One photo's position, or null when it has none. The viewer's "view on map" acts on the answer. */
     suspend fun locationFor(mediaStoreId: Long): MediaLocation?

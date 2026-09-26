@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.data.map.MapTileProvider
 import com.lumovault.app.domain.map.MapClustering
+import com.lumovault.app.domain.map.MapFraming
 import com.lumovault.app.domain.map.MapPin
+import com.lumovault.app.domain.map.MapPlacement
 import com.lumovault.app.domain.map.MapViewport
 import com.lumovault.app.domain.model.MapBounds
 import com.lumovault.app.domain.model.MediaLocation
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -92,6 +95,20 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     val focusLocation: StateFlow<MediaLocation?> = focus
 
+    private val _placement = MutableStateFlow<MapPlacement?>(null)
+
+    /**
+     * How the map should frame the library the first time it can.
+     *
+     * Set once per view model, and cleared when the screen has acted on it — see
+     * [MapFraming.shouldPlace]. A map that recentres on its photos every time the query answer changes is a
+     * map the user cannot move, so this is a one-shot request rather than a standing fact about the library.
+     */
+    val placement: StateFlow<MapPlacement?> = _placement
+
+    /** Whether this view model has already had its map moved to the photos. */
+    private var framed = false
+
     /**
      * How many positioned photos exist at all.
      *
@@ -128,6 +145,39 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         // I/O, so there is no background scheduler for this and no poll.
         container.startMetadataExtraction()
         viewModelScope.launch { pendingExtraction.value = container.mediaMetadataRepository.pendingExtractionCount() }
+        viewModelScope.launch {
+            // Framing follows the count rather than happening once at open, because the common first visit is
+            // a library whose EXIF has not been read yet: framing at that moment would leave the map on the
+            // Gulf of Guinea with a hundred photos somewhere off screen. The count going from nothing to
+            // something is the moment the map can be pointed at the library — and [frameOnLibrary] is a
+            // one-shot after that, so no later change moves a map the user has already started looking at.
+            container.mediaMetadataRepository.observeLocatedCount()
+                .distinctUntilChanged()
+                .collect { frameOnLibrary() }
+        }
+    }
+
+    /**
+     * Ask the table where the positioned photos are, and hold the answer until the screen takes it.
+     *
+     * Two guards keep this from becoming a query per database invalidation: [framed] makes it a one-shot per
+     * view model, and a [_placement] nobody has acted on yet is itself a reason not to ask again. The case the
+     * second guard covers is the metadata pass finishing while the map sits open — hundreds of rows landing,
+     * each invalidating the flow underneath it.
+     *
+     * No dispatcher is forced around the query: a Room `suspend` function already runs off the caller's
+     * thread, and the answer is five numbers rather than a window's worth of photos.
+     */
+    private suspend fun frameOnLibrary() {
+        if (framed || _placement.value != null) return
+        val framing = MapFraming.placementFor(container.mediaMetadataRepository.locatedBounds())
+        if (MapFraming.shouldPlace(framed, framing)) _placement.value = framing
+    }
+
+    /** The screen has moved the map. Never ask it to move again for this visit. */
+    fun placementConsumed() {
+        framed = true
+        _placement.value = null
     }
 
     fun permissionToRequest(): String = container.permissionRepository.mediaLocationPermissionToRequest()

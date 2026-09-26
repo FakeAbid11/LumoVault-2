@@ -33,33 +33,48 @@ val telegramApiId: Int = providers.gradleProperty("TELEGRAM_API_ID")
     .toIntOrNull()
     ?: 0
 
-// Map tiles are a provider choice, not a constant. `MAP_TILE_URL` is a {z}/{x}/{y} template and
-// `MAP_TILE_USER_AGENT` is the identifying string a provider's terms require; both are build inputs like the
-// Telegram credentials, and an absent URL is a supported state — see domain/map/TileTemplate.kt, which is what
-// decides whether a template can address a tile at all.
+// Map tiles are a provider choice, not a constant, and *which* provider is a usage-policy question. The
+// default is OSM's standard tile server, whose policy permits an application to fetch the tiles it puts on a
+// screen on three conditions it states outright: identify the client with a descriptive User-Agent, keep the
+// fetching light (no bulk downloads — this app asks for one viewport at a time, from the map tab only), and
+// show attribution. All three are met here: the agent below, osmdroid's on-disk cache in the app's own cache
+// directory (`MapTileProvider.configure`), and `MAP_TILE_ATTRIBUTION` drawn on the map by `MapScreen`. The
+// same policy asks anything that grows past light use to move to a third-party provider or its own server, so
+// every one of these four values is a build input like the Telegram credentials — pass `-PMAP_TILE_URL=…` to
+// point elsewhere, or blank to ship without tiles, which the screen then says while still plotting every photo.
+// `MAP_TILE_USER_AGENT` should also carry a contact address in a build that leaves the developer's hands, as
+// the policy requests. An absent or malformed URL is a supported state either way: see
+// domain/map/TileTemplate.kt, which decides whether a template can address a tile at all.
+
+// `{z}/{x}/{y}` is the shape `TileTemplate` substitutes.
+val defaultMapTileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+// A tile host that sees the library's default agent sees nothing: TileDownloader logs and returns no tile
+// when the agent is still literally "osmdroid", so an unset agent is a blank map rather than a polite one.
+val defaultMapTileUserAgent = "LumoVault/0.1 (https://github.com/FakeAbid11/LumoVault-2)"
+
+// What the ODbL and the tile policy both require to be visible wherever its tiles are shown.
+val defaultMapTileAttribution = "© OpenStreetMap contributors"
+
 val mapTileUrl: String = safeBuildConfigValue(
     providers.gradleProperty("MAP_TILE_URL")
         .orElse(providers.environmentVariable("MAP_TILE_URL"))
-        .getOrElse(""),
+        .getOrElse(defaultMapTileUrl),
 )
     .takeIf { it.canAddressTiles() }
     ?: ""
 
-// A tile host that sees the library's default agent sees nothing: TileDownloader refuses to fetch when the
-// agent is literally "osmdroid". So a build that names no agent still gets one that identifies an app.
-val defaultTileUserAgent: String = "LumoVault/0.1"
-
 val mapTileUserAgent: String = safeBuildConfigValue(
     providers.gradleProperty("MAP_TILE_USER_AGENT")
         .orElse(providers.environmentVariable("MAP_TILE_USER_AGENT"))
-        .getOrElse(defaultTileUserAgent),
-).ifBlank { defaultTileUserAgent }
+        .getOrElse(defaultMapTileUserAgent),
+).ifBlank { defaultMapTileUserAgent }
 
 val mapTileAttribution: String = safeBuildConfigValue(
     providers.gradleProperty("MAP_TILE_ATTRIBUTION")
         .orElse(providers.environmentVariable("MAP_TILE_ATTRIBUTION"))
-        .getOrElse(""),
-)
+        .getOrElse(defaultMapTileAttribution),
+).ifBlank { defaultMapTileAttribution }
 
 val mapTileMaxZoom: Int = providers.gradleProperty("MAP_TILE_MAX_ZOOM")
     .orElse(providers.environmentVariable("MAP_TILE_MAX_ZOOM"))

@@ -137,11 +137,50 @@ interface MediaMetadataDao {
     )
     fun observeLocatedCount(): Flow<Int>
 
-    /** One item's coordinates, for the viewer's "view on map", which must not load a rectangle to answer. */
+    /**
+     * The rectangle every placeable photo sits in, as one aggregate.
+     *
+     * The map needs this before it has a size to read a viewport from: "where should this map open" cannot
+     * wait for the first pan, and it must not be answered by loading up to 2,000 rows to take their average.
+     * `MIN`/`MAX` over the same two indexes the viewport query range-scans is one pass and four numbers.
+     *
+     * The range predicates are not redundant with `IS NOT NULL`. A camera can write a GPS block that reads
+     * latitude 91, and a rectangle built from that has no north edge at all — the map would open framing a
+     * place that does not exist. The reader refuses such pairs on the way in
+     * ([com.lumovault.app.domain.metadata.ExifFacts.location]); this says the same thing about rows already in
+     * the table, including any written before that check existed.
+     *
+     * Trash is excluded for the same reason the viewport query excludes it: a hidden photo is not a place the
+     * map should be promising to show.
+     */
+    @Query(
+        """
+        SELECT MIN(x.latitude) AS minLatitude, MAX(x.latitude) AS maxLatitude,
+               MIN(x.longitude) AS minLongitude, MAX(x.longitude) AS maxLongitude,
+               COUNT(*) AS placedCount
+        FROM media_metadata x
+        JOIN media m ON m.media_store_id = x.media_store_id
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE x.latitude IS NOT NULL AND x.longitude IS NOT NULL
+          AND x.latitude BETWEEN -90.0 AND 90.0
+          AND x.longitude BETWEEN -180.0 AND 180.0
+          AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun locatedBounds(): LocatedBoundsRow?
+
+    /**
+     * One item's coordinates, for the viewer's "view on map", which must not load a rectangle to answer.
+     *
+     * The ranges are here rather than only in [MediaLocation]'s constructor because the caller of this cannot
+     * afford an exception: a stored pair outside the possible range answers "no position", which is what the
+     * button then says, instead of throwing from a click.
+     */
     @Query(
         """
         SELECT latitude, longitude FROM media_metadata
         WHERE media_store_id = :mediaStoreId AND latitude IS NOT NULL AND longitude IS NOT NULL
+          AND latitude BETWEEN -90.0 AND 90.0 AND longitude BETWEEN -180.0 AND 180.0
         LIMIT 1
         """,
     )
@@ -191,4 +230,19 @@ data class MetadataCandidateRow(val mediaStoreId: Long, val contentUri: String)
 
 /** Just a position, for a query that only ever asks for one. */
 data class PhotoCoordinates(val latitude: Double, val longitude: Double)
+
+/**
+ * The four numbers that frame a library, and how many photos contributed.
+ *
+ * The extremes are nullable because an aggregate over no rows answers null rather than nothing, and "the
+ * query ran and there is nothing placed yet" is the sentence the map has to be able to tell apart from "these
+ * are the edges".
+ */
+data class LocatedBoundsRow(
+    val minLatitude: Double?,
+    val maxLatitude: Double?,
+    val minLongitude: Double?,
+    val maxLongitude: Double?,
+    val placedCount: Int,
+)
 

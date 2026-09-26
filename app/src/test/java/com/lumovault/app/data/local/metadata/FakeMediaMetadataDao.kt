@@ -81,10 +81,42 @@ class FakeMediaMetadataDao(private val store: OrganizationStore) : MediaMetadata
         }
     }
 
+    /**
+     * Mirrors the framing aggregate: only pairs that are present, in range, and on a device that still has
+     * the file (and not in Trash) get to decide where the map opens. An impossible pair — latitude 91 — is
+     * excluded here exactly as the SQL excludes it, which is what makes "a bad row cannot move the map" a
+     * tested statement rather than a hoped-for one.
+     */
+    override suspend fun locatedBounds(): LocatedBoundsRow? {
+        val placed = store.metadata.values.mapNotNull { row ->
+            val lat = row.latitude
+            val lon = row.longitude
+            if (lat == null || lon == null) return@mapNotNull null
+            if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return@mapNotNull null
+            if (!store.media.containsKey(row.mediaStoreId)) return@mapNotNull null
+            if (trashedAt(row.mediaStoreId) != 0L) return@mapNotNull null
+            lat to lon
+        }
+        if (placed.isEmpty()) return LocatedBoundsRow(null, null, null, null, 0)
+        return LocatedBoundsRow(
+            minLatitude = placed.minOf { it.first },
+            maxLatitude = placed.maxOf { it.first },
+            minLongitude = placed.minOf { it.second },
+            maxLongitude = placed.maxOf { it.second },
+            placedCount = placed.size,
+        )
+    }
+
     override suspend fun coordinatesFor(mediaStoreId: Long): PhotoCoordinates? =
-        store.metadata[mediaStoreId]
-            ?.takeIf { it.latitude != null && it.longitude != null }
-            ?.let { PhotoCoordinates(it.latitude!!, it.longitude!!) }
+        store.metadata[mediaStoreId]?.let { row ->
+            val lat = row.latitude
+            val lon = row.longitude
+            if (lat == null || lon == null) return@let null
+            // Out of range answers "no position" rather than throwing: `MediaLocation` refuses an impossible
+            // pair, and a click on a photo's "view on map" is not where that argument should surface.
+            if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return@let null
+            PhotoCoordinates(lat, lon)
+        }
 
     override suspend fun clearFor(ids: Collection<Long>): Int {
         val matching = ids.count { store.metadata.containsKey(it) }
