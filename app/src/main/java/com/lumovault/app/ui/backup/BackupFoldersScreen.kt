@@ -38,7 +38,6 @@ import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
-import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.LocalFolder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,28 +55,19 @@ import kotlinx.coroutines.launch
 data class BackupFoldersUiState(
     val folders: List<LocalFolder> = emptyList(),
     val selected: Set<String> = emptySet(),
-    val source: BackupSource? = null,
+    /** What is saved, in the same words the Backup & storage hub uses for it. */
+    val sourceLine: BackupSourceLine = BackupSourceLine(null, 0),
     val loading: Boolean = true,
-) {
-    /**
-     * Nothing chosen yet, as opposed to nothing available.
-     *
-     * The distinction decides what the summary line says: a person who selected every folder and a person
-     * who never selected one are not the same state, and the second one is the setting that stops
-     * automatic backup entirely — which the queue treats as a refusal rather than as "everything", on
-     * purpose.
-     */
-    val nothingSelected: Boolean get() = selected.isEmpty()
-}
+)
 
 /**
  * The Settings side of the same two columns onboarding writes.
  *
- * There is deliberately no second preference store: this screen reads and writes
- * [com.lumovault.app.domain.repository.OnboardingRepository.setBackupSource], which is the one place
- * `source_selection` and `selected_folders` live. A folder chosen here is the folder onboarding would
- * show, and the unattended pass reads the same row on its next run — no schedule churn, no second queue,
- * and no upload path that could disagree with the first about what "backed up" means.
+ * There is deliberately no second preference store: this screen saves through
+ * [com.lumovault.app.domain.usecase.ApplyBackupSelectionUseCase], which is the one place `source_selection`
+ * and `selected_folders` are written and the schedule is re-read. A folder chosen here is the folder
+ * onboarding would show, it queues what is already inside it on the spot, and it queues what appears later on
+ * the same periodic pass — no second queue, and no upload path that could disagree with the first.
  */
 class BackupFoldersViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LumoVaultApplication).container
@@ -98,7 +88,7 @@ class BackupFoldersViewModel(application: Application) : AndroidViewModel(applic
         BackupFoldersUiState(
             folders = available,
             selected = pending ?: current.selectedFolders.toSet(),
-            source = current.backupSource,
+            sourceLine = BackupSourceLine(current.backupSource, current.selectedFolders.size),
             loading = available.isEmpty() && current.backupSource == null,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), BackupFoldersUiState())
@@ -109,26 +99,25 @@ class BackupFoldersViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Writes the choice.
+     * Writes the choice, and starts what the choice implies.
      *
      * An empty selection is saved as [BackupSource.SelectedFolders] with no folders rather than silently
      * becoming "everything": the queue refuses to queue anything when folders were chosen and none are, and
-     * changing that here would make the screen's own checkboxes a lie.
+     * changing that here would make the screen's own checkboxes a lie. What an empty selection does mean is
+     * that whatever was lined up to be sent from the folders now left out is taken back out — that is the
+     * other half of the same call, and the reason this screen does not write the settings row itself.
      */
     fun save() {
         val chosen = draft.value ?: return
         draft.value = null
         viewModelScope.launch {
-            container.onboardingRepository.setBackupSource(
-                source = BackupSource.SelectedFolders,
-                folders = chosen.map(FolderPaths::normalize).sorted(),
-            )
+            container.applyBackupSelection.apply(BackupSource.SelectedFolders, chosen.toList())
         }
     }
 
     fun saveAllMedia() {
         draft.value = null
-        viewModelScope.launch { container.onboardingRepository.setBackupSource(BackupSource.AllMedia) }
+        viewModelScope.launch { container.applyBackupSelection.apply(BackupSource.AllMedia, emptyList()) }
     }
 
     fun cancel() {
@@ -192,10 +181,7 @@ fun BackupFoldersScreen(
             }
             item {
                 Text(
-                    text = stringResource(
-                        if (state.source == BackupSource.AllMedia) R.string.backup_folders_entry_all
-                        else R.string.backup_folders_entry_unanswered
-                    ),
+                    text = state.sourceLine.label(),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

@@ -117,6 +117,15 @@ Rules that have already caused a mistake here:
   hand-tapped backup into the chain the unattended pass already occupies, and a chain waits for the
   constraints of the work inside it — so "Wi-Fi only" began blocking a backup the user started on mobile
   data, which is the one thing `BackupPreferences` promises cannot happen.
+- **A settings write that changes what background work should do must re-decide the schedule in the same
+  call, and ask for a pass.** Saving a folder selection wrote `selected_folders` and `backup_enabled` and
+  nothing else: the periodic pass had been installed (or cancelled) under the previous answer, so what the
+  user had just opted in waited for a process restart to be noticed — which is why it looked intermittent
+  rather than broken. Same reason as the toggle rule above: constraints and schedules live on the WorkManager
+  request, not in the row. A one-shot pass needs **its own** unique name; reusing the periodic one's throws.
+- **Two scans in flight corrupt the index, so `sync()` is single-flight.** A scan tags rows and then prunes
+  every older tag; a second scan finishing in between deletes rows the first has already written. Foreground
+  triggers alone made that unlikely; a scheduled pass, a save and its retries do not.
 - **A `CoroutineWorker` that launches an infinite collector as a child of `supervisorScope` never finishes
   `doWork`.** The scope waits for its children and a Room flow has no last value, so the foreground service
   and its notification outlive the queue. Keep the `Job` and cancel it in a `finally`.

@@ -399,6 +399,39 @@ class BackupQueueRepositoryTest {
         assertEquals(true, repository.hasQueuedWork())
     }
 
+    @Test
+    fun withdrawingANarrowedSelectionTouchesOnlyRowsThatNeverStarted() = runBlocking<Unit> {
+        val camera = "DCIM/Camera/"
+        val screenshots = "Pictures/Screenshots/"
+        dao.withItemsIn(screenshots, 1L, 2L, 3L, 4L, 5L)
+        repository.enqueue(listOf(1L, 2L, 3L, 4L, 5L))
+        // Four reasons not to move a row, all of them out of scope for the sweep: in flight, already sent,
+        // already failed, and already cancelled by a person.
+        dao.forceRawState(2L, UploadState.Preparing.storageKey)
+        dao.forceRawState(3L, UploadState.BackedUp.storageKey)
+        dao.forceRawState(4L, UploadState.Failed.storageKey)
+        dao.forceRawState(5L, UploadState.Cancelled.storageKey)
+
+        val withdrawn = repository.releaseUnsentOutside(listOf(camera))
+
+        assertEquals("only the one row still waiting to be claimed", 1, withdrawn)
+        assertEquals(UploadState.NotBackedUp.storageKey, dao.row(1L).state)
+        assertEquals(UploadState.Preparing.storageKey, dao.row(2L).state)
+        assertEquals(UploadState.BackedUp.storageKey, dao.row(3L).state)
+        assertEquals(UploadState.Failed.storageKey, dao.row(4L).state)
+        assertEquals(UploadState.Cancelled.storageKey, dao.row(5L).state)
+    }
+
+    @Test
+    fun aSelectionThatStillCoversTheItemLeavesItsRowAlone() = runBlocking<Unit> {
+        val screenshots = "Pictures/Screenshots/"
+        dao.withItemsIn(screenshots, 1L)
+        repository.enqueue(listOf(1L))
+
+        assertEquals(0, repository.releaseUnsentOutside(listOf(screenshots)))
+        assertEquals(UploadState.Queued.storageKey, dao.row(1L).state)
+    }
+
     /** Queues one item and claims it, which is the only way to be in `PREPARING` legitimately. */
     private suspend fun claimedRequest(): BackupRequest? {
         dao.withMedia(1L)

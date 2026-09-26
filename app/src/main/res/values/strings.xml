@@ -403,7 +403,7 @@
     <string name="backup_folders_entry_all">All photos, videos and GIFs</string>
     <string name="backup_folders_entry_none">No folders chosen, so nothing is backed up automatically</string>
     <string name="backup_folders_entry_unanswered">Not chosen yet</string>
-    <string name="backup_folders_explainer">Automatic backup takes new media from these folders only. Photos already in your LumoVault Backup stay recognized wherever they are.</string>
+    <string name="backup_folders_explainer">Backup takes media from these folders only — what is already inside them as soon as you save, and whatever you add later. Photos already in your LumoVault Backup stay recognized wherever they are.</string>
     <string name="backup_folders_back_up_everything">Back up everything</string>
     <string name="backup_folders_empty">No folders with photos or videos yet. They appear here after the library has been scanned.</string>
     <plurals name="backup_folders_selected">

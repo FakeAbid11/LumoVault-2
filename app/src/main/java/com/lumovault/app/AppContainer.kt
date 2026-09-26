@@ -73,6 +73,7 @@ import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
 import com.lumovault.app.domain.telegram.TelegramOriginalRepository
 import com.lumovault.app.domain.telegram.TelegramPreviewRepository
+import com.lumovault.app.domain.usecase.ApplyBackupSelectionUseCase
 import com.lumovault.app.domain.usecase.ExtractMediaMetadataUseCase
 import com.lumovault.app.domain.usecase.FreeUpSpaceUseCase
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
@@ -499,6 +500,28 @@ class AppContainer(context: Context) {
             parameters = parameters,
             runPass = { runAutomaticBackup.run() },
         )
+
+    /**
+     * What a saved folder or source selection does, in one place, for onboarding and Settings alike.
+     *
+     * The rescheduling reads the settings row back rather than assuming it, because the write it is reacting
+     * to is the one that just set it: a schedule built from a remembered value could be installed under the
+     * rules the previous choice asked for. And the immediate pass is asked for through WorkManager rather
+     * than run here, so a folder the user opted in starts backing up even if they close the app one second
+     * after saving it.
+     */
+    val applyBackupSelection: ApplyBackupSelectionUseCase by lazy {
+        ApplyBackupSelectionUseCase(
+            onboarding = onboardingRepository,
+            queue = backupQueueRepository,
+            reschedulePasses = { enablesBackup ->
+                applicationScope.launch {
+                    backupScheduler.scheduleAutomaticPasses(settingsRepository.backupPreferences.first())
+                    if (enablesBackup) backupScheduler.scanNow()
+                }
+            },
+        )
+    }
 
     /**
      * Installs, replaces, or cancels the periodic pass so it matches what the settings now say.

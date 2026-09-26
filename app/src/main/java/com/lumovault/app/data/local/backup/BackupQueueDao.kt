@@ -214,6 +214,39 @@ interface BackupQueueDao {
     ): List<Long>
 
     /**
+     * Puts back the items a narrowed folder selection no longer covers, while nothing has been sent.
+     *
+     * `queued` is the only state this touches, and that is the whole safety of the statement: a row still
+     * waiting to be claimed has never been staged, never been hashed for sending and never been put in a
+     * Telegram channel, so withdrawing it contradicts nothing. Everything past that point — `preparing`,
+     * `uploading`, `backed_up`, `failed`, `cancelled` — is either something that already happened or a
+     * decision somebody made, and this undoes neither.
+     *
+     * The state it returns to is [UploadState.NotBackedUp] rather than a deleted row, because the row may
+     * carry a content hash recognition recorded, and because a folder that is selected again later should
+     * find its items where the frontier looks for them.
+     *
+     * `NOT IN (SELECT …)` rather than a bound list for the same reason every other sweep here is written
+     * that way: a library cannot be passed as parameters, and SQLite's variable ceiling is a crash with a
+     * number in it.
+     */
+    @Query(
+        """
+        UPDATE backup_queue SET state = :openState, updated_at = :now
+        WHERE state = :queuedState
+          AND media_store_id NOT IN (
+              SELECT media_store_id FROM media WHERE relative_path IN (:folders)
+          )
+        """
+    )
+    suspend fun releaseUnsentOutside(
+        folders: Collection<String>,
+        queuedState: String,
+        openState: String,
+        now: Long,
+    ): Int
+
+    /**
      * The local item that already *is* this message's content, when one is on the device.
      *
      * Asked before anything is downloaded, because the duplicate worth preventing is the one a restore

@@ -402,7 +402,9 @@ cloud record ──user taps Download──▶ TDLib original ─▶ hash what l
   Trash does; a dismiss deletes nothing, and below API 30 the screen says the file has to go in the device's
   photos app rather than pretending. Nothing in any of these paths can delete a Telegram message.
 - **Automatic backup is the same queue.** A pass reads the grant live, reads the settings, scans, takes a
-  window of candidates that match the selected folders, and hands them to `enqueue` — then asks for a worker.
+  window of candidates that match the selected folders, and hands them to `enqueue` — then asks for a worker
+  **whenever the table holds anything**, not only when it added some: a queue a killed process left behind has
+  nothing new to discover, and a rule keyed to this pass's own inserts would leave those rows waiting forever.
   It sends nothing itself, so hashing, manifests, duplicate detection and "a started request is not a backup"
   all still apply. A `cancelled` row is never re-queued, because that was a decision.
 - **Scanning and sending are two workers with two constraint sets.** Noticing a new photo needs no network and
@@ -410,6 +412,14 @@ cloud record ──user taps Download──▶ TDLib original ─▶ hash what l
   Wi-Fi stops noticing anything, which is not what "back up automatically" means. Wi-Fi-only and charging-only
   bind the unattended path and **never** a hand-tapped backup: the tap is the agreement. Changing either
   toggle re-installs the periodic work in the same action, because constraints live on the request.
+- **Saving a folder selection starts work, in one place.** `ApplyBackupSelectionUseCase` is what both the
+  onboarding picker and the Settings screen call: it writes the source and the normalized folder list (the
+  same `backupEnabled` column the Settings toggle reads, so no hidden second switch stands between a chosen
+  folder and a backup), withdraws the items a narrowed selection no longer covers **while they are still
+  unsent**, re-installs the periodic pass and asks for one scan immediately — a one-shot under its own unique
+  WorkManager name, because a six-hour period is not what "back up this folder" means to a person standing in
+  front of the phone. Deselecting a folder takes its unsent rows back to merely-known; nothing claimed, sent,
+  failed or cancelled is touched, and no Telegram message is.
 - **Two screens read aggregates, never lists.** `BackupHealth` comes from counted states, a cloud-only count,
   `MAX(uploaded_at)` and the scan stamp; "everything is backed up" is only sayable when nothing is waiting,
   failed or unaccounted for. An empty library is not called safe. The periodic pass runs every six hours —

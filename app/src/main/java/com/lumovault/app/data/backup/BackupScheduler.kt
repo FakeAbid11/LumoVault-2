@@ -110,6 +110,33 @@ class BackupScheduler(private val context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
     }
 
+    /**
+     * One scan-and-queue pass, now, in the background.
+     *
+     * Re-installing the periodic schedule is not enough after a folder save: on a six-hour period, "back up
+     * this folder" would otherwise wait for the next period — or for a process restart, which is the only
+     * other thing that re-reads the settings. So the same worker the period uses is asked for once,
+     * immediately, and the queueing that follows does not depend on the app staying open.
+     *
+     * It carries its own unique name, for two reasons. WorkManager rejects a unique name that the other kind
+     * of request already holds, so one-time scan work named like the periodic pass throws instead of
+     * queuing; and `APPEND_OR_REPLACE` on a name of its own turns a second save during a running pass into
+     * exactly one follow-up pass rather than two scans pruning each other's rows.
+     *
+     * No constraints, matching the periodic pass: reading MediaStore and writing rows needs neither a network
+     * nor a charger. What Wi-Fi-only and charging-only govern is the *send* this pass may then ask for, which
+     * is a different request under a different name — [startAutomatic].
+     */
+    fun scanNow() {
+        val request = OneTimeWorkRequestBuilder<AutomaticBackupWorker>()
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
+            .addTag(WORK_TAG)
+            .build()
+
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(SCAN_NOW_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
+    }
+
     private fun connectedOnly(): Constraints = constraintsFor(manualWorkRequest)
 
     private fun constraintsFor(request: WorkRequest): Constraints = Constraints.Builder()
@@ -140,6 +167,12 @@ class BackupScheduler(private val context: Context) {
 
         /** The periodic scan-and-queue pass. Its own name, so cancelling it never touches a send. */
         const val PERIODIC_WORK_NAME = "lumovault-automatic-backup"
+
+        /**
+         * The one-shot version of the same pass, asked for by a folder save. Its own name because WorkManager
+         * keys unique work across both kinds: reusing [PERIODIC_WORK_NAME] for a one-time request fails.
+         */
+        const val SCAN_NOW_WORK_NAME = "lumovault-automatic-backup-now"
 
         /**
          * Six hours: long enough that a phone which gains two photos a day is not woken to scan 90,000 rows

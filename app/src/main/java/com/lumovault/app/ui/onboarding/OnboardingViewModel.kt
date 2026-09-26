@@ -122,11 +122,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             emptyList()
         }
         viewModelScope.launch {
-            container.onboardingRepository.setBackupSource(source, folders)
-            // The source is also what switches unattended backup on, so the schedule has to be re-read in
-            // the same breath the settings screen does it — otherwise "back up automatically" is a promise
-            // the app keeps only after the process is restarted.
-            container.refreshAutomaticBackup()
+            // The same call the folder screen in Settings makes: the source is also what switches unattended
+            // backup on, so it has to re-read the schedule and ask for a first pass in the same breath.
+            // Doing only the settings write here is how setup could finish with backup "on" and nothing
+            // scheduled until the process was restarted.
+            container.applyBackupSelection.apply(source, folders)
         }
     }
 
@@ -135,8 +135,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         val next = if (folder in selected) selected - folder else selected + folder
 
         viewModelScope.launch {
-            container.onboardingRepository.setBackupSource(BackupSource.SelectedFolders, next.sorted())
-            container.refreshAutomaticBackup()
+            // Every tap writes, because this screen has no Save to wait for. Repeated requests coalesce into
+            // one follow-up pass on a unique work name rather than a scan per tap.
+            container.applyBackupSelection.apply(BackupSource.SelectedFolders, next.toList())
         }
     }
 

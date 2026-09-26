@@ -379,6 +379,26 @@ class FakeBackupQueueDao : BackupQueueDao {
 
     override suspend fun countIn(state: String): Int = rows.values.count { it.state == state }
 
+    /**
+     * Mirrors the selection-narrowing sweep: only a `queued` row whose media is filed outside [folders] goes
+     * back, which is the same `NOT IN (SELECT … relative_path IN (:folders))` the real statement runs —
+     * including that an item with no index row left counts as outside the folders, because it certainly is.
+     */
+    override suspend fun releaseUnsentOutside(
+        folders: Collection<String>,
+        queuedState: String,
+        openState: String,
+        now: Long,
+    ): Int {
+        val matching = rows.values.filter { row ->
+            val path = media[row.mediaStoreId]?.relativePath
+            row.state == queuedState && !(path != null && path in folders)
+        }
+        matching.forEach { rows[it.mediaStoreId] = it.copy(state = openState, updatedAt = now) }
+        bump()
+        return matching.size
+    }
+
     override suspend fun hashesStillOnDevice(hashes: Collection<String>): List<String> =
         rows.values
             .filter { it.contentHash in hashes && it.contentHash.isNotBlank() && it.mediaStoreId in media }

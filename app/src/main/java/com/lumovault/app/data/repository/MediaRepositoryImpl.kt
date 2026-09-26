@@ -16,6 +16,8 @@ import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.SyncResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Keeps the Room index in step with MediaStore.
@@ -39,6 +41,21 @@ class MediaRepositoryImpl(
     private val settings: AppSettingsStore,
     private val nowSeconds: () -> Long = System::currentTimeMillis,
 ) : MediaRepository {
+
+    /**
+     * One scan at a time, for the whole process.
+     *
+     * A sync stamps the rows it saw and then deletes everything stamped older, so two scans in flight are
+     * not merely wasteful: the later one prunes rows the earlier one has already upserted but not yet
+     * finished writing, and the index quietly loses items that exist on the device. Nothing stopped that
+     * while a scan could only be started by somebody in the foreground; a background pass now starts one on
+     * a schedule, on a save, and on every retry in between, so the overlap is a case that will occur.
+     *
+     * Serialising is safe rather than merely defensive — a second scan of the same MediaStore content writes
+     * the same rows, and it is the prune that must not run twice at once.
+     */
+    private val syncLock = Mutex()
+
     override fun observeWindow(limit: Int): Flow<List<Media>> =
         dao.observeWindow(limit).map { rows -> rows.map(MediaEntity::toMedia) }
 
@@ -52,11 +69,11 @@ class MediaRepositoryImpl(
     override fun observeFolders(): Flow<List<String>> =
         dao.observeFolders().map { paths -> paths.map(String::displayFolder).sorted() }
 
-    override suspend fun sync(): SyncResult {
+    override suspend fun sync(): SyncResult = syncLock.withLock {
         val scanId = System.currentTimeMillis()
         val scanned = source.scan(scanId)
 
-        return database.withTransaction {
+        database.withTransaction {
             // Chunked so one sync cannot hold the write transaction long enough to starve the
             // timeline query of a scroll in progress.
             scanned.chunked(UPSERT_CHUNK).forEach { dao.upsertAll(it) }

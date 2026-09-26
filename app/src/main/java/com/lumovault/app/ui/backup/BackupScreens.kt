@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -135,11 +134,7 @@ fun BackupHubScreen(
                 val line = viewModel.source.collectAsStateWithLifecycle().value
                 EntryRow(
                     title = stringResource(R.string.backup_folders_title),
-                    subtitle = if (line.labelRes == R.plurals.backup_folders_selected) {
-                        pluralStringResource(line.labelRes, line.folderCount, line.folderCount)
-                    } else {
-                        stringResource(line.labelRes)
-                    },
+                    subtitle = line.label(),
                     onClick = onOpenFolders,
                 )
             }

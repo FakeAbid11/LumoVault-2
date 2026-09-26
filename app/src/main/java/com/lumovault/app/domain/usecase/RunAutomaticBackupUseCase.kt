@@ -29,6 +29,11 @@ import kotlinx.coroutines.flow.first
  * It is also safe to run twice. [BackupQueueRepository.enqueue] adds rows only for items that have none, so
  * a worker retried after a dropped connection, a reboot, and a periodic pass overlapping a pull-to-refresh
  * all produce one queue rather than four copies of the same photo.
+ *
+ * And because it is the only pass that runs unattended, it is the only thing that can notice a queue left
+ * behind by a process that died mid-send: the send is asked for whenever the table holds work, not only when
+ * this pass added some. A phone restarted with forty items waiting has nothing *new* to discover, and a rule
+ * keyed to this pass's own inserts would leave those forty waiting indefinitely.
  */
 class RunAutomaticBackupUseCase(
     private val media: MediaRepository,
@@ -58,10 +63,14 @@ class RunAutomaticBackupUseCase(
             folders = progress.selectedFolders,
             limit = candidatesPerPass,
         )
-        if (candidates.isEmpty()) return Outcome.Queued(queued = 0, moreRemaining = false)
+        val queued = if (candidates.isEmpty()) 0 else queue.enqueue(candidates)
 
-        val queued = queue.enqueue(candidates)
-        if (queued > 0) scheduleUpload()
+        // Ask for a send whenever the queue holds something, which is a different question from "did this
+        // pass add anything". A phone killed between queueing and sending leaves rows waiting in `queued`
+        // with no caller left to ask for them, and the next pass would find nothing *new* to add: a resume
+        // rule keyed to this pass's own inserts is how the oldest items in a library end up the last ones
+        // backed up, and how "the queue is working through it" quietly stops being true.
+        if (queue.hasQueuedWork()) scheduleUpload()
 
         return Outcome.Queued(queued = queued, moreRemaining = candidates.size >= candidatesPerPass)
     }

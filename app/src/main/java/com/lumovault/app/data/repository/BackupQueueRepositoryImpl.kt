@@ -169,6 +169,22 @@ class BackupQueueRepositoryImpl(
         )
     }
 
+    override suspend fun releaseUnsentOutside(folders: Collection<String>): Int {
+        val queued = UploadState.Queued.storageKey
+        val open = UploadState.NotBackedUp.storageKey
+        val now = nowSeconds()
+        // An empty selection covers nothing, so every unsent row is out of scope — and that path is taken
+        // deliberately rather than falling through, because `IN ()` with no elements is not a statement
+        // SQLite will take.
+        if (folders.isEmpty()) return dao.moveAll(from = queued, to = open, now = now)
+        return dao.releaseUnsentOutside(
+            folders = folders,
+            queuedState = queued,
+            openState = open,
+            now = now,
+        )
+    }
+
     override suspend fun recordRestored(
         mediaStoreId: Long,
         remote: RemoteBackup,

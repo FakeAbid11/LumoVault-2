@@ -116,6 +116,20 @@ interface BackupQueueRepository {
     suspend fun autoBackupCandidates(source: BackupSource?, folders: List<String>, limit: Int): List<Long>
 
     /**
+     * Withdraws the unsent items a narrowed folder selection no longer covers, and returns how many.
+     *
+     * This is what makes a deselected folder mean something. Without it the queue keeps draining rows the
+     * user has just excluded, so the app uploads a folder out from under a person who stopped selecting it,
+     * and the only way to stop that would be a feature nobody thought to ask for.
+     *
+     * Only [UploadState.Queued] rows are touched, and only moved back to [UploadState.NotBackedUp]: nothing
+     * that was claimed, staged, sent, failed or deliberately cancelled is altered here, and no Telegram
+     * message is affected by a row that never left the phone. An empty [folders] means nothing is in scope,
+     * so every unsent row goes back.
+     */
+    suspend fun releaseUnsentOutside(folders: Collection<String>): Int
+
+    /**
      * The queue's frontier of items whose content identity is unknown or doubtful.
      *
      * [includeWholeLibrary] is the layered check's throttle, and the caller sets it from the remote index

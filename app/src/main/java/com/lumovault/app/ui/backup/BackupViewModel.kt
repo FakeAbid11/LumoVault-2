@@ -2,6 +2,9 @@ package com.lumovault.app.ui.backup
 
 import androidx.annotation.StringRes
 import android.app.Application
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
@@ -144,3 +147,19 @@ data class BackupSourceLine(val source: BackupSource?, val folderCount: Int) {
             else -> R.plurals.backup_folders_selected
         }
 }
+
+/**
+ * The line as words, in the one place the four cases are decided.
+ *
+ * Both the hub and the folder screen show this, and they showed it differently: each had its own `if`, and
+ * the folder screen's knew only "everything" and "not chosen yet" — so a person with three folders selected
+ * was told, on the screen that lists folders, that nothing had been chosen. One helper, two callers, one
+ * thing that can be wrong.
+ */
+@Composable
+fun BackupSourceLine.label(): String =
+    if (labelRes == R.plurals.backup_folders_selected) {
+        pluralStringResource(labelRes, folderCount, folderCount)
+    } else {
+        stringResource(labelRes)
+    }

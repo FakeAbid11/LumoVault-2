@@ -36,6 +36,12 @@ import org.junit.Test
  * about this pass is about the queue: that it cannot take the same item twice, that a cancelled item stays
  * cancelled, that "nothing selected" is not "everything", and that an item already settled as stored is not
  * put back in line by a pass that did not know.
+ *
+ * Four more rules are asserted here because the pass is the only unattended caller, so these are the only
+ * place they can be checked without a phone: a photo that appeared while the app was closed is found by the
+ * next scan, a queue a killed process left behind is sent again even when nothing new turns up, a library
+ * bigger than one window is worked through to the end, and a permission that went away is reported as the
+ * unknown it is rather than as a library with nothing left to do.
  */
 class RunAutomaticBackupUseCaseTest {
     private val clock = QueueClock()
@@ -249,13 +255,98 @@ class RunAutomaticBackupUseCaseTest {
         assertEquals("the scan is what discovers both new files and gone ones", 1, media.syncs)
         assertEquals(0, schedules)
     }
+
+    @Test
+    fun aPhotoTakenWhileTheAppWasClosedIsFoundByTheNextPass() = runBlocking<Unit> {
+        dao.withItem(1L)
+        permissions.access = MediaAccessStatus.Granted
+        settings.enableAutomatic()
+        onboarding.set(source = BackupSource.AllMedia)
+        val useCase = useCase()
+        useCase.run()
+
+        // The camera wrote a second file, and nothing in the app was told about it.
+        media.upcoming += { dao.withItem(2L) }
+        val outcome = useCase.run()
+
+        assertEquals(RunAutomaticBackupUseCase.Outcome.Queued(queued = 1, moreRemaining = false), outcome)
+        assertEquals(UploadState.Queued.storageKey, dao.row(1L).state)
+        assertEquals(UploadState.Queued.storageKey, dao.row(2L).state)
+        assertEquals(2, media.syncs)
+    }
+
+    @Test
+    fun aQueueLeftWaitingByAKilledProcessIsSentAgainWithNothingNewToFind() = runBlocking<Unit> {
+        dao.withItem(1L)
+        permissions.access = MediaAccessStatus.Granted
+        settings.enableAutomatic()
+        onboarding.set(source = BackupSource.AllMedia)
+        useCase().run()
+        // The send died with the process: the row is still exactly where it was put, waiting.
+        dao.forceRawState(1L, UploadState.Queued.storageKey)
+        val askedBefore = schedules
+
+        val outcome = useCase().run()
+
+        assertEquals(RunAutomaticBackupUseCase.Outcome.Queued(queued = 0, moreRemaining = false), outcome)
+        assertEquals(
+            "this pass added nothing and still has to ask, or nothing else ever will",
+            askedBefore + 1,
+            schedules,
+        )
+    }
+
+    @Test
+    fun aFolderBiggerThanTheWindowIsWorkedThroughRatherThanLeftAtTheFirstBatch() = runBlocking<Unit> {
+        (1L..5L).forEach { dao.withItem(it) }
+        permissions.access = MediaAccessStatus.Granted
+        settings.enableAutomatic()
+        onboarding.set(source = BackupSource.AllMedia)
+        val useCase = useCase(limit = 2)
+
+        assertEquals(RunAutomaticBackupUseCase.Outcome.Queued(2, moreRemaining = true), useCase.run())
+        assertEquals(RunAutomaticBackupUseCase.Outcome.Queued(2, moreRemaining = true), useCase.run())
+        assertEquals(RunAutomaticBackupUseCase.Outcome.Queued(1, moreRemaining = false), useCase.run())
+
+        assertEquals("the last item is queued as surely as the first", 5, dao.countIn(UploadState.Queued.storageKey))
+        assertEquals("and it stops asking once there is nothing left to say", 3, schedules)
+    }
+
+    @Test
+    fun aPermissionLostHalfwayLeavesTheWaitingQueueWaitingRatherThanFinished() = runBlocking<Unit> {
+        dao.withItem(1L)
+        permissions.access = MediaAccessStatus.Granted
+        settings.enableAutomatic()
+        onboarding.set(source = BackupSource.AllMedia)
+        useCase().run()
+        val askedBefore = schedules
+
+        permissions.access = MediaAccessStatus.Denied
+        assertEquals(RunAutomaticBackupUseCase.Outcome.NoMediaAccess, useCase().run())
+
+        assertEquals(
+            "a scan denied cannot prune the index out from under the queue and leave nothing pending",
+            1,
+            media.syncs,
+        )
+        assertEquals(1, dao.countIn(UploadState.Queued.storageKey))
+        assertEquals("nothing became backed up because nobody was asked", 0, dao.countIn(UploadState.BackedUp.storageKey))
+        assertEquals(askedBefore, schedules)
+    }
 }
 
 private class FakeLibrary : MediaRepository {
     var syncs = 0
 
+    /**
+     * What the next scan is to find. Each entry runs once, from inside `sync()`, which is how a photo taken
+     * while the app was closed appears in the index between two passes.
+     */
+    val upcoming = mutableListOf<() -> Unit>()
+
     override suspend fun sync(): SyncResult {
         syncs += 1
+        if (upcoming.isNotEmpty()) upcoming.removeAt(0).invoke()
         return SyncResult(indexed = 0, removed = 0)
     }
 
