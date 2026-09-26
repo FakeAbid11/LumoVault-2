@@ -88,6 +88,13 @@ navigation or backup behaviour was touched. What moved, and why, is in
 [A shared visual language, and what it fixed](#a-shared-visual-language-and-what-it-fixed). Nothing about this
 pass is verified on a phone — it changed exactly the things a JVM test cannot see.
 
+**Flutter-reference design port:** complete and CI-verified (run
+[36249345236](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36249345236), 509 unit tests, 0 failed,
+debug APK with both TDLib ABIs), on the `ui/flutter-parity-redesign` branch through PR #2. The native theme,
+type scale, navigation bar, photo grids and date scrubber now take their values from the Flutter app's source
+rather than from a parallel interpretation of the same idea — see
+[The Flutter reference, ported](#the-flutter-reference-ported). No screen has been looked at on a phone.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
@@ -778,6 +785,50 @@ tests pass before and after, and the only gate that says anything about these fi
 timeline really fits four columns on a specific device, whether the rail's pill clears the notch on a 20 dp
 bezel, whether a 96 dp cell is too small for a library of screenshots heavy with text — all device questions,
 and none of them claimed.
+
+## The Flutter reference, ported
+
+The original LumoVault was Flutter ([`FakeAbid11/LumoVault`](https://github.com/FakeAbid11/LumoVault)), and
+the native app had drifted from it in the way two implementations of one product do when nobody reads the
+other's source. This pass reads it. Every number below is quoted from that codebase, not chosen here.
+
+```
+seed 0xFF2B5CE6 · SchemeVibrant · contrast 0        lib/core/theme/app_theme.dart
+→ ColorScheme.fromSeed, light and dark, every role   ui/theme/Color.kt, Theme.kt
+
+titleMedium 16/w600/1.5 · labelSmall 11/w500 · bodyMedium 14/w400/1.43
+→ the same TextTheme, weights and line heights       ui/theme/Type.kt
+
+capsule radius 28 · height 64 · margin 16 · icon 22 · indicator stadium secondaryContainer
+→ the floating bar, built as a component             ui/components/FloatingNavBar.kt
+
+4 fixed columns · 2 dp gutter · edge to edge · 12 dp tile · 8 dp chip
+→ both photo grids, and the day header's count pill  ui/screens/PhotosScreen.kt, CloudScreen.kt
+```
+
+**The scheme was the largest single difference.** The native theme set eleven roles and let Material fill the
+rest, so `surfaceContainerHighest` — the navigation capsule, the selection strip, a day header's count pill —
+came from the baseline palette rather than the seed, and `outlineVariant` was a grey the seed never produces.
+The Flutter app derives everything from one seed; the native app now carries that same derived table.
+
+**The scrubber replaced the month rail.** The reference has no tick marks and no month index: one handle whose
+height is the viewport's share of the list, dragged through a 44 dp strip, with a bubble naming the day under
+the finger and a click as each day is crossed. `TimelineRail`'s month arithmetic went with the rail it served,
+and [`ScrollScrubber`](app/src/main/java/com/lumovault/app/domain/model/ScrollScrubber.kt) is the mapping the
+reference actually performs — tested for the ends of the track, the clamps, the floor on the handle and the
+boundary item that belongs to the day starting on it.
+
+**Deliberate deviations, both stated rather than quietly taken.** The reference floats its content under the
+capsule (`extendBody`) and each list adds 96 dp itself; the native shell keeps the bar in the scaffold slot so
+`innerPadding` gives every screen its clearance and eleven screens cannot forget to. And the reference's device
+tab has a search action; the native app has no search, so the app bar keeps the theme toggle and the settings
+gear rather than drawing a button that would do nothing.
+
+**Not verified on a device.** The build is green — [run
+36249345236](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36249345236), 509 unit tests, 0 failed,
+debug APK with both TDLib ABIs — and a compiler is the only thing that has looked at any of this. The
+reference's proportions are reproduced faithfully in code; how they land on a specific phone's density, notch
+and font scale is a device question, and no device was attached.
 
 ## Toolchain
 

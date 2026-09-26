@@ -56,7 +56,7 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.navigation.AlbumTarget
-import com.lumovault.app.ui.theme.GridCellMinSize
+import com.lumovault.app.ui.theme.GridColumnsMedium
 import com.lumovault.app.ui.theme.GridSpacing
 import com.lumovault.app.ui.theme.GroupCardCorner
 
@@ -325,7 +325,7 @@ private fun MediaGrid(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = GridCellMinSize),
+        columns = GridCells.Fixed(GridColumnsMedium),
         state = gridState,
         contentPadding = PaddingValues(GridSpacing),
         horizontalArrangement = Arrangement.spacedBy(GridSpacing),
@@ -462,7 +462,7 @@ private fun AddMediaSheet(
                     )
                 }
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = GridCellMinSize),
+                    columns = GridCells.Fixed(GridColumnsMedium),
                     contentPadding = PaddingValues(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(GridSpacing),
                     verticalArrangement = Arrangement.spacedBy(GridSpacing),
