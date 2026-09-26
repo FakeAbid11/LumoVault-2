@@ -30,6 +30,7 @@
 
     <string name="theme_toggle">Switch theme</string>
     <string name="back">Back</string>
+    <string name="step_progress">%1$d of %2$d</string>
 
     <!-- Screen 1: Welcome -->
     <string name="welcome_tagline">Your photos.\nYour storage.</string>
@@ -55,6 +56,9 @@
     <string name="connect_not_configured">This build cannot reach Telegram yet.</string>
     <string name="connect_not_configured_detail">LumoVault was compiled without the Telegram library or API credentials, so signing in is unavailable. Setup can continue now and the account can be connected later.</string>
     <string name="connect_restoring">Checking your Telegram session…</string>
+    <string name="connect_sending_code">Sending your code…</string>
+    <string name="connect_verifying_code">Checking the code…</string>
+    <string name="connect_signing_in">Signing you in…</string>
 
     <!-- Verification code -->
     <string name="code_title">Enter verification code</string>
@@ -64,6 +68,10 @@
     <string name="code_label">Code</string>
     <string name="code_action">Confirm</string>
     <string name="code_resend">Resend code</string>
+    <plurals name="code_resend_countdown">
+        <item quantity="one">Resend code in %1$d second</item>
+        <item quantity="other">Resend code in %1$d seconds</item>
+    </plurals>
     <string name="code_change_number">Change number</string>
 
     <!-- Two-step verification -->
@@ -71,6 +79,9 @@
     <string name="password_description">Enter your Telegram password to continue.</string>
     <string name="password_hint_label">Password</string>
     <string name="password_action">Continue</string>
+    <string name="password_hint_prefix">Hint: %1$s</string>
+    <string name="password_show">Show password</string>
+    <string name="password_hide">Hide password</string>
 
     <!-- Authentication failures -->
     <string name="error_phone_invalid">That phone number doesn\'t look right.</string>

@@ -8,6 +8,7 @@ import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.Country
 import com.lumovault.app.domain.model.OptionalStepDecision
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import com.lumovault.app.domain.telegram.isInFlight
 import com.lumovault.app.domain.telegram.isAuthenticated
 import com.lumovault.app.util.PhoneNumbers
 import kotlinx.coroutines.Dispatchers
@@ -45,8 +46,10 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                         state.copy(
                             telegram = telegram,
                             progress = progress,
-                            // A failure keeps the panel the user was on; any other state moves it.
-                            telegramPanel = if (telegram is TelegramAuthState.Failed) {
+                            // Only Telegram's answers move the panel. An in-flight state — a resend
+                            // passing through SendingCode, a code being verified, a failure — keeps the
+                            // panel the user is looking at; see TelegramAuthState.isInFlight.
+                            telegramPanel = if (telegram.isInFlight) {
                                 state.telegramPanel
                             } else {
                                 TelegramPanel.of(telegram)

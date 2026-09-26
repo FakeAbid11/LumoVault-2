@@ -7,25 +7,34 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -33,13 +42,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Country
 import com.lumovault.app.domain.telegram.AuthCodeChannel
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.ui.components.CountryPicker
 import com.lumovault.app.util.PhoneNumbers
+import kotlinx.coroutines.delay
 
 /**
  * Screen 3, and the only screen that talks to Telegram.
@@ -69,7 +81,26 @@ fun ConnectTelegramScreen(
 
     val panel = state.panel
     val failure = (state.telegram as? TelegramAuthState.Failed)?.failure
-    val waitingForCode = panel == TelegramPanel.Code
+    val primaryEnabled = panel.primaryEnabled(state, codeDraft, passwordDraft)
+
+    // Drafts belong to their panel: a code typed for a number the user then changed, or a password
+    // from an attempt that ended, must not survive into the next one.
+    LaunchedEffect(panel) {
+        if (panel != TelegramPanel.Code) codeDraft = ""
+        if (panel != TelegramPanel.Password) passwordDraft = ""
+    }
+
+    // Telegram's own behaviour: a code that is complete is a code that is submitted. It fires only
+    // when Telegram stated the length — a guessed one would submit half-typed digits — and never
+    // while a verification is in flight.
+    val expectedLength = (state.telegram as? TelegramAuthState.WaitingForCode)?.codeLength
+    LaunchedEffect(codeDraft, expectedLength, state.busy, panel) {
+        if (panel == TelegramPanel.Code && !state.busy &&
+            expectedLength != null && codeDraft.length == expectedLength
+        ) {
+            onSubmitCode(codeDraft)
+        }
+    }
 
     OnboardingScaffold(
         step = 3,
@@ -81,7 +112,8 @@ fun ConnectTelegramScreen(
             TelegramPanel.Password -> stringResource(R.string.password_description)
         },
         primaryLabel = stringResource(panel.actionRes()),
-        primaryEnabled = panel.primaryEnabled(state),
+        primaryEnabled = primaryEnabled,
+        primaryBusy = state.busy,
         onPrimary = {
             when (panel) {
                 TelegramPanel.Phone -> if (state.telegramUnavailable) onContinueWithoutTelegram() else onSubmitPhoneNumber()
@@ -100,7 +132,8 @@ fun ConnectTelegramScreen(
                 failure = failure,
                 onRetry = when (panel) {
                     TelegramPanel.Phone -> onSubmitPhoneNumber.takeIf { state.canRequestCode }
-                    TelegramPanel.Code -> onSubmitCode.takeIf { codeDraft.isNotBlank() }?.let { { onSubmitCode(codeDraft) } }
+                    TelegramPanel.Code -> onSubmitCode.takeIf { codeDraft.isNotEmpty() }
+                        ?.let { { onSubmitCode(codeDraft) } }
                     TelegramPanel.Password -> onSubmitPassword.takeIf { passwordDraft.isNotBlank() }
                         ?.let { { onSubmitPassword(passwordDraft) } }
                 },
@@ -112,25 +145,41 @@ fun ConnectTelegramScreen(
                 state = state,
                 onCountryClick = { pickerOpen = true },
                 onPhoneChange = onPhoneChange,
+                onSubmit = {
+                    if (state.telegramUnavailable) onContinueWithoutTelegram() else onSubmitPhoneNumber()
+                },
+                submitEnabled = primaryEnabled,
             )
 
             TelegramPanel.Code -> CodeFields(
                 state = state,
                 codeDraft = codeDraft,
                 onCodeChange = { codeDraft = it.filter(Char::isDigit) },
-                onResendCode = onResendCode,
+                // The old code died with the resend; keeping it in the field would only invite a
+                // second submit of something Telegram has already invalidated.
+                onResendCode = {
+                    codeDraft = ""
+                    onResendCode()
+                },
                 onChangeNumber = onChangeNumber,
+                onSubmitCode = { onSubmitCode(codeDraft) },
+                submitEnabled = primaryEnabled,
             )
 
             TelegramPanel.Password -> PasswordField(
+                state = state,
                 passwordDraft = passwordDraft,
                 onPasswordChange = { passwordDraft = it },
-                busy = state.busy,
+                onSubmit = {
+                    onSubmitPassword(passwordDraft)
+                    passwordDraft = ""
+                },
+                submitEnabled = primaryEnabled,
             )
         }
 
-        if (state.busy && !waitingForCode) {
-            BusyRow()
+        if (state.busy) {
+            BusyRow(state.telegram)
         }
     }
 
@@ -152,11 +201,17 @@ private fun PhoneFields(
     state: OnboardingUiState,
     onCountryClick: () -> Unit,
     onPhoneChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    submitEnabled: Boolean,
 ) {
     if (state.telegramUnavailable) {
         NotConfiguredCard()
         return
     }
+
+    val focusRequester = remember { FocusRequester() }
+    // The keyboard is the point of this panel: opening it is the screen's job, not the user's.
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     CountryButton(
         country = state.selectedCountry,
@@ -180,10 +235,19 @@ private fun PhoneFields(
             }
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { if (submitEnabled) onSubmit() }),
         prefix = {
-            state.selectedCountry?.let { Text("${it.dialPrefix} ") }
+            state.selectedCountry?.let { country ->
+                // Real spacing, not the trailing space character the label used to carry.
+                Text(
+                    text = country.dialPrefix,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
         },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
     )
 }
 
@@ -194,24 +258,69 @@ private fun CodeFields(
     onCodeChange: (String) -> Unit,
     onResendCode: () -> Unit,
     onChangeNumber: () -> Unit,
+    onSubmitCode: () -> Unit,
+    submitEnabled: Boolean,
 ) {
-    val expectedLength = (state.telegram as? TelegramAuthState.WaitingForCode)?.codeLength
+    val waiting = state.telegram as? TelegramAuthState.WaitingForCode
+    val expectedLength = waiting?.codeLength
+
+    // Telegram's own re-send wait, counted down locally. A resend answer is usually an equal
+    // WaitingForCode value, which the state flow does not re-emit — so the tap re-arms the countdown
+    // itself instead of waiting for a re-emission that cannot come. Telegram enforces the real limit
+    // regardless; a refusal arrives in the banner.
+    var secondsLeft by rememberSaveable { mutableStateOf(waiting?.timeoutSeconds ?: 0) }
+    LaunchedEffect(waiting) {
+        if (waiting != null) secondsLeft = waiting.timeoutSeconds ?: 0
+    }
+    LaunchedEffect(secondsLeft) {
+        if (secondsLeft > 0) {
+            delay(1_000)
+            secondsLeft = secondsLeft - 1
+        }
+    }
+
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     OutlinedTextField(
         value = codeDraft,
         onValueChange = onCodeChange,
         label = { Text(stringResource(R.string.code_label)) },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go),
+        enabled = !state.busy,
+        // A wrong code is a Failed state; the field wearing the error colour is what connects the
+        // banner to the thing being corrected.
+        isError = state.telegram is TelegramAuthState.Failed,
+        // Digits at heading size with room between them: an OTP reads as a code, not as a sentence.
+        textStyle = MaterialTheme.typography.headlineSmall.copyWith(letterSpacing = 0.3.em),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.NumberPassword,
+            imeAction = ImeAction.Go,
+        ),
+        keyboardActions = KeyboardActions(onGo = { if (submitEnabled) onSubmitCode() }),
         supportingText = expectedLength?.let { length ->
             { Text(stringResource(R.string.code_length_hint, length)) }
         },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
     )
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = onResendCode, enabled = !state.busy) {
-            Text(stringResource(R.string.code_resend))
+        TextButton(
+            onClick = {
+                secondsLeft = waiting?.timeoutSeconds ?: 0
+                onResendCode()
+            },
+            enabled = secondsLeft <= 0 && !state.busy,
+        ) {
+            Text(
+                if (secondsLeft > 0) {
+                    pluralStringResource(R.plurals.code_resend_countdown, secondsLeft, secondsLeft)
+                } else {
+                    stringResource(R.string.code_resend)
+                },
+            )
         }
         TextButton(onClick = onChangeNumber, enabled = !state.busy) {
             Text(stringResource(R.string.code_change_number))
@@ -220,19 +329,48 @@ private fun CodeFields(
 }
 
 @Composable
-private fun PasswordField(passwordDraft: String, onPasswordChange: (String) -> Unit, busy: Boolean) {
+private fun PasswordField(
+    state: OnboardingUiState,
+    passwordDraft: String,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    submitEnabled: Boolean,
+) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // Telegram's own hint for this account, captured since Phase 4 and never shown until now. It is
+    // the account owner's text on the owner's screen; like every credential here, it is never logged.
+    val hint = (state.telegram as? TelegramAuthState.WaitingForPassword)?.hint?.takeIf { it.isNotBlank() }
+
     OutlinedTextField(
         value = passwordDraft,
         onValueChange = onPasswordChange,
         label = { Text(stringResource(R.string.password_hint_label)) },
         singleLine = true,
-        enabled = !busy,
-        visualTransformation = PasswordVisualTransformation(),
+        enabled = !state.busy,
+        isError = state.telegram is TelegramAuthState.Failed,
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        supportingText = hint?.let { { Text(stringResource(R.string.password_hint_prefix, it)) } },
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = stringResource(
+                        if (visible) R.string.password_hide else R.string.password_show,
+                    ),
+                )
+            }
+        },
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Go,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        keyboardActions = KeyboardActions(onGo = { if (submitEnabled) onSubmit() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
     )
 }
 
@@ -312,16 +450,27 @@ private fun NotConfiguredCard() {
     }
 }
 
+/**
+ * One line saying which request is on the wire. The old fixed "checking your session" played over
+ * every busy moment, including a code being sent — a label that describes a different step than the
+ * one running is worse than no label, because it is believed.
+ */
 @Composable
-private fun BusyRow() {
+private fun BusyRow(telegram: TelegramAuthState) {
+    val textRes = when (telegram) {
+        TelegramAuthState.SendingCode -> R.string.connect_sending_code
+        TelegramAuthState.VerifyingCode -> R.string.connect_verifying_code
+        TelegramAuthState.Authenticating -> R.string.connect_signing_in
+        // Neutral wording: this row also shows while a stored session is being re-read.
+        else -> R.string.connect_restoring
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         Text(
-            // Neutral wording: this row also shows while a stored session is being re-read.
-            text = stringResource(R.string.connect_restoring),
+            text = stringResource(textRes),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -355,9 +504,18 @@ private fun TelegramPanel.actionRes(): Int = when (this) {
     TelegramPanel.Password -> R.string.password_action
 }
 
-private fun TelegramPanel.primaryEnabled(state: OnboardingUiState): Boolean = when (this) {
+private fun TelegramPanel.primaryEnabled(
+    state: OnboardingUiState,
+    codeDraft: String,
+    passwordDraft: String,
+): Boolean = when (this) {
     // A build that cannot reach Telegram must not become a wall the user cannot get past.
     TelegramPanel.Phone -> state.telegramUnavailable || (state.canRequestCode && !state.busy)
-    TelegramPanel.Code -> !state.busy
-    TelegramPanel.Password -> !state.busy
+
+    // Non-empty, and the full length when Telegram stated one: a short code is a wasted round trip,
+    // and an empty Confirm button is a tap that teaches nothing.
+    TelegramPanel.Code -> !state.busy && codeDraft.isNotEmpty() &&
+        ((state.telegram as? TelegramAuthState.WaitingForCode)?.codeLength?.let { codeDraft.length >= it } ?: true)
+
+    TelegramPanel.Password -> !state.busy && passwordDraft.isNotBlank()
 }

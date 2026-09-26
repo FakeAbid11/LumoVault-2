@@ -9,6 +9,7 @@ import com.lumovault.app.domain.model.OnboardingProgress
 import com.lumovault.app.domain.model.OnboardingSummary
 import com.lumovault.app.domain.telegram.AuthCodeChannel
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import com.lumovault.app.domain.telegram.isInFlight
 import com.lumovault.app.domain.telegram.isAuthenticated
 import com.lumovault.app.util.PhoneNumbers
 import com.lumovault.app.util.Privacy
@@ -45,9 +46,12 @@ data class OnboardingUiState(
     /** Folders present in the media index; empty until the library has been scanned. */
     val availableFolders: List<LocalFolder> = emptyList(),
 ) {
-    /** The sub-step Telegram's latest state implies, or the previous one while an error is showing. */
+    /**
+     * The sub-step Telegram's latest *answer* implies. In-flight states — a request on the wire or a
+     * failure of the last one — keep the panel the user is looking at; see [isInFlight].
+     */
     val panel: TelegramPanel
-        get() = if (telegram is TelegramAuthState.Failed) telegramPanel else TelegramPanel.of(telegram)
+        get() = if (telegram.isInFlight) telegramPanel else TelegramPanel.of(telegram)
     /** The single place a phone number becomes E.164; the calling code is never glued on by hand. */
     val internationalNumber: String?
         get() = selectedCountry?.let { PhoneNumbers.toE164(it.iso2, phoneInput) }

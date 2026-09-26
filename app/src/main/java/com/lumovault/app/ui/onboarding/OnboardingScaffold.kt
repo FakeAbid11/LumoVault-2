@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +55,11 @@ fun OnboardingScaffold(
     description: String? = null,
     onBack: (() -> Unit)? = null,
     primaryEnabled: Boolean = true,
+    /**
+     * Replaces the label with a spinner while the step's own work is in flight. The button is expected
+     * to be disabled at the same time; the spinner is the visible half of "your tap was received".
+     */
+    primaryBusy: Boolean = false,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     Scaffold(
@@ -60,7 +67,8 @@ fun OnboardingScaffold(
         topBar = {
             if (onBack != null) {
                 TopAppBar(
-                    title = { Text(" ") },
+                    // Empty rather than a space-string: a title of " " is read aloud as a blank label.
+                    title = {},
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
@@ -129,7 +137,15 @@ fun OnboardingScaffold(
                     .widthIn(max = FormMaxWidth)
                     .align(Alignment.CenterHorizontally),
             ) {
-                Text(text = primaryLabel)
+                if (primaryBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(text = primaryLabel)
+                }
             }
 
             Spacer(Modifier.height(SpaceLg))
@@ -159,7 +175,7 @@ private fun StepProgress(step: Int, totalSteps: Int) {
                 .height(ProgressHeight),
         )
         Text(
-            text = "$step / $totalSteps",
+            text = stringResource(R.string.step_progress, step, totalSteps),
             style = LumoVaultType.sectionDetail,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
