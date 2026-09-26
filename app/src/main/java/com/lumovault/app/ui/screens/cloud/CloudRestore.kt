@@ -63,9 +63,33 @@ internal fun RestoreAction(
                 )
             }
 
-            RestoreState.Verifying -> StatusLine(stringResource(R.string.restore_verifying), live != null)
-            RestoreState.Saving -> StatusLine(stringResource(R.string.restore_saving), live != null)
-            RestoreState.Pending -> StatusLine(stringResource(R.string.restore_preparing), live != null)
+            // Cancel belongs to every live state, not only the one where bytes move: a queued, verifying
+            // or saving download is still work the user can stop, and the repository settles the row under
+            // the same reason from any of them.
+            RestoreState.Verifying, RestoreState.Saving, RestoreState.Pending -> {
+                val label = when (job?.state) {
+                    RestoreState.Verifying -> R.string.restore_verifying
+                    RestoreState.Saving -> R.string.restore_saving
+                    else -> R.string.restore_preparing
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (live != null) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    }
+                    Text(
+                        text = stringResource(label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.restore_cancel_action))
+                    }
+                }
+            }
 
             RestoreState.Downloading -> Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -91,20 +115,6 @@ internal fun RestoreAction(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-    }
-}
-
-@Composable
-private fun StatusLine(text: String, indeterminate: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (indeterminate) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        }
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

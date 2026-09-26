@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.model.CloudMedia
+import com.lumovault.app.domain.model.CloudTypeCount
 import com.lumovault.app.domain.restore.CloudRestoreTarget
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.telegram.CloudFailure
@@ -62,18 +63,29 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
     private val counts = container.cloudIndexRepository.observeTypeCounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
+    /**
+     * Room's invalidation signal for the local index. Its value is not read — subscribing is the point:
+     * a restore that lands writes a `media` row, which re-runs the presence lookup, which flips this
+     * item's badge from "In cloud" to "On device" within a frame instead of at the next resume. Before
+     * this, every input to [uiState] was cloud-side and the badge sat stale over a file the user could
+     * already open in the gallery.
+     */
+    private val localChanges = container.mediaRepository.observeCount()
+
+    // The typed `combine` answers five flows and quietly degrades to `Array<Any?>` at six, so the six
+    // inputs are grouped into two typed fives threes and rejoined. The alternative — vararg combine — is
+    // the exact overload the re-entrancy comment above this class exists to warn about.
     val uiState: StateFlow<CloudUiState> = combine(
-        container.cloudSync.state,
-        items,
-        totalCount,
-        counts,
-        syncFailed,
-    ) { init, media, total, typeCounts, failed ->
+        combine(container.cloudSync.state, syncFailed) { init, failed -> init to failed },
+        combine(items, totalCount, counts, localChanges) { media, total, typeCounts, _ ->
+            CloudIndexWindow(media, total, typeCounts)
+        },
+    ) { (init, failed), window ->
         val derived = deriveCloudState(
             init = init,
-            items = media,
-            totalCount = total,
-            counts = typeCounts,
+            items = window.items,
+            totalCount = window.total,
+            counts = window.typeCounts,
             // Which of these remote items also live on the device: one batched query over the loaded
             // window, never a MediaStore or database round-trip per cell. Computed inside this transform
             // rather than by a side collector on `items` — a side collector subscribes for the ViewModel's
@@ -81,10 +93,10 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
             // stack, defeating the WhileSubscribed policy below. Here the lookup runs exactly while the
             // screen is watching. Room's suspend queries execute on its own executor, not on this
             // collector's thread.
-            localMatches = if (media.isEmpty()) {
+            localMatches = if (window.items.isEmpty()) {
                 emptySet()
             } else {
-                container.localPresenceLookup.backedUp(media)
+                container.localPresenceLookup.backedUp(window.items)
             },
         )
         // "Nothing has happened yet" plus "the one attempt threw" is a failure with a retry, not a
@@ -95,6 +107,13 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
             derived
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CloudUiState.Idle)
+
+    /** Three cloud-side reads that always change together; a private carrier, not a domain type. */
+    private data class CloudIndexWindow(
+        val items: List<CloudMedia>,
+        val total: Int,
+        val typeCounts: List<CloudTypeCount>,
+    )
 
     /**
      * The one message the item sheet is open on, which is what the job row below is keyed by.

@@ -177,7 +177,11 @@ fun CloudScreen(
 
     // The sheet already dismisses on a tap anywhere outside the picture, but the system back gesture was
     // not one of them — and a full-screen overlay that swallows back feels stuck rather than focused.
-    BackHandler(enabled = selected != null) { selected = null }
+    // The ViewModel is told too, so the job-row observation stops with the sheet instead of outliving it.
+    BackHandler(enabled = selected != null) {
+        selected = null
+        viewModel.focusing(null)
+    }
 
     selected?.let { item ->
         CloudViewer(
@@ -442,8 +446,15 @@ private fun CloudViewer(
     onDismiss: () -> Unit,
 ) {
     var previewPath by remember(item.messageId) { mutableStateOf<String?>(null) }
+    // "still asking" and "asked and got nothing" are different facts. Naming a preview that has not
+    // arrived yet "broken" tells the user their thumbnail is damaged while the call that would prove
+    // it has not even returned.
+    var previewAttempted by remember(item.messageId) { mutableStateOf(false) }
 
-    LaunchedEffect(item) { previewPath = previewPathFor(item) }
+    LaunchedEffect(item) {
+        previewPath = previewPathFor(item)
+        previewAttempted = true
+    }
 
     Box(
         modifier = Modifier
@@ -468,7 +479,7 @@ private fun CloudViewer(
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(MediaBadgeCorner)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CloudCellPlaceholder(broken = item.hasPreview)
+                        CloudCellPlaceholder(broken = previewAttempted && item.hasPreview)
                     }
                 } else {
                     SubcomposeAsyncImage(
