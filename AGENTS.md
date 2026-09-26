@@ -141,7 +141,18 @@ Rules that have already caused a mistake here:
   osmdroid 6.1.20 does not have (`onPause`, `onResume`, `onDetach`, `setDestroyMode` are the whole surface,
   read from the artifact's sources jar) — and for `combining(Iterable<Flow<T>>)`, which kotlinx-coroutines
   1.11.0 does not either; the collection overload is the ordinary `combine(flows) { Array<T> -> R }`, while
-  `debounce` is still `@FlowPreview` and `sample` is not.
+  `debounce` is still `@FlowPreview` and `sample` is not. The same jar settled four more things the map now
+  depends on: `zoomToBoundingBox(BoundingBox, Boolean, Int)` exists; `BoundingBox`'s constructor is
+  **north, east, south, west**, not min/min/max/max; `getBoundingBox()` is a field and never null, but holds
+  a zero-span rectangle until `onLayout` has run, so `View.post` is not a sufficient wait; and `onDetach`
+  clears the listener list *and* the overlay manager's, which makes `setDestroyMode(false)` necessary but not
+  sufficient across a Compose navigation.
+- **A map that is never told where it is looks exactly like a map with nothing in it.** The viewport reaches
+  the model only from listener callbacks, so a screen that installs a listener and never publishes leaves
+  the query with `null` and the pins list empty — and `MapView`'s own documentation says its fit-to-bounds
+  call must come after the layout. Framing therefore lives in `domain/map/MapFraming.kt`, over numbers, and
+  it is a one-shot by construction: a map that recentres whenever the viewport changes is a map the user
+  cannot move.
 
 - **An empty Telegram answer is not an answer about Telegram.** `searchChats` is *offline*: on a fresh
   install TDLib knows no chats, so it returns nothing, and `SynchronizeCloudUseCase` used to read that as

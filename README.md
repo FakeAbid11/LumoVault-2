@@ -100,16 +100,23 @@ so a debug artifact built with them set is a build of a client that is shareable
 
 The map plots photo positions with osmdroid, and osmdroid needs a tile host to draw anything behind
 them. It is a **build input**, the same shape as the credentials above, because the OSM Foundation's
-[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is explicit that the public
-servers are not a production backend for somebody else's app: a declared, meaningful User-Agent is
-mandatory, bulk or preventive fetching is forbidden, and tiles must be cached. Which host a build
-uses is therefore a distribution decision, not a constant in a repository.
+[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is explicit about what it
+permits and what it refuses: a client must declare a meaningful User-Agent, bulk or preventive fetching
+is forbidden, tiles must be cached, attribution must be shown — and an app that grows past light use is
+asked to move to a third-party provider or its own server.
+
+The **default** is OSM's standard tile host, taken under those terms rather than around them: the
+traffic identifies LumoVault by name, nothing is fetched until the map screen is open, one viewport at
+a time is asked for with a 250 ms debounce, tiles are cached in the app's own `cacheDir/osmdroid`, and
+the credit line is drawn on the map. That is the light, personal-use case the policy describes. A build
+meant for wider distribution should set its own host *and* put a contact address in the user agent —
+which the policy asks of everyone — and the four values below are exactly how.
 
 | Build input | Meaning | Default |
 | --- | --- | --- |
-| `MAP_TILE_URL` | a `{z}/{x}/{y}` template, `http(s)://…` | empty → **no tiles** |
-| `MAP_TILE_USER_AGENT` | what the host is asked to identify the traffic as | `LumoVault/0.1` |
-| `MAP_TILE_ATTRIBUTION` | the credit line drawn under the map | empty |
+| `MAP_TILE_URL` | a `{z}/{x}/{y}` template, `http(s)://…` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` |
+| `MAP_TILE_USER_AGENT` | what the host is asked to identify the traffic as | `LumoVault/0.1 (repo URL)` |
+| `MAP_TILE_ATTRIBUTION` | the credit line drawn on the map | `© OpenStreetMap contributors` |
 | `MAP_TILE_MAX_ZOOM` | the deepest zoom the host allows, clamped to 1–22 | 19 |
 
 ```
@@ -124,12 +131,12 @@ the build from generated `BuildConfig` source nobody reads, and a dropped value 
 below instead. A template is kept only if it names `{z}`, `{x}` and `{y}`; `TileTemplate.isUsable`
 applies the same test at runtime, so the build cannot accept a template the app would then refuse.
 
-**With no `MAP_TILE_URL` the map still works and says it has no tiles.** Every photo position, every
-cluster, the bottom strip and the viewer hand-off all render on a blank canvas, and the screen shows
-a notice naming the missing build input. Fetching is turned off outright rather than left alone:
-osmdroid's own default tile source is Mapnik at `tile.openstreetmap.org`, so an unset source would
-quietly mean the public servers — the one thing this policy says not to assume. Tiles are cached in
-the app's own `cacheDir/osmdroid`, and no storage permission is involved.
+**With `MAP_TILE_URL` set empty the map still works and says it has no tiles.** Every photo position,
+every cluster, the bottom strip and the viewer hand-off all render on a plain canvas, and the screen
+shows a notice naming the missing build input. Fetching is turned off outright in that case rather than
+left alone: osmdroid has a default tile source of its own, so an unset source would quietly mean a
+server the build never chose — the one thing the policy above says not to assume. No storage permission
+is involved either way, because the cache lives in the app's private directory.
 
 Nothing is fetched from a tile host until the map screen is actually open; there is no pre-fetch of a
 bounding box, and the pass that reads EXIF costs no network at all.
@@ -367,9 +374,10 @@ frame-accurate scrub preview.
 actually animates, whether a video surface appears or stays black, whether the permission dialog reads as
 the explanation it is meant to be, and whether tiles render from a configured host are all the developer's
 to confirm — the unit tests cover the arithmetic and the queries behind each of them, and none of the
-pixels. Three warnings worth repeating before a first run: the tile host must be configured (see *Map
-tiles*) or the map is deliberately blank; the map is empty until photos are opened or consent is given,
-because positions come from EXIF that is read on demand; and a photo taken before this build has no
+pixels. Three warnings worth repeating before a first run: a tile host has to be configured *or* left
+blank on purpose (see *Map tiles* — a build with no host plots every photo on a plain canvas and says
+so); the map is empty until photos are opened or consent is given, because positions come from EXIF that
+is read on demand; and a photo taken before this build has no
 `date_taken_seconds` until the next scan sees it.
 
 ## Restore, free up space, background — Phase 9
