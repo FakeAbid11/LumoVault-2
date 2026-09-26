@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -59,6 +60,7 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.components.MediaCell
+import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
@@ -92,10 +94,10 @@ fun AlbumDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val libraryItems by viewModel.libraryItems.collectAsStateWithLifecycle()
 
-    var renaming by remember { mutableStateOf(false) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
     var confirming by remember { mutableStateOf<Confirmation?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    var deletionUnsupported by remember { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var deletionUnsupported by rememberSaveable { mutableStateOf(false) }
 
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -105,6 +107,20 @@ fun AlbumDetailScreen(
     BackHandler(enabled = state.selection.isNotEmpty()) { viewModel.clearSelection() }
 
     val isTrash = state.systemAlbum == SystemAlbum.Trash
+
+    if (state.items != null && state.isUnresolved) {
+        // A link to an album this build cannot name, or one deleted since: both used to draw a titleless
+        // "0 items" screen — silent, with no Add, Rename or Delete, and no sentence saying why. The
+        // `items != null` test keeps this from firing during the first load, when the album row simply
+        // has not arrived yet.
+        PlaceholderScreen(
+            title = stringResource(R.string.album_gone_title),
+            description = stringResource(R.string.album_gone_body),
+            icon = Icons.Filled.PhotoLibrary,
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         AlbumHeader(

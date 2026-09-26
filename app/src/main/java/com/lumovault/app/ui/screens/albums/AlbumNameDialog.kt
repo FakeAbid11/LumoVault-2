@@ -8,10 +8,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.lumovault.app.R
+import com.lumovault.app.domain.organization.AlbumRepository
 
 /**
  * The name prompt, shared by create and rename.
@@ -27,8 +28,11 @@ fun AlbumNameDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     initial: String = "",
+    maxLength: Int = AlbumRepository.MAX_NAME_LENGTH,
 ) {
-    var value by remember { mutableStateOf(initial) }
+    // Saveable: the activity recreates on rotation, and the typed name — with the prompt still open —
+    // is work the user is mid-way through, not a detail to lose with the pixels.
+    var value by rememberSaveable { mutableStateOf(initial) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -36,7 +40,10 @@ fun AlbumNameDialog(
         text = {
             OutlinedTextField(
                 value = value,
-                onValueChange = { value = it },
+                // Capped where the library will keep it: the repository truncates a longer name rather
+                // than refusing it, and stopping the field at the same limit means what was typed is
+                // what gets stored.
+                onValueChange = { input -> value = input.take(maxLength) },
                 label = { Text(stringResource(R.string.album_name_label)) },
                 singleLine = true,
                 isError = value.isBlank(),

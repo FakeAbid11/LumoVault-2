@@ -365,6 +365,8 @@
     <string name="album_remove_confirm_title">Remove from album?</string>
     <string name="album_remove_confirm_body">The photos stay in your library and in your backup. Only this album loses them.</string>
     <string name="album_cover_unavailable">Empty album</string>
+    <string name="album_gone_title">Can\'t open this album</string>
+    <string name="album_gone_body">It was deleted, or this link describes an album this app cannot find.</string>
     <string name="album_selected_count">%1$d selected</string>
     <string name="album_add_sheet_title">Add to %1$s</string>
     <string name="album_add_sheet_add_action">Add %1$d</string>
@@ -426,6 +428,9 @@
     <string name="folders_discard_title">Discard folder changes?</string>
     <string name="folders_discard_body">The folders ticked here are not saved yet. Leaving now discards them.</string>
     <string name="folders_discard_action">Discard</string>
+    <string name="backup_stop_confirm_title">Stop automatic backup?</string>
+    <string name="backup_stop_confirm_body">With no folders ticked, nothing new backs up automatically. Photos already in your LumoVault Backup stay there.</string>
+    <string name="backup_stop_confirm_action">Stop automatic backup</string>
     <plurals name="backup_folders_selected">
         <item quantity="one">%d folder selected</item>
         <item quantity="other">%d folders selected</item>

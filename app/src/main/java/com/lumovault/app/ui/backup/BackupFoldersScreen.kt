@@ -151,6 +151,7 @@ fun BackupFoldersScreen(
     // This screen is a draft with a Save, unlike the onboarding picker that writes per tap: back with
     // unsaved ticks used to drop them silently. Both exits — the gesture and the arrow — ask first.
     var confirmDiscard by remember { mutableStateOf(false) }
+    var confirmStop by remember { mutableStateOf(false) }
     BackHandler(enabled = state.hasUnsavedChanges) { confirmDiscard = true }
 
     Scaffold(
@@ -171,8 +172,18 @@ fun BackupFoldersScreen(
                 actions = {
                     TextButton(
                         onClick = {
-                            viewModel.save()
-                            onNavigateUp()
+                            // Unticking every folder is turning automatic backup off wearing a save
+                            // button — the queue will honestly refuse to take anything from no folders.
+                            // That decision deserves the same confirm the discard path already asks
+                            // for; any other save is plain.
+                            val turningOff = state.selected.isEmpty() &&
+                                state.sourceLine.source == BackupSource.SelectedFolders &&
+                                state.sourceLine.folderCount > 0
+                            if (turningOff) confirmStop = true
+                            else {
+                                viewModel.save()
+                                onNavigateUp()
+                            }
                         },
                         enabled = state.folders.isNotEmpty(),
                     ) {
@@ -266,6 +277,28 @@ fun BackupFoldersScreen(
                 }
             }
         }
+    }
+
+    if (confirmStop) {
+        AlertDialog(
+            onDismissRequest = { confirmStop = false },
+            title = { Text(stringResource(R.string.backup_stop_confirm_title)) },
+            text = { Text(stringResource(R.string.backup_stop_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmStop = false
+                        viewModel.save()
+                        onNavigateUp()
+                    },
+                ) { Text(stringResource(R.string.backup_stop_confirm_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmStop = false }) {
+                    Text(stringResource(R.string.album_cancel))
+                }
+            },
+        )
     }
 
     if (confirmDiscard) {
