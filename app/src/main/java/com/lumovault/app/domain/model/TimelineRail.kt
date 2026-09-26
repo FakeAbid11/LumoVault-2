@@ -2,7 +2,6 @@ package com.lumovault.app.domain.model
 
 import java.time.LocalDate
 import java.time.YearMonth
-import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -103,17 +102,23 @@ object TimelineRail {
     fun RailMonth.endIndex(): Int = firstItemIndex + itemCount
 
     /**
-     * How many months to skip between drawn labels, so that no two labels want the same pixels.
+     * Where a month sits on the rail, as a fraction of its height — the inverse of [itemIndexFor].
      *
-     * A ten-year library is 120 ticks, and a phone gives the rail eight hundred-odd pixels of it: a label
-     * each would be a smear. Asking for a stride rather than measuring the text keeps this a number that can
-     * be tested — and the answer for a short rail is 1, which is what the four-month library should look
-     * like. Anything unmeasurable (a track that has not been laid out yet, zero months) answers 1 so the
-     * first frame is not a rail of nothing.
+     * The centre of the month's own slice, not its start, because this number draws a marker beside a month
+     * rather than a boundary between two: a pill that names March while pointing at the first item of March
+     * reads as one month early. Weighted by items for the same reason [itemIndexFor] is — the rail's shape is
+     * the library's shape, so a share of the items is the same share of the track.
+     *
+     * Zero for a month that is not on the rail: callers pass what [monthFor] answered, and a month from a
+     * superseded list is the one case where drawing anything would be drawing a lie.
      */
-    fun labelStride(monthCount: Int, trackPx: Float, minPxPerLabel: Float): Int {
-        if (monthCount <= 0 || trackPx <= 0f || minPxPerLabel <= 0f) return 1
-        val fits = (trackPx / minPxPerLabel).toInt().coerceAtLeast(1)
-        return ceil(monthCount / fits.toDouble()).roundToInt().coerceAtLeast(1)
+    fun fractionFor(months: List<RailMonth>, month: RailMonth): Float {
+        val total = months.sumOf { it.itemCount }
+        if (total <= 0) return 0f
+        val position = months.indexOf(month)
+        if (position < 0) return 0f
+        val itemsBefore = months.subList(0, position).sumOf { it.itemCount }
+        val centre = itemsBefore + month.itemCount / 2f
+        return (centre / total).coerceIn(0f, 1f)
     }
 }

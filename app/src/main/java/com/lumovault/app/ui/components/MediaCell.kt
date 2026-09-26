@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -23,13 +22,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -40,13 +38,9 @@ import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.ui.screens.photos.BackupCellStatus
 import com.lumovault.app.util.formatDuration
-import com.lumovault.app.ui.theme.MediaBadgeScrim
-import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.FavoriteAccent
-import com.lumovault.app.ui.theme.MediaBadgeCorner
-import com.lumovault.app.ui.theme.MediaBadgeIconSize
 import com.lumovault.app.ui.theme.MediaBadgeInset
-import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaGlyphIconSize
 import com.lumovault.app.ui.theme.MediaThumbCorner
 
 /**
@@ -57,10 +51,16 @@ import com.lumovault.app.ui.theme.MediaThumbCorner
  * fill a 100dp square; video frames come from TDLib-free `MediaMetadataRetriever` decoding shipped
  * by `coil-video`.
  *
- * [status] is the one visible record that a backup was asked for and what became of it. It is drawn
- * small and at the start edge, leaving the duration and GIF badges exactly where they were: the type
- * badge is about the file and the status badge is about its journey, and neither should displace the
- * other.
+ * The four corners are allocated, not improvised, because a badge that moves between screens is a badge the
+ * user has to re-learn: top-start is the file's *journey* (queued, uploading, done, failed — or, when the item
+ * is chosen, the tick that chose it), top-end is the user's own mark (a favourite), bottom-start is the type
+ * that moves (a video) and bottom-end is text (a duration, a GIF tag). Nothing here is clickable: the whole
+ * cell takes the tap and the long press, and a control on top of a photograph that swallows either would make
+ * the photo unopenable by half its own area.
+ *
+ * [status] is the one visible record that a backup was asked for and what became of it. It is drawn small and
+ * at the start edge, leaving the duration and GIF badges exactly where they were: the type badge is about the
+ * file and the status badge is about its journey, and neither should displace the other.
  */
 @Composable
 fun MediaCell(
@@ -109,86 +109,68 @@ fun MediaCell(
             error = { ThumbnailPlaceholder(icon = Icons.Filled.BrokenImage) },
         )
 
+        // Top-start, in both cases: the tick replaces the status mark rather than sitting beside it, because
+        // a cell that is being chosen has no interesting backup state to show at the same moment.
         if (selected) {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
+            MediaGlyph(
+                icon = Icons.Filled.CheckCircle,
                 contentDescription = stringResource(R.string.backup_cell_selected),
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(MediaBadgeInset)
-                    .size(MediaBadgeIconSize),
-                tint = MaterialTheme.colorScheme.primary,
+                    .padding(MediaBadgeInset),
+                iconSize = MediaGlyphIconSize,
             )
         } else {
             BackupStatusBadge(
                 status = status,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(MediaBadgeInset)
-                    .size(MediaBadgeIconSize),
+                    .padding(MediaBadgeInset),
+            )
+        }
+
+        if (favorite) {
+            MediaGlyph(
+                icon = Icons.Filled.Favorite,
+                contentDescription = stringResource(R.string.organization_favorite_marked),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(MediaBadgeInset),
+                iconSize = MediaGlyphIconSize,
+                tint = FavoriteAccent,
             )
         }
 
         when (media.type) {
             MediaType.Video -> {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
+                MediaGlyph(
+                    icon = Icons.Filled.PlayArrow,
                     contentDescription = null,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(MediaBadgeInset)
-                        .size(MediaBadgeIconSize),
-                    tint = OnMedia,
+                        .padding(MediaBadgeInset),
+                    iconSize = MediaGlyphIconSize,
                 )
-                if (media.durationMillis != null) {
-                    Surface(
+                media.durationMillis?.let { millis ->
+                    MediaPill(
+                        text = formatDuration(millis),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(MediaBadgeInset),
-                        shape = RoundedCornerShape(MediaBadgeCorner),
-                        color = MediaBadgeScrim,
-                        contentColor = OnMedia,
-                    ) {
-                        Text(
-                            text = formatDuration(media.durationMillis),
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
-                            textAlign = TextAlign.End,
-                        )
-                    }
+                        textAlign = TextAlign.End,
+                    )
                 }
             }
 
-            MediaType.Gif -> Surface(
+            // A GIF's tag shares the corner a video's duration uses, and the two cannot both be on one cell.
+            MediaType.Gif -> MediaPill(
+                text = stringResource(R.string.media_badge_gif),
                 modifier = Modifier
-                    // Bottom edge, because the favourite mark owns the top-right corner: a GIF that is
-                    // also a favourite has to show both, and the type badge has nowhere else to crowd.
                     .align(Alignment.BottomEnd)
                     .padding(MediaBadgeInset),
-                shape = RoundedCornerShape(MediaBadgeCorner),
-                color = MediaBadgeScrim,
-                contentColor = OnMedia,
-            ) {
-                Text(
-                    text = stringResource(R.string.media_badge_gif),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
-                )
-            }
+            )
 
             MediaType.Photo -> Unit
-        }
-
-        if (favorite) {
-            Icon(
-                imageVector = Icons.Filled.Favorite,
-                contentDescription = stringResource(R.string.organization_favorite_marked),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(MediaBadgeInset)
-                    .size(MediaBadgeIconSize),
-                tint = FavoriteAccent,
-            )
         }
     }
 }
@@ -212,23 +194,15 @@ private fun BackupStatusBadge(status: BackupCellStatus, modifier: Modifier = Mod
         BackupCellStatus.Failed -> Icons.Filled.Refresh to R.string.backup_state_failed
     }
 
-    // A scrim behind the glyph, as the duration badge uses: a thumbnail is arbitrary content and a
-    // thin white icon vanishes against a bright sky.
-    Box(
-        modifier = modifier.background(MediaBadgeScrim, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = stringResource(label),
-            modifier = Modifier.padding(2.dp),
-            tint = OnMedia,
-        )
-    }
+    MediaGlyph(
+        icon = icon,
+        contentDescription = stringResource(label),
+        modifier = modifier,
+    )
 }
 
 @Composable
-private fun ThumbnailPlaceholder(icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+private fun ThumbnailPlaceholder(icon: ImageVector? = null) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -239,11 +213,12 @@ private fun ThumbnailPlaceholder(icon: androidx.compose.ui.graphics.vector.Image
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(MediaBadgeIconSize),
+                modifier = Modifier.size(MediaGlyphIconSize),
                 tint = MaterialTheme.colorScheme.outline,
             )
         }
     }
 }
 
-private val SelectionRing = 2.dp
+/** Thicker than a hairline, because a 1 dp ring on a dark thumbnail is a line the eye reads as an artefact. */
+private val SelectionRing = 2.5.dp

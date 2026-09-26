@@ -159,19 +159,39 @@ class TimelineRailTest {
     }
 
     @Test
-    fun labelsAreThinnedOnlyWhenTheTrackCannotHoldThem() {
-        val twelve = (1..12).map { month ->
-            day(epochDay = epochDay(2024, month, 1), photos = 2)
-        }
-        val months = TimelineRail.months(twelve)
+    fun aMonthIsAnnouncedAtTheMiddleOfItsOwnSliceOfTheTrack() {
+        // Two months of equal weight split the rail in half, so their centres are a quarter of the way down
+        // and three quarters. The pill is drawn at these numbers: a month named at fraction 0 would float
+        // above the first tick it is supposed to be labelling, and one named at its last item would sit over
+        // the month below it.
+        val months = TimelineRail.months(library)
 
-        assertEquals("a track with room for every month labels every month",
-            1, TimelineRail.labelStride(months.size, trackPx = 1_200f, minPxPerLabel = 24f))
-        assertEquals("96px of track at 24px a label fits four of them, so every third month is named",
-            3, TimelineRail.labelStride(months.size, trackPx = 96f, minPxPerLabel = 24f))
-        assertEquals("a track that has not been measured yet is no reason to draw nothing",
-            1, TimelineRail.labelStride(months.size, trackPx = 0f, minPxPerLabel = 24f))
-        assertEquals(1, TimelineRail.labelStride(0, trackPx = 800f, minPxPerLabel = 24f))
+        assertEquals(0.25f, TimelineRail.fractionFor(months, months[0]), 0.001f)
+        assertEquals(0.75f, TimelineRail.fractionFor(months, months[1]), 0.001f)
+    }
+
+    @Test
+    fun theCentreOfAWholeLibraryIsItsOwnMiddle() {
+        val one = TimelineRail.months(listOf(day(epochDay = epochDay(2024, 3, 1), photos = 9)))
+
+        assertEquals("one month on the rail is the whole rail", 0.5f, TimelineRail.fractionFor(one, one[0]), 0.001f)
+        assertEquals("a month from a list it is not in names nothing",
+            0f, TimelineRail.fractionFor(one, RailMonth(YearMonth.of(2020, 1), firstItemIndex = 0, itemCount = 1)),
+            0.001f)
+        assertEquals(0f, TimelineRail.fractionFor(emptyList(), RailMonth(YearMonth.of(2024, 3), 0, 0)), 0.001f)
+    }
+
+    @Test
+    fun aFractionAndAnIndexRoundTripToTheSameMonth() {
+        // The drag asks the other question — height to index — and the two must agree, or the name beside the
+        // finger is not the name of the month the grid has just scrolled to.
+        val months = TimelineRail.months(library)
+
+        months.forEach { month ->
+            val centre = TimelineRail.fractionFor(months, month)
+            val index = TimelineRail.itemIndexFor(months, centre)
+            assertEquals(month.yearMonth, TimelineRail.monthFor(months, index)?.yearMonth)
+        }
     }
 
     @Test

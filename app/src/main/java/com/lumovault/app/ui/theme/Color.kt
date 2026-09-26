@@ -30,6 +30,10 @@ internal val LightOutline = Color(0xFF7E8CA3)
 // dark or light app background is the wrong value for a badge over whatever the user's picture happens to be.
 // They live here rather than in each screen because four screens need them and two had already drifted apart.
 internal val MediaBadgeScrim = Color(0xB3000000)
+
+/** Lighter than the pill's: a disc sits behind a whole glyph for the whole time the grid is on screen, while a
+ * tag is read once and should be the quietest thing that is still legible. */
+internal val MediaGlyphScrim = Color(0x8C000000)
 internal val OnMedia = Color(0xFFFFFFFF)
 internal val FullScreenScrim = Color(0xCC000000)
 internal val MapNoticeScrim = Color(0x99000000)

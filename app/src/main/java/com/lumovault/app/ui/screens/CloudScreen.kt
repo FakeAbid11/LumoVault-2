@@ -23,7 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -59,6 +63,8 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.restore.RestoreJob
+import com.lumovault.app.ui.components.MediaGlyph
+import com.lumovault.app.ui.components.MediaPill
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.cloud.RestoreAction
 import com.lumovault.app.ui.screens.cloud.CloudUiState
@@ -69,16 +75,20 @@ import com.lumovault.app.util.toByteText
 import com.lumovault.app.util.formatDay
 import com.lumovault.app.util.formatDuration
 import java.time.LocalDate
-import com.lumovault.app.ui.theme.MediaBadgeScrim
-import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.FullScreenScrim
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MediaBadgeCorner
-import com.lumovault.app.ui.theme.MediaBadgeIconSize
 import com.lumovault.app.ui.theme.MediaBadgeInset
-import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
+import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXl
+import com.lumovault.app.ui.theme.SpaceXs
 
 /**
  * The cloud library (PRD section 24), drawn from the local cloud index rather than from a message
@@ -244,12 +254,17 @@ private fun CloudHeader(state: CloudUiState.Library) {
         .ifBlank { resources.getQuantityString(R.plurals.cloud_items_found, state.totalCount, state.totalCount) }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = GridSpacing, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = GridSpacing, vertical = SpaceSm),
+        verticalArrangement = Arrangement.spacedBy(SpaceXs),
     ) {
         Text(
             text = countsText,
-            style = MaterialTheme.typography.titleMedium,
+            // The count is the header of a list, not a title: at `titleMedium` it out-shouts every day header
+            // under it, and the one number a user reads here is which of their photos are where.
+            style = LumoVaultType.sectionHeader,
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         // The two notices are mutually exclusive by construction: a stale library is not also being
@@ -257,13 +272,13 @@ private fun CloudHeader(state: CloudUiState.Library) {
         when {
             state.fromCache -> Text(
                 text = stringResource(R.string.cloud_offline_notice),
-                style = MaterialTheme.typography.bodySmall,
+                style = LumoVaultType.sectionDetail,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             state.refreshing -> Text(
                 text = stringResource(R.string.cloud_refreshing_notice),
-                style = MaterialTheme.typography.bodySmall,
+                style = LumoVaultType.sectionDetail,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -280,16 +295,31 @@ private fun CloudDayHeader(epochDay: Long) {
         else -> formatDay(day, distance)
     }
 
+    // The same header the local timeline draws, because the two screens are the same library seen from two
+    // ends of a cable, and a day that is 15 sp semi-bold on one and 16 sp regular on the other reads as two
+    // different apps.
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = GridSpacing, vertical = 10.dp),
+        style = LumoVaultType.sectionHeader,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = GridSpacing, end = GridSpacing, top = SpaceLg, bottom = SpaceSm),
     )
 }
 
 /**
- * One remote item. The corner marks are deliberately quiet: this is a photo library, not a file
- * manager, so "cloud only" versus "also on this device" is a badge rather than a column of status.
+ * One remote item.
+ *
+ * The corners mean the same thing they mean on a local thumbnail, which is the whole reason this cell draws
+ * through the same two components: a duration bottom-end, a "GIF" tag bottom-end, a play mark bottom-start. A
+ * user who has learned where the timeline puts a mark should not have to relearn it in the cloud.
+ *
+ * "On this device" is the only state with a mark, and it is drawn at top-start where the local grid puts a
+ * photo's backup state — the same corner for the same kind of question, "what has happened to this file".
+ * "Cloud only" draws nothing, for the reason the local cell gives for an un-backuped photo: it is where every
+ * item on this screen starts, so marking it is not information, it is the grid covered in clouds until the few
+ * cells that differ stop standing out.
  */
 @Composable
 private fun CloudMediaCell(
@@ -327,71 +357,68 @@ private fun CloudMediaCell(
             )
         }
 
-        // A restore in flight is drawn on the cell as well as in the sheet, because the sheet closes and
-        // the download does not: the user needs to see which of these pictures is still arriving.
-        if (restoring) {
-            LinearProgressIndicator(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                color = OnMedia,
-            )
-        }
-
-        if (item.type == MediaType.Video) {
-            Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.align(Alignment.BottomStart).padding(MediaBadgeInset).size(MediaBadgeIconSize),
-                tint = OnMedia,
-            )
-        }
-
-        item.durationSeconds?.let { seconds ->
-            Badge(
-                text = formatDuration(seconds * MILLIS_PER_SECOND),
-                modifier = Modifier.align(Alignment.BottomEnd),
+        if (onDevice) {
+            MediaGlyph(
+                icon = Icons.Filled.CloudDone,
+                contentDescription = stringResource(R.string.cloud_badge_on_device),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(MediaBadgeInset),
             )
         }
 
         if (item.type == MediaType.Gif) {
-            Badge(
+            MediaPill(
                 text = stringResource(R.string.media_badge_gif),
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(MediaBadgeInset),
             )
+        } else if (item.type == MediaType.Video) {
+            MediaGlyph(
+                icon = Icons.Filled.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(MediaBadgeInset),
+            )
+            item.durationSeconds?.let { seconds ->
+                MediaPill(
+                    text = formatDuration(seconds * MILLIS_PER_SECOND),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(MediaBadgeInset),
+                    textAlign = TextAlign.End,
+                )
+            }
         }
 
-        Badge(
-            text = stringResource(if (onDevice) R.string.cloud_badge_on_device else R.string.cloud_badge_cloud_only),
-            modifier = Modifier.align(Alignment.TopStart),
-        )
-    }
-}
-
-@Composable
-private fun Badge(text: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.padding(MediaBadgeInset),
-        shape = RoundedCornerShape(MediaBadgeCorner),
-        color = MediaBadgeScrim,
-        contentColor = OnMedia,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
-        )
+        // A restore in flight is drawn on the cell as well as in the sheet, because the sheet closes and
+        // the download does not: the user needs to see which of these pictures is still arriving.
+        if (restoring) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                color = OnMedia,
+                trackColor = MediaBadgeScrim,
+            )
+        }
     }
 }
 
 @Composable
 private fun CloudCellPlaceholder(broken: Boolean) {
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (broken) Icons.Filled.BrokenImage else Icons.Filled.Cloud,
+            imageVector = if (broken) Icons.Filled.BrokenImage else Icons.Filled.CloudDownload,
             contentDescription = null,
-            modifier = Modifier.size(MediaBadgeIconSize),
+            modifier = Modifier.size(PlaceholderIconSize),
             tint = MaterialTheme.colorScheme.outline,
         )
     }
@@ -457,7 +484,9 @@ private fun CloudViewer(
 
                 Text(
                     text = item.fileName.ifBlank { stringResource(R.string.cloud_viewer_unnamed) },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = LumoVaultType.itemTitle,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
                 )
 
                 Text(
@@ -475,21 +504,17 @@ private fun CloudViewer(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
+                // One line, not two: where the file is and how sure we are of its date are the same kind of
+                // footnote, and stacked they pushed the one control on this sheet below the fold on a short
+                // screen.
                 Text(
                     text = stringResource(
                         if (onDevice) R.string.cloud_badge_on_device else R.string.cloud_badge_cloud_only,
-                    ) + " · " + stringResource(R.string.cloud_viewer_dates_from_message),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Text(
-                    text = if (item.hasPreview) {
-                        stringResource(R.string.cloud_viewer_preview_shown)
-                    } else {
-                        stringResource(R.string.cloud_viewer_no_preview)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                    ) + " · " + stringResource(R.string.cloud_viewer_dates_from_message) + " · " + stringResource(
+                        if (item.hasPreview) R.string.cloud_viewer_preview_shown
+                        else R.string.cloud_viewer_no_preview,
+                    ),
+                    style = LumoVaultType.sectionDetail,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
@@ -515,45 +540,37 @@ private fun CloudViewer(
 
 @Composable
 private fun Working(title: String, detail: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(32.dp),
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = SpaceXl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.Center),
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+        Text(text = title, style = LumoVaultType.sectionHeader)
+        // The count underneath is the reassuring part: a sync that shows a number going up is working, and a
+        // spinner alone cannot tell a first run from a stall.
+        Text(
+            text = detail,
+            style = LumoVaultType.sectionDetail,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
 private fun CloudUnavailable(onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.cloud_error_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.cloud_error_body),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        TextButton(onClick = onRetry) {
-            Text(stringResource(R.string.error_retry))
-        }
-    }
+    PlaceholderScreen(
+        title = stringResource(R.string.cloud_error_title),
+        description = stringResource(R.string.cloud_error_body),
+        icon = Icons.Filled.CloudOff,
+        action = {
+            Button(onClick = onRetry) {
+                Text(stringResource(R.string.error_retry))
+            }
+        },
+    )
 }
 
 private fun MediaType.kindRes(): Int = when (this) {
@@ -575,6 +592,9 @@ private fun CloudUiState.Preparing.Step.labelRes(): Int = when (this) {
 }
 
 private val ViewerPreviewHeight = 260.dp
+
+/** Bigger than a corner mark and smaller than the cell: a placeholder is the whole cell's content. */
+private val PlaceholderIconSize = 22.dp
 
 private const val MILLIS_PER_SECOND = 1000L
 
