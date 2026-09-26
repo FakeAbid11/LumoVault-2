@@ -40,7 +40,7 @@ import com.lumovault.app.data.local.restore.MediaRestoreEntity
  * a column and no migration produces it. That mismatch is not a warning; it is a crash on the first launch
  * after an upgrade, on a person's own library.
  */
-internal const val LUMOVAULT_SCHEMA_VERSION = 9
+internal const val LUMOVAULT_SCHEMA_VERSION = 10
 
 @Database(
     entities = [
@@ -443,6 +443,26 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * The prune step's index.
+         *
+         * Every scan tags the rows it saw and then deletes every older tag — `WHERE last_seen_scan_id <`,
+         * over the whole library, once per sync. Until now that ran as a full table scan: the comment on
+         * [MediaEntity] always claimed the prune filter was one of the two queries the table serves, while
+         * the index list only ever carried the timeline's sort and the type filter. Index-only migration:
+         * no column is added, so nothing about column order can drift, and the name below is exactly the
+         * one Room derives from `Index("last_seen_scan_id")` on the entity — a fresh install and an
+         * upgraded one must agree on it byte for byte, or Room's schema validation rejects the database.
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_last_seen_scan_id` " +
+                        "ON `media` (`last_seen_scan_id`)",
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -452,6 +472,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
         )
     }
 }

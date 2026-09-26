@@ -23,11 +23,13 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "media",
     indices = [
-        // The timeline sorts by date and the prune step filters by scan id; those are the two
-        // queries this table actually serves. No index on content_uri: it is derived from the
-        // primary key, so a second index would only slow writes down.
+        // The timeline sorts by date, the prune step filters by scan id, and the type filters the
+        // sections — those are the queries this table actually serves. No index on content_uri: it is
+        // derived from the primary key, so a second index would only slow writes down. The scan-id
+        // index arrived in schema 10; before it, every sync's prune was a full scan of the library.
         Index("date_added_seconds"),
         Index("media_type"),
+        Index("last_seen_scan_id"),
     ],
 )
 data class MediaEntity(
