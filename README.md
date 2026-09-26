@@ -55,6 +55,15 @@ for one immediately; a pass asks for a send whenever the queue holds work, so a 
 process resumes. Whether a folder's photos actually arrive in the Telegram channel is **not** verified on a
 device — see [Folder backup — what a saved selection starts](#folder-backup--what-a-saved-selection-starts).
 
+**Map screen fixed:** complete and CI-verified (runs
+[36231603467](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36231603467) — red, one mis-imported
+coroutine function — and
+[36231837667](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36231837667), 500 unit tests, 0 failed,
+debug APK built with both TDLib ABIs packaged). The map never published its viewport before a pan, never moved
+itself to where the photos are, and shipped with no tile host; all three are fixed, and osmdroid's own
+`onDetach` clearing is now survived by a re-attach. Whether the map actually draws — tiles, markers, a pan
+that stays where it was left — is still a device question and is not claimed.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
