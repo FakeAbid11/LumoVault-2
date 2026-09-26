@@ -2,6 +2,7 @@ package com.lumovault.app.domain.model
 
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
