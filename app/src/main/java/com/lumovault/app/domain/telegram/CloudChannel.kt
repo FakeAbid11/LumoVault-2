@@ -27,6 +27,44 @@ sealed interface CloudChannelVerdict {
 }
 
 /**
+ * What discovery concluded about the account's storage channel.
+ *
+ * The distinction that lives here is the reason this type exists: [Found] and [Absent] are answers, and
+ * [InProgress] is not. A freshly installed TDLib has an empty chat cache and knows nothing about the
+ * account's dialogs yet, and reading that as "this account has no storage channel" creates a second, empty
+ * one — after which the association points at the new channel and the user's photographs are still in the
+ * old one, with nothing in the app able to put them back. Absence therefore has to be *established*, not
+ * merely observed.
+ */
+sealed interface ChannelDiscovery {
+    /**
+     * A channel this account owns whose marker this build can read.
+     *
+     * [alternates] counts the other valid candidates it passed over; more than zero means the account holds
+     * two storage channels, which an older build could cause and which the adoption rule resolves towards
+     * the one that holds messages.
+     */
+    data class Found(val chatId: Long, val alternates: Int = 0) : ChannelDiscovery
+
+    /** Discovery ran to its end and the account genuinely has no storage channel. The only state that allows creating one. */
+    data object Absent : ChannelDiscovery
+
+    /**
+     * Discovery could not conclude: TDLib is still loading the chat list, or Telegram refused, paused or
+     * lost the request. Retryable, and never a basis for creating anything.
+     */
+    data class InProgress(val reason: Reason) : ChannelDiscovery
+
+    enum class Reason {
+        /** TDLib has not finished loading the account's chats, so nothing about them is known yet. */
+        ChatListLoading,
+
+        /** The lookup itself failed — offline, rate limited, or a Telegram-side error. */
+        TelegramUnreachable,
+    }
+}
+
+/**
  * A channel LumoVault has adopted, and the account it belongs to.
  *
  * [ownerUserId] is what makes a swapped Telegram account invalidate the association (PRD section 73)

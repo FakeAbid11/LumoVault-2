@@ -1,6 +1,7 @@
 package com.lumovault.app.data.remote.telegram
 
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.ChannelDiscovery
 import com.lumovault.app.domain.telegram.CloudChannelVerdict
 import com.lumovault.app.domain.telegram.CloudFailure
 import com.lumovault.app.domain.telegram.CloudFailureException
@@ -27,7 +28,10 @@ import org.junit.Test
 class TdLibCloudRepositoryTest {
     private val client = FakeTelegramClient()
 
-    private val repository = TdLibCloudRepository(client)
+    /** Recorded instead of slept, so a bounded retry is asserted at the speed of the assertion. */
+    private val pauses = mutableListOf<Long>()
+
+    private val repository = TdLibCloudRepository(client, pause = { pauses += it })
 
     private fun photoMessage(id: Long, remoteId: String): TdApi.Message {
         val message = TdApi.Message()
@@ -66,21 +70,32 @@ class TdLibCloudRepositoryTest {
         assertEquals(CloudFailure.Kind.NotAuthenticated, failure.failure.kind)
     }
 
+    /**
+     * The six cases discovery exists to get right. The one that matters most is the third: a lookup that
+     * answered nothing because TDLib had not loaded the account's chats yet, which used to be read as
+     * "this account has no storage channel" and answered by creating one — after which the association
+     * points at the empty channel and every photograph the user backed up stays in the old one.
+     */
     @Test
-    fun `discovery searches the account's own chats and verifies before it adopts`() {
+    fun `discovery asks the server for the account's own channels and verifies before it adopts`() {
         val stranger = 11L
         val mine = 22L
 
         client.answer = { function ->
             when {
-                function is TdApi.SearchChats -> {
+                function is TdApi.SearchChatsOnServer -> {
                     assertEquals(LumoVaultStorageProtocol.CHANNEL_TITLE, function.query)
                     assertTrue(
                         "only channels may match, so a private chat cannot be adopted",
                         function.typeFilter is TdApi.SearchChatTypeFilterChannel,
                     )
-                    TdApi.Chats().apply { chatIds = longArrayOf(stranger, mine) }
+                    chats(stranger, mine)
                 }
+
+                // The offline cache is empty, which is the reinstall case; the server answer is what has
+                // to be enough to find the channel.
+                function is TdApi.SearchChats -> chats()
+                function is TdApi.LoadChats -> TdApi.Ok()
 
                 function is TdApi.GetChat && function.chatId == stranger ->
                     chat(stranger, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 7)
@@ -89,26 +104,188 @@ class TdLibCloudRepositoryTest {
                     chat(mine, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 9)
 
                 function is TdApi.GetSupergroup && function.supergroupId == 7L ->
-                    TdApi.Supergroup().apply { status = TdApi.ChatMemberStatusMember() }
+                    supergroupOwnedBy(TdApi.ChatMemberStatusMember())
 
                 function is TdApi.GetSupergroup && function.supergroupId == 9L ->
-                    TdApi.Supergroup().apply { status = TdApi.ChatMemberStatusCreator() }
+                    supergroupOwnedBy(TdApi.ChatMemberStatusCreator())
 
-                function is TdApi.GetSupergroupFullInfo ->
-                    TdApi.SupergroupFullInfo().apply { description = LumoVaultStorageProtocol.markerText() }
+                function is TdApi.GetSupergroupFullInfo -> markerInfo()
 
                 else -> TdApi.Ok()
             }
         }
 
-        // The first candidate carries the right name and belongs to someone else; the second is ours,
-        // so discovery must walk past the impostor rather than adopt it.
-        assertEquals(mine, runBlocking { repository.findStorageChannel() })
+        // The first candidate carries the right name and belongs to someone else; the second is ours, so
+        // discovery must walk past the impostor rather than adopt it.
+        assertEquals(
+            ChannelDiscovery.Found(chatId = mine, alternates = 0),
+            runBlocking { repository.discoverStorageChannel() },
+        )
         assertEquals(
             "the stranger's channel was examined, not adopted",
             1,
             client.sent.count { it is TdApi.GetSupergroup && it.supergroupId == 7L },
         )
+        assertTrue(
+            "an answer was found, so nothing was created",
+            client.sent.none { it is TdApi.CreateNewSupergroupChat },
+        )
+    }
+
+    @Test
+    fun `a chat list that has not finished loading is retried rather than answered with a new channel`() {
+        val mine = 22L
+        var serverRounds = 0
+
+        client.answer = { function ->
+            when {
+                function is TdApi.SearchChatsOnServer -> {
+                    serverRounds += 1
+                    if (serverRounds < 2) chats() else chats(mine)
+                }
+
+                function is TdApi.SearchChats -> chats()
+                function is TdApi.LoadChats -> TdApi.Ok()
+                function is TdApi.GetChat -> chat(mine, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 9)
+                function is TdApi.GetSupergroup -> supergroupOwnedBy(TdApi.ChatMemberStatusCreator())
+                function is TdApi.GetSupergroupFullInfo -> markerInfo()
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(
+            ChannelDiscovery.Found(chatId = mine, alternates = 0),
+            runBlocking { repository.discoverStorageChannel() },
+        )
+        assertEquals("the empty round waited before asking again", 1, pauses.size)
+        assertTrue(client.sent.none { it is TdApi.CreateNewSupergroupChat })
+    }
+
+    @Test
+    fun `a loaded list and a clean server answer are the only thing that concludes absence`() {
+        client.answer = { function ->
+            when {
+                // TDLib's documented end-of-chat-list answer.
+                function is TdApi.LoadChats -> throw TelegramRequestException(code = 404, reason = "ALL_CHATS_LOADED")
+                function is TdApi.SearchChatsOnServer -> chats()
+                function is TdApi.SearchChats -> chats()
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(ChannelDiscovery.Absent, runBlocking { repository.discoverStorageChannel() })
+        assertEquals("a concluded search does not wait", 0, pauses.size)
+    }
+
+    @Test
+    fun `a server search that fails is never read as a channel that does not exist`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.LoadChats -> throw TelegramRequestException(code = 404, reason = "ALL_CHATS_LOADED")
+                function is TdApi.SearchChatsOnServer ->
+                    throw TelegramRequestException(code = 420, reason = "FLOOD_WAIT_30")
+
+                function is TdApi.SearchChats -> chats()
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(
+            "Telegram did not answer, which is not the same as there being nothing to find",
+            ChannelDiscovery.InProgress(ChannelDiscovery.Reason.TelegramUnreachable),
+            runBlocking { repository.discoverStorageChannel() },
+        )
+        assertEquals(
+            "every round without a conclusion waited; the last one had nothing left to wait for",
+            5,
+            pauses.size,
+        )
+    }
+
+    @Test
+    fun `a chat list still loading gives up as inconclusive and never as absent`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.LoadChats -> TdApi.Ok()
+                function is TdApi.SearchChatsOnServer -> chats()
+                function is TdApi.SearchChats -> chats()
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(
+            ChannelDiscovery.InProgress(ChannelDiscovery.Reason.ChatListLoading),
+            runBlocking { repository.discoverStorageChannel() },
+        )
+    }
+
+    @Test
+    fun `a loadChats failure that is not the end of the list is a cloud failure, not absence`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.LoadChats -> throw TelegramRequestException(code = 500, reason = "INTERNAL")
+                else -> chats()
+            }
+        }
+
+        val failure = runCatching { runBlocking { repository.discoverStorageChannel() } }.exceptionOrNull()
+        assertTrue(failure is CloudFailureException)
+        assertEquals(CloudFailure.Kind.RequestFailed, (failure as CloudFailureException).failure.kind)
+        assertEquals(500, failure.failure.statusCode)
+    }
+
+    @Test
+    fun `two valid channels resolve to the one holding the backups and neither is disturbed`() {
+        val emptySecond = 21L
+        val oldLibrary = 22L
+
+        client.answer = { function ->
+            when {
+                function is TdApi.SearchChatsOnServer -> chats(emptySecond, oldLibrary)
+                function is TdApi.SearchChats -> chats()
+                function is TdApi.LoadChats -> TdApi.Ok()
+                function is TdApi.GetSupergroup -> supergroupOwnedBy(TdApi.ChatMemberStatusCreator())
+                function is TdApi.GetSupergroupFullInfo -> markerInfo()
+
+                function is TdApi.GetChat -> chat(
+                    function.chatId,
+                    LumoVaultStorageProtocol.CHANNEL_TITLE,
+                    supergroupId = function.chatId,
+                )
+
+                // The older channel holds 412 messages; the one an errant build created holds none.
+                function is TdApi.GetChatHistory -> TdApi.Messages().apply {
+                    totalCount = if (function.chatId == oldLibrary) 412 else 0
+                    messages = emptyArray()
+                }
+
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(
+            ChannelDiscovery.Found(chatId = oldLibrary, alternates = 1),
+            runBlocking { repository.discoverStorageChannel() },
+        )
+        assertTrue(
+            "choosing between two channels never deletes or creates one",
+            client.sent.none { it is TdApi.CreateNewSupergroupChat || it is TdApi.DeleteChatHistory },
+        )
+    }
+
+    /** TDLib's answer to a chat search: the ids, in the order it found them. */
+    private fun chats(vararg ids: Long): TdApi.Chats {
+        val chats = TdApi.Chats()
+        chats.chatIds = ids
+        chats.totalCount = ids.size
+        return chats
+    }
+
+    /** A description carrying this build's marker, which is the cheapest way a channel proves itself. */
+    private fun markerInfo(version: Int = LumoVaultStorageProtocol.VERSION): TdApi.SupergroupFullInfo {
+        val info = TdApi.SupergroupFullInfo()
+        info.description = LumoVaultStorageProtocol.markerText(version = version)
+        return info
     }
 
     @Test

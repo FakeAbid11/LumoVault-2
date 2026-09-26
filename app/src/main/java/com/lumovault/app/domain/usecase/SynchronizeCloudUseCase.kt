@@ -1,6 +1,7 @@
 package com.lumovault.app.domain.usecase
 
 import com.lumovault.app.domain.repository.CloudIndexRepository
+import com.lumovault.app.domain.telegram.ChannelDiscovery
 import com.lumovault.app.domain.telegram.CloudAssociation
 import com.lumovault.app.domain.telegram.CloudChannelVerdict
 import com.lumovault.app.domain.telegram.CloudFailure
@@ -24,8 +25,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * Rules it exists to enforce:
  * - A saved chat id is never trusted blindly ([CloudIndexRepository.association] is validated, and a
  *   chat id belonging to a different Telegram account is dropped before anything is read).
- * - A channel is created only when no *valid* channel exists, so a second sign-in cannot produce a
- *   second storage channel.
+ * - A channel is created only when discovery has *concluded* that none exists. A lookup that came back
+ *   empty because TDLib is still loading its chat list — which is every cloud start-up after a reinstall,
+ *   until this rule existed — is not an answer, and building on it costs the user the channel holding every
+ *   photograph they backed up.
  * - A scan that resumes from a cursor does not prune, because it did not see the whole history.
  * - Progress is a count of indexed items, never a percentage invented from a page number.
  */
@@ -35,6 +38,15 @@ class SynchronizeCloudUseCase(
     private val isAuthenticated: () -> Boolean,
     private val nowSeconds: () -> Long,
     private val pageSize: Int = PAGE_SIZE,
+    /**
+     * Where the recovery decision goes, one event per line.
+     *
+     * A parameter rather than a call to `Log`, because this class is the domain and stays readable without
+     * an Android framework in it — the container wires it to the real log. What it is for is the question a
+     * support conversation cannot otherwise answer: was the saved channel reused, did discovery run, did it
+     * find the old channel, and was creation actually permitted. Chat ids only; never a title or a path.
+     */
+    private val recover: (String) -> Unit = { },
 ) {
     private val _state = MutableStateFlow<CloudInitState>(CloudInitState.Idle)
     val state: StateFlow<CloudInitState> = _state.asStateFlow()
@@ -77,29 +89,53 @@ class SynchronizeCloudUseCase(
 
         if (association == null) {
             _state.value = CloudInitState.SearchingChannel
-            val found = telegram.findStorageChannel()
-
-            association = when {
-                found != null -> CloudAssociation(
-                    chatId = found,
-                    ownerUserId = userId,
-                    protocolVersion = LumoVaultStorageProtocol.VERSION,
-                )
-
-                !createIfMissing -> {
-                    _state.value = CloudInitState.Failed(CloudFailure(CloudFailure.Kind.ChannelUnusable))
-                    return null
+            association = when (val discovery = telegram.discoverStorageChannel()) {
+                is ChannelDiscovery.Found -> {
+                    recover("CLOUD_CHANNEL_RECOVERED chat_id=${discovery.chatId}")
+                    if (discovery.alternates > 0) {
+                        // More than one channel passed every check. The decision below is deterministic and
+                        // nothing is deleted, so this is a fact worth having in a log rather than a fault.
+                        recover("CLOUD_CHANNEL_AMBIGUOUS alternates=${discovery.alternates}")
+                    }
+                    CloudAssociation(
+                        chatId = discovery.chatId,
+                        ownerUserId = userId,
+                        protocolVersion = LumoVaultStorageProtocol.VERSION,
+                    ).also { index.saveAssociation(it) }
                 }
 
-                else -> {
+                // The only branch creation can come from: discovery finished and answered.
+                ChannelDiscovery.Absent -> {
+                    if (!createIfMissing) {
+                        // A channel that used to be here was deleted, and PRD section 74 wants that said
+                        // rather than papered over with a fresh empty one.
+                        recover("CLOUD_CHANNEL_CREATION_DECLINED reason=caller_forbade_creation")
+                        _state.value = CloudInitState.Failed(CloudFailure(CloudFailure.Kind.ChannelUnusable))
+                        return null
+                    }
+
+                    recover("CLOUD_CHANNEL_CREATION_ALLOWED")
                     _state.value = CloudInitState.CreatingChannel
                     CloudAssociation(
                         chatId = telegram.createStorageChannel(),
                         ownerUserId = userId,
                         protocolVersion = LumoVaultStorageProtocol.VERSION,
-                    ).also { index.saveAssociation(it) }
+                    ).also {
+                        index.saveAssociation(it)
+                        recover("CLOUD_CHANNEL_CREATED chat_id=${it.chatId}")
+                    }
                 }
-            }
+
+                is ChannelDiscovery.InProgress -> {
+                    // Nothing was concluded, so nothing is built on top of the silence. Retryable, and the
+                    // reason it is not `Failed` is that nothing about the library is wrong yet.
+                    recover("CLOUD_CHANNEL_DISCOVERY_RETRY reason=${discovery.reason}")
+                    _state.value = CloudInitState.Offline
+                    null
+                }
+            } ?: return null
+        } else {
+            recover("CLOUD_CHANNEL_ASSOCIATION_FOUND chat_id=${association.chatId}")
         }
 
         scan(association)

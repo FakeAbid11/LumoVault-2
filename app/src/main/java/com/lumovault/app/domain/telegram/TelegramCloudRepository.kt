@@ -15,13 +15,18 @@ interface TelegramCloudRepository {
     suspend fun accountUserId(): Long
 
     /**
-     * The user's own chats matching [LumoVaultStorageProtocol.CHANNEL_TITLE], each verified before it
-     * is returned. Null when none is valid, which is what authorizes creation.
+     * The account's storage channel, or the conclusion that it has none.
      *
-     * Server-side channel search is deliberately not used: it looks up public channels on Telegram's
-     * internet, and this storage channel is private to the account.
+     * Deliberately not a nullable chat id, which is what this method used to return: `null` conflated "this
+     * account has no storage channel" with "TDLib has not told me about its chats yet", and the caller's
+     * answer to both was to create one. On a reinstall — where the TDLib database is as fresh as the Room
+     * file — that conflation cost people their whole cloud library, which stays in the original channel
+     * while the app browses an empty new one.
+     *
+     * A channel is still only adopted on evidence, never on a name: broadcast type, this account's
+     * ownership, and a supported marker.
      */
-    suspend fun findStorageChannel(): Long?
+    suspend fun discoverStorageChannel(): ChannelDiscovery
 
     suspend fun validateChannel(chatId: Long): CloudChannelVerdict
 

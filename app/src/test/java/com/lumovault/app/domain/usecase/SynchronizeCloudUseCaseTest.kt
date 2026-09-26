@@ -5,6 +5,9 @@ import com.lumovault.app.domain.model.CloudTypeCount
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.CloudIndexRepository
 import com.lumovault.app.domain.repository.RemoteBackup
+import com.lumovault.app.domain.telegram.ChannelDiscovery
+import com.lumovault.app.domain.telegram.CloudFailure
+import com.lumovault.app.domain.telegram.CloudFailureException
 import com.lumovault.app.domain.telegram.CloudAssociation
 import com.lumovault.app.domain.telegram.CloudChannelVerdict
 import com.lumovault.app.domain.telegram.CloudHistoryPage
@@ -53,16 +56,25 @@ class SynchronizeCloudUseCaseTest {
     inner class FakeTelegram(
         private val pages: List<List<Long>>,
         var userId: Long = 11L,
-        var existingChannel: Long? = CHAT_ID,
+        var discovery: ChannelDiscovery = ChannelDiscovery.Found(CHAT_ID),
         var verdict: CloudChannelVerdict = CloudChannelVerdict.Valid,
         var usable: Boolean = true,
+        /** Thrown instead of answering, for the cases where Telegram is the thing that failed. */
+        var discoveryFailure: Exception? = null,
     ) : TelegramCloudRepository {
         val requestedFrom = mutableListOf<Long>()
         var created = 0
+        var discoveries = 0
 
         override val isUsable: Boolean get() = usable
         override suspend fun accountUserId(): Long = userId
-        override suspend fun findStorageChannel(): Long? = existingChannel
+
+        override suspend fun discoverStorageChannel(): ChannelDiscovery {
+            discoveries += 1
+            discoveryFailure?.let { throw it }
+            return discovery
+        }
+
         override suspend fun validateChannel(chatId: Long): CloudChannelVerdict = verdict
 
         override suspend fun createStorageChannel(): Long {
@@ -202,7 +214,7 @@ class SynchronizeCloudUseCaseTest {
     fun invalidSavedChannelFallsBackToDiscoveryAndCreation() = runBlocking {
         val telegram = FakeTelegram(
             pages = listOf(listOf(1)),
-            existingChannel = null,
+            discovery = ChannelDiscovery.Absent,
             verdict = CloudChannelVerdict.NotFound,
         )
         val index = FakeIndex(
@@ -232,6 +244,192 @@ class SynchronizeCloudUseCaseTest {
         )
         assertNull(signedOut.synchronize())
         assertEquals(CloudInitState.WaitingForTelegram, signedOut.state.value)
-        assertTrue("no pages were requested from a session that is not ready", index.pagesWritten.isEmpty())
+        assertTrue("no pages were asked for by a session that is not ready", index.pagesWritten.isEmpty())
+    }
+
+    /**
+     * The reinstall path, which is the only way this flow can end with the user's library on screen or in
+     * the wrong channel.
+     *
+     * Every case below asserts on `created` first, because that is the number that cannot be wrong: an
+     * adoption that works and a creation that also happens leaves the account with two storage channels and
+     * the association pointing at the empty one, which no later sync repairs. The other half — that discovery
+     * can *refuse* to conclude — is what the tests that expect `InProgress` are for, since the bug this
+     * replaced was exactly that refusal being read as an answer.
+     */
+    @Test
+    fun aStillValidSavedAssociationIsUsedWithoutAskingTelegramToSearch() = runBlocking {
+        val telegram = FakeTelegram(
+            pages = listOf(listOf(1)),
+            discovery = ChannelDiscovery.Absent,
+        )
+        val index = FakeIndex(
+            initial = CloudAssociation(chatId = CHAT_ID, ownerUserId = 11L, protocolVersion = 1),
+        )
+        val events = mutableListOf<String>()
+        val usecase = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+            pageSize = 3,
+            recover = { events += it },
+        )
+
+        val adopted = usecase.synchronize()
+
+        assertEquals(CHAT_ID, adopted?.chatId)
+        assertEquals("a warm association is not a reason to search", 0, telegram.discoveries)
+        assertEquals(0, telegram.created)
+        assertTrue(events.contains("CLOUD_CHANNEL_ASSOCIATION_FOUND chat_id=$CHAT_ID"))
+    }
+
+    @Test
+    fun aReinstalledAccountAdoptsTheChannelItFindsAndBuildsItsIndexFromIt() = runBlocking {
+        // Nothing local: no association, no index. The account's channel and its messages are all there is.
+        val telegram = FakeTelegram(pages = listOf(listOf(9, 8, 7), listOf(6, 5, 4), listOf(3, 2, 1)))
+        val index = FakeIndex()
+        val events = mutableListOf<String>()
+        val usecase = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 1_000L },
+            pageSize = 3,
+            recover = { events += it },
+        )
+
+        val adopted = usecase.synchronize()
+
+        assertEquals(CHAT_ID, adopted?.chatId)
+        assertEquals(1, telegram.discoveries)
+        assertEquals("the old channel was found, so nothing was built", 0, telegram.created)
+        assertEquals(
+            "history is re-indexed from the channel, newest page first",
+            listOf(listOf(9L, 8L, 7L), listOf(6L, 5L, 4L), listOf(3L, 2L, 1L)),
+            index.pagesWritten,
+        )
+        assertEquals("and the adopted id is persisted before anything else can ask", CHAT_ID, index.saved?.chatId)
+        assertTrue(events.contains("CLOUD_CHANNEL_RECOVERED chat_id=$CHAT_ID"))
+        assertFalse("creation was never permitted", events.contains("CLOUD_CHANNEL_CREATION_ALLOWED"))
+    }
+
+    @Test
+    fun aFreshTdLibCacheThatHasNotFinishedLoadingDiscoversNothingAndCreatesNothing() = runBlocking {
+        val telegram = FakeTelegram(
+            pages = listOf(listOf(1)),
+            discovery = ChannelDiscovery.InProgress(ChannelDiscovery.Reason.ChatListLoading),
+        )
+        val index = FakeIndex()
+        val events = mutableListOf<String>()
+        val usecase = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+            recover = { events += it },
+        )
+
+        val adopted = usecase.synchronize()
+
+        assertNull("an inconclusive search is not a green light", adopted)
+        assertEquals(0, telegram.created)
+        assertTrue("nothing is indexed when there is no channel to index", index.pagesWritten.isEmpty())
+        assertEquals(CloudInitState.Offline, usecase.state.value)
+        assertTrue(events.any { it.startsWith("CLOUD_CHANNEL_DISCOVERY_RETRY") })
+    }
+
+    @Test
+    fun aTelegramFailureDuringDiscoveryIsRetriedAndNeverTreatedAsAbsence() = runBlocking {
+        val telegram = FakeTelegram(
+            pages = listOf(listOf(1)),
+            discoveryFailure = CloudFailureException(CloudFailure(CloudFailure.Kind.RateLimited, 420)),
+        )
+        val index = FakeIndex()
+        val usecase = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+        )
+
+        assertNull(usecase.synchronize())
+        assertEquals(0, telegram.created)
+        assertEquals(CloudInitState.Offline, usecase.state.value)
+    }
+
+    @Test
+    fun aSearchThatConcludedTheAccountHasNoChannelCreatesExactlyOne() = runBlocking {
+        val telegram = FakeTelegram(pages = listOf(listOf(1)), discovery = ChannelDiscovery.Absent)
+        val index = FakeIndex()
+        val events = mutableListOf<String>()
+
+        val adopted = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+            recover = { events += it },
+        ).synchronize()
+
+        assertEquals(1, telegram.created)
+        assertEquals(CHAT_ID, adopted?.chatId)
+        assertTrue(events.contains("CLOUD_CHANNEL_CREATION_ALLOWED"))
+        assertTrue(events.contains("CLOUD_CHANNEL_CREATED chat_id=$CHAT_ID"))
+    }
+
+    @Test
+    fun recoveryRepeatedAfterARestartKeepsUsingTheSameChannel() = runBlocking {
+        val telegram = FakeTelegram(pages = listOf(listOf(1)))
+        val index = FakeIndex()
+        val usecase = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+        )
+
+        val first = usecase.synchronize()
+        val second = usecase.synchronize()
+
+        assertEquals(first?.chatId, second?.chatId)
+        assertEquals("a second pass over the same account builds nothing", 0, telegram.created)
+    }
+
+    @Test
+    fun aCallerThatForbiddenCreationIsToldTheChannelIsGoneRatherThanGivenANewOne() = runBlocking {
+        val telegram = FakeTelegram(pages = listOf(listOf(1)), discovery = ChannelDiscovery.Absent)
+        val index = FakeIndex()
+
+        val adopted = SynchronizeCloudUseCase(
+            telegram = telegram,
+            index = index,
+            isAuthenticated = { true },
+            nowSeconds = { 5L },
+        ).synchronize(createIfMissing = false)
+
+        assertNull(adopted)
+        assertEquals(0, telegram.created)
+    }
+
+    @Test
+    fun aCancelledDiscoveryCreatesNothingOnTheWayOut() = runBlocking {
+        val telegram = FakeTelegram(
+            pages = listOf(listOf(1)),
+            discoveryFailure = kotlinx.coroutines.CancellationException("user left the screen"),
+        )
+        val index = FakeIndex()
+
+        val thrown = runCatching {
+            SynchronizeCloudUseCase(
+                telegram = telegram,
+                index = index,
+                isAuthenticated = { true },
+                nowSeconds = { 5L },
+            ).synchronize()
+        }.exceptionOrNull()
+
+        assertTrue("cancellation must not be swallowed into a state", thrown is kotlinx.coroutines.CancellationException)
+        assertEquals("and it must not leave a channel behind", 0, telegram.created)
     }
 }

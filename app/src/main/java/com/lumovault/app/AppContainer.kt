@@ -284,6 +284,9 @@ class AppContainer(context: Context) {
                 telegramAuthRepository.state.value is TelegramAuthState.Authenticated
             },
             nowSeconds = ::unixNow,
+            // Which recovery decision was taken is the one thing a reinstall report needs and no screen
+            // shows, so it goes to logcat: events and chat ids, never a title or a path.
+            recover = { event -> android.util.Log.i("LumoVaultCloudRecovery", event) },
         )
     }
 
