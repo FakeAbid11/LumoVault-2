@@ -12,12 +12,14 @@ import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.repository.SettingsRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
 import kotlinx.coroutines.flow.map
@@ -131,8 +133,12 @@ private fun diagnosticsFlow(container: com.lumovault.app.AppContainer): Flow<Bac
                 else -> TelegramWord.WaitingForSignIn
             },
             channelAvailable = container.cloudIndexRepository.association() != null,
-            databaseVersion = container.databaseVersion,
-            stagingSpaceFreeBytes = container.backupFreeSpaceBytes(),
+            // This transform runs wherever the flow is collected — the hub's viewModelScope, i.e. Main —
+            // and these two are not Room-scheduled queries: reading the version opens the database file
+            // and reading the free space stats the filesystem. Both go to the IO dispatcher, or every
+            // health/preference/auth emission pays for them synchronously on the UI thread.
+            databaseVersion = withContext(Dispatchers.IO) { container.databaseVersion },
+            stagingSpaceFreeBytes = withContext(Dispatchers.IO) { container.backupFreeSpaceBytes() },
         )
     }
 
