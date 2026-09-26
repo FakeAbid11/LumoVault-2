@@ -16,7 +16,10 @@
     <string name="photos_permission_body">LumoVault needs access to your photos and videos to show your library.</string>
     <string name="photos_permission_action">Allow access</string>
     <string name="photos_scanning_title">Scanning your library</string>
-    <string name="photos_scanning_progress">%1$d items found</string>
+    <plurals name="photos_scanning_progress">
+        <item quantity="one">%1$d item found</item>
+        <item quantity="other">%1$d items found</item>
+    </plurals>
     <string name="photos_error_title">Couldn\'t load your library</string>
     <string name="photos_error_body">Something went wrong while reading your device media.</string>
     <string name="photos_limited_access_notice">Only the photos you selected are shown.</string>
@@ -143,7 +146,6 @@
     <string name="source_none">Not now</string>
     <string name="source_none_detail">You can choose later in Settings.</string>
     <string name="source_action">Continue</string>
-    <string name="source_selected_count">%1$d folders selected</string>
 
     <string name="folders_title">Select folders</string>
     <string name="folders_empty_title">No folders to list yet</string>
@@ -166,7 +168,10 @@
     <string name="country_search_label">Search country</string>
     <string name="country_search_clear">Clear search</string>
     <string name="country_no_results">No country matches that search.</string>
-    <string name="country_result_count">%1$d countries</string>
+    <plurals name="country_result_count">
+        <item quantity="one">%1$d country</item>
+        <item quantity="other">%1$d countries</item>
+    </plurals>
     <!-- Cloud library (PRD sections 24-26). The copy never claims a sync happened, and never says
          "no photos" for a library that is merely not indexed yet. -->
     <string name="cloud_not_available_title">Telegram isn\'t available in this build</string>
@@ -183,7 +188,7 @@
     <string name="cloud_empty_body">Photos and videos you back up to LumoVault will appear here.</string>
     <string name="cloud_error_title">Couldn\'t load your cloud</string>
     <string name="cloud_error_body">Something went wrong while reaching Telegram. Your device photos are unaffected.</string>
-    <string name="cloud_offline_notice">You\'re offline. Showing your last synced cloud library.</string>
+    <string name="cloud_offline_notice">You\'re offline. Showing the cloud library this device already has.</string>
     <string name="cloud_refreshing_notice">Checking for new items…</string>
     <string name="cloud_badge_on_device">On this device</string>
     <string name="cloud_badge_cloud_only">In cloud</string>
@@ -198,10 +203,6 @@
         <item quantity="one">%1$d item found</item>
         <item quantity="other">%1$d items found</item>
     </plurals>
-    <plurals name="cloud_items_count">
-        <item quantity="one">%1$d item</item>
-        <item quantity="other">%1$d items</item>
-    </plurals>
 
     <!-- Phase 5: backup. The notification and the in-app progress line read from the same queue
          counts, so the two can never tell the user different stories about the same upload. -->
@@ -210,10 +211,8 @@
     <string name="backup_progress_title">Backing up</string>
     <string name="backup_progress_count">%1$d of %2$d</string>
     <string name="backup_progress_percent">%1$d%%</string>
-    <string name="backup_progress_count_and_percent">%1$d of %2$d · %3$d%%</string>
     <string name="backup_preparing">Preparing…</string>
-    <string name="backup_uploading">Uploading %1$s</string>
-    <string name="backup_action">Back Up</string>
+    <string name="backup_action">Back up</string>
     <string name="backup_selected_count">%1$d selected</string>
     <string name="backup_cell_selected">Selected</string>
     <string name="backup_selection_clear">Clear</string>
@@ -225,26 +224,10 @@
     <string name="backup_state_uploading">Uploading</string>
     <string name="backup_state_queued">Queued</string>
     <string name="backup_state_failed">Failed</string>
-    <string name="backup_done_title">Backup finished</string>
-    <string name="backup_error_no_channel">Set up your Telegram storage channel first.</string>
-    <string name="backup_error_unavailable">Telegram is not available in this build.</string>
-    <string name="backup_error_offline">Waiting for a connection.</string>
     <plurals name="backup_failed_count">
         <item quantity="one">%1$d item couldn\'t be backed up</item>
         <item quantity="other">%1$d items couldn\'t be backed up</item>
     </plurals>
-
-    <!-- Each one names what the user can act on, and none of them repeats a TDLib error: a raw
-         reason can quote a file name or a chat, and it is kept out of everything a user reads. -->
-    <string name="backup_failure_source_missing">This file is no longer on the device.</string>
-    <string name="backup_failure_source_unreadable">This file could not be read.</string>
-    <string name="backup_failure_insufficient_space">Not enough free space to prepare this file.</string>
-    <string name="backup_failure_channel_unavailable">The backup channel is unavailable.</string>
-    <string name="backup_failure_not_authenticated">Sign in to Telegram to continue.</string>
-    <string name="backup_failure_network">Telegram connection was interrupted.</string>
-    <string name="backup_failure_rate_limited">Telegram asked to pause. It will retry shortly.</string>
-    <string name="backup_failure_rejected">Telegram refused this file.</string>
-    <string name="backup_failure_unknown">Backup couldn\'t finish.</string>
 
     <!--
         Phase 8: the viewer. The details rows are labels only, because a value the file does not hold is not
@@ -256,10 +239,9 @@
     <string name="viewer_info">About this file</string>
     <string name="viewer_details_title">File information</string>
     <string name="viewer_gone_title">This item is no longer here</string>
-    <string name="viewer_gone_body">The photo or video was removed from this device. Your backups are unaffected.</string>
+    <string name="viewer_gone_body">This photo or video is no longer part of the list it came from — it may have been deleted, or removed from this album.</string>
     <string name="viewer_gone_body_empty">This album is empty now. The photos themselves are untouched.</string>
     <string name="viewer_image_unreadable">This file couldn\'t be displayed.</string>
-    <string name="viewer_video_unavailable">This device can\'t play this clip. Your backup of it is unaffected.</string>
     <string name="viewer_video_failed_title">Can\'t play this video</string>
     <string name="viewer_video_failed_body">The file may be in a format this phone cannot decode, or it may no longer be where the library remembers it. Your backup and the rest of the album are unaffected.</string>
     <string name="viewer_play">Play</string>
@@ -341,7 +323,7 @@
     <string name="album_system_screenshots">Screenshots</string>
     <string name="album_system_downloads">Downloads</string>
     <string name="album_system_videos">Videos</string>
-    <string name="album_system_favorites">Favorites</string>
+    <string name="album_system_favorites">Favourites</string>
     <string name="album_system_archive">Archive</string>
     <string name="album_system_trash">Trash</string>
     <string name="album_system_recently_added">Recently Added</string>
@@ -400,10 +382,6 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
-    <plurals name="organization_moved_count">
-        <item quantity="one">%1$d item moved</item>
-        <item quantity="other">%1$d items moved</item>
-    </plurals>
 
 
     <!-- Phase 9: restore, free up space, automatic backup, health and diagnostics. No apostrophes: AAPT2
@@ -438,7 +416,10 @@
         <item quantity="other">%d folders selected</item>
     </plurals>
 
-    <string name="health_all_backed_up">%1$s items backed up. Nothing is waiting.</string>
+    <plurals name="health_all_backed_up">
+        <item quantity="one">%1$d item backed up. Nothing is waiting.</item>
+        <item quantity="other">%1$d items backed up. Nothing is waiting.</item>
+    </plurals>
     <string name="health_backed_up">%1$s of %2$s backed up</string>
     <string name="health_waiting">%1$s waiting</string>
     <string name="health_failed">%1$s failed</string>
@@ -449,7 +430,10 @@
     <string name="health_never">not yet</string>
     <string name="health_view_issues">View details</string>
     <string name="health_title">Backup health</string>
-    <string name="health_reclaimable">%1$s items, about %2$s, can be freed from this device.</string>
+    <plurals name="health_reclaimable">
+        <item quantity="one">%1$d item, about %2$s, can be freed from this device.</item>
+        <item quantity="other">%1$d items, about %2$s, can be freed from this device.</item>
+    </plurals>
     <string name="health_no_scan">Backup has not scanned this library yet.</string>
     <string name="health_no_backup">Backup has not finished an item yet.</string>
     <string name="action_back">Back</string>
@@ -487,7 +471,10 @@
 
     <string name="free_space_title">Free up space</string>
     <string name="free_space_entry_note">Remove local copies that are proven to be stored in your channel.</string>
-    <string name="free_space_header">%1$s can be freed. %2$s photos and videos are safely backed up.</string>
+    <plurals name="free_space_header">
+        <item quantity="one">%1$s can be freed. %2$d photo or video is safely backed up.</item>
+        <item quantity="other">%1$s can be freed. %2$d photos and videos are safely backed up.</item>
+    </plurals>
     <string name="free_space_none">No safely backed-up items are ready to remove.</string>
     <string name="free_space_remains">Your cloud copies stay in LumoVault, and anything removed here can be downloaded again.</string>
     <string name="free_space_selected">%1$s selected · %2$s</string>
@@ -497,11 +484,17 @@
     <string name="free_space_select_all">Select all</string>
     <string name="free_space_clear_selection">Clear</string>
     <string name="free_space_confirm_title">Remove these from this device?</string>
-    <string name="free_space_confirm_body">%1$s items, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</string>
+    <plurals name="free_space_confirm_body">
+        <item quantity="one">%1$d item, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</item>
+        <item quantity="other">%1$d items, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</item>
+    </plurals>
     <string name="free_space_confirm_action">Ask Android</string>
-    <string name="free_space_done">Removed %1$s items and freed about %2$s.</string>
+    <plurals name="free_space_done">
+        <item quantity="one">Removed %1$d item and freed about %2$s.</item>
+        <item quantity="other">Removed %1$d items and freed about %2$s.</item>
+    </plurals>
     <string name="free_space_nothing_left">Nothing was removed. These items changed before the deletion could happen.</string>
-    <string name="free_space_declined">Cancelled. Nothing was removed.</string>
+    <string name="free_space_declined">Dismissed. Nothing was removed.</string>
     <string name="free_space_unavailable">This Android version will not let LumoVault ask. Remove them with the photos app on this device.</string>
     <string name="free_space_failed">Android did not allow the deletion. Nothing was removed.</string>
     <string name="action_dismiss">Dismiss</string>

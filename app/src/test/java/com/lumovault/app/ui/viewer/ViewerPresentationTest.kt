@@ -69,9 +69,10 @@ class ViewerPresentationTest {
 
     @Test
     fun retiringAnItemKeepsThePagerInItsSlot() {
-        // The window after archive/trash hides one item: the neighbour now standing at the same index is
-        // what the viewer keeps page on, because the pager never moved.
-        assertEquals(9L, ViewerPresentation.survivorAfterRetirement(listOf(7L, 8L, 9L), retiredIndex = 1))
+        // The window after archive/trash hides one item: the id now standing at the retired index is
+        // what the viewer keeps page on, because the pager never moved. The list passed in is the one
+        // WITHOUT the retired item — `[7, 9]` after 8 was trashed — so the survivor of index 1 is 9.
+        assertEquals(9L, ViewerPresentation.survivorAfterRetirement(listOf(7L, 9L), retiredIndex = 1))
         assertEquals(
             "retiring the last item of the window moves the boundary up by one — clamp to the new last",
             8L,

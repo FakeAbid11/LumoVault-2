@@ -548,7 +548,7 @@ private fun Scanning(found: Int) {
             style = LumoVaultType.sectionHeader,
         )
         Text(
-            text = stringResource(R.string.photos_scanning_progress, found),
+            text = pluralStringResource(R.plurals.photos_scanning_progress, found, found),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

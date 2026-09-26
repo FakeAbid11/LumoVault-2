@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -69,7 +70,7 @@ fun BackupSourceScreen(
                 onOpenFolders()
             },
             supporting = if (selected == BackupSource.SelectedFolders && selectedFolderCount > 0) {
-                stringResource(R.string.source_selected_count, selectedFolderCount)
+                pluralStringResource(R.plurals.backup_folders_selected, selectedFolderCount, selectedFolderCount)
             } else {
                 null
             },

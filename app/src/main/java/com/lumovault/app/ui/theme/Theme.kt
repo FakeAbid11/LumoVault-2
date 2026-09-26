@@ -19,8 +19,12 @@ private val LumoVaultDarkColors = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
-    error = ErrorRed,
-    onError = OnErrorRed,
+    error = DarkError,
+    onError = DarkOnError,
+    errorContainer = DarkErrorContainer,
+    onErrorContainer = DarkOnErrorContainer,
+    inverseSurface = DarkInverseSurface,
+    inverseOnSurface = DarkOnInverseSurface,
 )
 
 private val LumoVaultLightColors = lightColorScheme(
@@ -37,6 +41,10 @@ private val LumoVaultLightColors = lightColorScheme(
     outline = LightOutline,
     error = ErrorRed,
     onError = OnErrorRed,
+    errorContainer = LightErrorContainer,
+    onErrorContainer = LightOnErrorContainer,
+    inverseSurface = LightInverseSurface,
+    inverseOnSurface = LightOnInverseSurface,
 )
 
 /**

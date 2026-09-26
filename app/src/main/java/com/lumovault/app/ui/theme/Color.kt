@@ -12,7 +12,7 @@ internal val DarkPrimary = Color(0xFF4C8DFF)
 internal val DarkOnPrimary = Color(0xFF001429)
 internal val DarkPrimaryContainer = Color(0xFF1B3A67)
 internal val DarkOnPrimaryContainer = Color(0xFFCFE0FF)
-internal val DarkOutline = Color(0xFF43526B)
+internal val DarkOutline = Color(0xFF6E7F9E)
 
 // Light scheme: white + light blue surfaces, the same blue accent family.
 internal val LightBackground = Color(0xFFFFFFFF)
@@ -24,7 +24,7 @@ internal val LightPrimary = Color(0xFF0F5FD8)
 internal val LightOnPrimary = Color(0xFFFFFFFF)
 internal val LightPrimaryContainer = Color(0xFFD3E3FF)
 internal val LightOnPrimaryContainer = Color(0xFF00296B)
-internal val LightOutline = Color(0xFF7E8CA3)
+internal val LightOutline = Color(0xFF66748C)
 
 // Drawn on top of a photograph, so these cannot come from the colour scheme: a surface colour chosen for a
 // dark or light app background is the wrong value for a badge over whatever the user's picture happens to be.
@@ -56,3 +56,29 @@ internal val BackedUpAccent = Color(0xFF7DE3A0)
 
 internal val ErrorRed = Color(0xFFB3261E)
 internal val OnErrorRed = Color(0xFFFFFFFF)
+internal val LightErrorContainer = Color(0xFFF9DEDC)
+internal val LightOnErrorContainer = Color(0xFF410E02)
+
+/**
+ * The error colours for the dark scheme, which is this app's default.
+ *
+ * A light-scheme red — the M3 baseline's own warning — sits at under 3:1 on these near-black surfaces,
+ * so the one message type that must not be missed was the one hardest to read. The dark scheme therefore
+ * inverts the role: a pale red statement on a deep-red container.
+ */
+internal val DarkError = Color(0xFFF2B8B5)
+internal val DarkOnError = Color(0xFF681A14)
+internal val DarkErrorContainer = Color(0xFF8C1D18)
+internal val DarkOnErrorContainer = Color(0xFFF9DEDC)
+
+/**
+ * The floating-label chip (the date rail's month pill) in each scheme.
+ *
+ * Left unset, Material 3 answers with its baseline purple-grey — an off-brand slab that, in the dark
+ * scheme, was almost white over the user's own photographs. These match the badge family the rest of
+ * the media surfaces use: a dark blue-tinted chip with the scheme's own text colour on it.
+ */
+internal val DarkInverseSurface = Color(0xFF2A3140)
+internal val DarkOnInverseSurface = Color(0xFFE6EDF8)
+internal val LightInverseSurface = Color(0xFF253A57)
+internal val LightOnInverseSurface = Color(0xFFEDF2FB)

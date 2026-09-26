@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Only the pre-Compose window surface. Compose owns every colour the UI actually reads;
-    this exists so the launch frame is already the right tone instead of flashing white.
+    this exists so the launch frame is already the right tone instead of flashing the wrong one.
+
+    Dark here because Dark is the app's default appearance (PRD section 44, ThemeMode.Default) —
+    a white first frame against a blue-black app is exactly the flash this file exists to prevent.
+    A user who *chose* Light sees one dark frame on launch: the chosen theme lives in Room and is
+    not readable before the first frame is drawn, and the flash of the majority default is the
+    smaller wrong. values-night keeps the system-dark case aligned.
 -->
 <resources>
-    <style name="Theme.LumoVault" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FFFFFFFF</item>
+    <style name="Theme.LumoVault" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF05070D</item>
     </style>
 </resources>

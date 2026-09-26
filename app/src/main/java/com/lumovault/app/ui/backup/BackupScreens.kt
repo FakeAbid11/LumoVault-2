@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -207,7 +208,7 @@ private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
         ) {
             Text(
                 text = if (health.allLocalMediaBackedUp) {
-                    stringResource(R.string.health_all_backed_up, health.backedUp.toString())
+                    pluralStringResource(R.plurals.health_all_backed_up, health.backedUp, health.backedUp)
                 } else {
                     stringResource(R.string.health_backed_up, health.backedUp.toString(), health.localTotal.toString())
                 },
@@ -300,9 +301,10 @@ fun BackupHealthScreen(
             HealthSummary(health = health, onOpenDetails = onOpenDiagnostics)
             if (health.reclaimableCount > 0) {
                 Text(
-                    text = stringResource(
-                        R.string.health_reclaimable,
-                        health.reclaimableCount.toString(),
+                    text = pluralStringResource(
+                        R.plurals.health_reclaimable,
+                        health.reclaimableCount,
+                        health.reclaimableCount,
                         health.reclaimableBytes.toByteText(),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
@@ -465,7 +467,12 @@ fun FreeUpSpaceScreen(
     val outcomeText = when (val outcome = state.outcome) {
         DeletionOutcome.None, DeletionOutcome.Asked -> null
         is DeletionOutcome.Removed ->
-            stringResource(R.string.free_space_done, outcome.deleted.toString(), outcome.reclaimedBytes.toByteText())
+            pluralStringResource(
+                R.plurals.free_space_done,
+                outcome.deleted,
+                outcome.deleted,
+                outcome.reclaimedBytes.toByteText(),
+            )
         DeletionOutcome.NothingLeft -> stringResource(R.string.free_space_nothing_left)
         DeletionOutcome.Declined -> stringResource(R.string.free_space_declined)
         DeletionOutcome.Unavailable -> stringResource(R.string.free_space_unavailable)
@@ -550,10 +557,11 @@ fun FreeUpSpaceScreen(
                 Text(
                     text = when {
                         state.nothingEligible -> stringResource(R.string.free_space_none)
-                        else -> stringResource(
-                            R.string.free_space_header,
+                        else -> pluralStringResource(
+                            R.plurals.free_space_header,
+                            state.plan.eligibleCount,
                             state.plan.reclaimableBytes.toByteText(),
-                            state.plan.eligibleCount.toString(),
+                            state.plan.eligibleCount,
                         )
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -629,9 +637,10 @@ fun FreeUpSpaceScreen(
             title = { Text(stringResource(R.string.free_space_confirm_title)) },
             text = {
                 Text(
-                    stringResource(
-                        R.string.free_space_confirm_body,
-                        state.selected.size.toString(),
+                    pluralStringResource(
+                        R.plurals.free_space_confirm_body,
+                        state.selected.size,
+                        state.selected.size,
                         state.selectedBytes.toByteText(),
                     ),
                 )
