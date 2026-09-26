@@ -60,6 +60,6 @@ internal val SpaceLg = 16.dp
 internal val SpaceXl = 24.dp
 internal val ScreenEdge = 12.dp
 
-/** Touch targets, because a control under a thumb has to be found before it can be pressed. */
-internal val MinTouchTarget = 44.dp
+/** Touch targets, because a control under a thumb has to be found before it can be pressed. 48dp is the Android guideline floor. */
+internal val MinTouchTarget = 48.dp
 internal val IconButtonSize = 40.dp

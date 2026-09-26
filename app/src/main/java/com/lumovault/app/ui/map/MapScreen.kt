@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -425,6 +424,16 @@ private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel, 
         val marker = Marker(map)
         marker.position = GeoPoint(pin.latitude, pin.longitude)
         marker.relatedObject = pin
+        // A marker with no title announces nothing to the info window or to an accessibility service —
+        // the whole map is silent to TalkBack without it. The count is the same words the preview panel
+        // uses (`map_cluster_photos`), so a pin and the panel agree about the same spot, and a lone photo
+        // reads as "1 photo here" through the same plural. No file name or date: a pin's label is not
+        // the place to broadcast somebody's metadata to whatever service is listening.
+        marker.title = map.context.resources.getQuantityString(
+            R.plurals.map_cluster_photos,
+            pin.count,
+            pin.count,
+        )
         // Set before `setTextIcon`, which reads them as it builds the bitmap.
         marker.setTextLabelBackgroundColor(style.chipBackground)
         marker.setTextLabelForegroundColor(style.chipText)
