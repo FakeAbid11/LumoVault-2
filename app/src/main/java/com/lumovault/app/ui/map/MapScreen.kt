@@ -59,9 +59,9 @@ import com.lumovault.app.domain.map.MapPin
 import com.lumovault.app.domain.model.MapPhoto
 import java.text.DateFormat
 import java.util.Date
-import kotlin.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent

@@ -137,6 +137,10 @@ Rules that have already caused a mistake here:
 - **Delete the whole expression, not just the clause.** Removing a `catch` from `val x = try { … } catch …`
   leaves a bare `try`, which is a Kotlin syntax error, not a style one; and moving a top-level function to
   another file leaves every previous same-package call site needing an `import`. Both were CI's to find.
+  The same trap has a spelling flavour: `suspendCancellableCoroutine` is `kotlinx.coroutines`, while the
+  `resume` extension on its continuation is `kotlin.coroutines`. Neither package is wrong-looking, so only
+  the compiler says so — and it says so as five cascading errors whose first is "cannot infer type for value
+  parameter", which reads like a body problem and is an import problem.
 - **A claim that names an API is a claim to check.** Phase 10's audits asked for `MapView.destroy()` — which
   osmdroid 6.1.20 does not have (`onPause`, `onResume`, `onDetach`, `setDestroyMode` are the whole surface,
   read from the artifact's sources jar) — and for `combining(Iterable<Flow<T>>)`, which kotlinx-coroutines
