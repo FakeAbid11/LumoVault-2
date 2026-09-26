@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,17 +93,26 @@ fun VideoStage(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val session = remember(contentUri) { VideoSession() }
+
+    /**
+     * Bumped the moment a page that has already released its player becomes the visible one again.
+     *
+     * [VideoPlayerState.Released] is terminal — a `MediaPlayer` cannot be taken back from it — so without a
+     * fresh session here, swiping away from a clip and back would leave a page that shows a spinner forever
+     * and never opens anything. One swipe, one player, and a new one for the next visit.
+     */
+    var attempt by remember(contentUri) { mutableIntStateOf(0) }
+    val session = remember(contentUri, attempt) { VideoSession() }
     val machine = session.playback
 
     // The mirror of the machine's state, so a transition recomposes the screen. Every write below goes
     // through the machine first, which is what makes the UI unable to claim a state the player does not
     // have.
-    var state by remember(contentUri) { mutableStateOf(VideoPlayerState.Idle) }
-    var durationMs by remember(contentUri) { mutableLongStateOf(0L) }
-    var positionMs by remember(contentUri) { mutableLongStateOf(0L) }
-    var scrubbingTo by remember(contentUri) { mutableLongStateOf(NO_SCRUB) }
-    var surface by remember(contentUri) { mutableStateOf<SurfaceHolder?>(null) }
+    var state by remember(contentUri, attempt) { mutableStateOf(VideoPlayerState.Idle) }
+    var durationMs by remember(contentUri, attempt) { mutableLongStateOf(0L) }
+    var positionMs by remember(contentUri, attempt) { mutableLongStateOf(0L) }
+    var scrubbingTo by remember(contentUri, attempt) { mutableLongStateOf(NO_SCRUB) }
+    var surface by remember(contentUri, attempt) { mutableStateOf<SurfaceHolder?>(null) }
 
     // The one way state reaches the screen: ask the machine, then draw what it says. A refused transition
     // still has to be drawn, or the transport keeps offering a control the player will reject.
@@ -138,10 +148,14 @@ fun VideoStage(
     // Decoding starts when the page becomes the visible one, and ends when it stops being visible: the pager
     // composes its neighbours, and a neighbour that prepares a clip holds a hardware decoder for a video the
     // user may never reach.
-    LaunchedEffect(isActive, contentUri) {
+    LaunchedEffect(isActive, contentUri, attempt) {
         if (!isActive) {
             if (machine.shouldRelease()) sync()
             destroyPlayer()
+            return@LaunchedEffect
+        }
+        if (machine.state == VideoPlayerState.Released) {
+            attempt += 1
             return@LaunchedEffect
         }
         if (machine.state != VideoPlayerState.Idle) return@LaunchedEffect

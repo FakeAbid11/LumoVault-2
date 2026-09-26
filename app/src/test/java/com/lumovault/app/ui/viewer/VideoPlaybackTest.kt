@@ -141,29 +141,35 @@ class VideoPlaybackTest {
         assertFalse(playback.canReadPosition())
     }
 
+    /**
+     * A `MediaPlayer` can deliver one more event after it has been released, and the crash is not the stale
+     * write to Compose state — it is the `duration` call inside that listener, on a thread where nothing
+     * catches. So the page's machine must refuse its own late callbacks, and a page that comes back is a new
+     * machine rather than the old one being talked out of being dead.
+     */
     @Test
-    fun aCallbackFromAReplacedPlayerCannotTouchTheNewOne() {
-        val first = VideoPlayback()
-        val stale = requireNotNull(first.open())
-        assertTrue(first.onPrepareStarted(stale))
-        assertTrue(first.shouldRelease())
+    fun aLateCallbackFromAReleasedPlayerIsRefusedRatherThanRun() {
+        val playback = VideoPlayback()
+        val token = requireNotNull(playback.open())
+        assertTrue(playback.onPrepareStarted(token))
 
-        val second = VideoPlayback()
-        val current = requireNotNull(second.open())
+        assertTrue(playback.shouldRelease())
+        assertFalse("the player that owns this token is gone", playback.isCurrent(token))
+        assertFalse(playback.onPrepared(token, 5_000L))
+        assertFalse(playback.onPlayerError(token))
+        assertFalse(playback.onPreparationFailed(token))
+        assertFalse(playback.onSurfaceCreated())
+        assertFalse(playback.onSurfaceDestroyed())
+        assertEquals("nothing a late callback says can rewrite a released page",
+            VideoPlayerState.Released, playback.state)
+        assertNull("and no duration is learned after the fact", playback.durationMs.takeIf { it > 0L })
 
-        assertFalse("the token does not match", second.isCurrent(stale))
-        assertFalse(second.onPrepared(stale, 5_000L))
-        assertFalse(second.onPlayerError(stale))
-        assertFalse(second.onPreparationFailed(stale))
-        assertEquals(
-            "a late prepared-callback must not make a page that is opening look ready",
-            VideoPlayerState.Opening,
-            second.state,
-        )
-        assertNull(second.durationMs.takeIf { it > 0L })
-
-        assertTrue(second.onPrepared(current, 5_000L))
-        assertEquals(VideoPlayerState.Ready, second.state)
+        val next = VideoPlayback()
+        val fresh = requireNotNull(next.open())
+        assertTrue(next.onPrepared(fresh, 5_000L).not())
+        assertTrue(next.onPrepareStarted(fresh))
+        assertTrue(next.onPrepared(fresh, 5_000L))
+        assertEquals(VideoPlayerState.Ready, next.state)
     }
 
     @Test
@@ -248,5 +254,9 @@ class VideoPlaybackTest {
         assertEquals(VideoPlayerState.Paused, playback.state)
         assertEquals("the bar lands at the end of the clip", 9_000L, playback.positionMs)
         assertFalse("and the playhead is no longer polled", playback.canReadPosition())
+
+        playback.onSeek(2_500L)
+        assertEquals("scrubbing back into it starts the playhead again", 2_500L, playback.positionMs)
+        assertTrue(playback.canReadPosition())
     }
 }

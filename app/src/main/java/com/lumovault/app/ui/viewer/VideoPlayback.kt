@@ -183,14 +183,29 @@ class VideoPlayback {
     }
 
     fun onSeek(targetMillis: Long) {
-        positionMs = seekTarget(targetMillis) ?: positionMs
+        val allowed = seekTarget(targetMillis) ?: return
+        positionMs = allowed
+        // Dragging the bar back into the clip is a request to watch it again, so the playhead starts
+        // being read again with it.
+        finished = false
     }
 
     var positionMs: Long = 0L
         private set
 
-    /** The playhead may only be read while the player is answering. */
-    fun canReadPosition(): Boolean = state == VideoPlayerState.Playing || state == VideoPlayerState.Paused
+    /**
+     * The clip ran to its end.
+     *
+     * Tracked separately because a finished clip sits in the same state as a paused one and would otherwise
+     * go on being polled ten times a second forever: the playhead is already where the clip ends, there is
+     * nothing left to read, and a page behind the finger should not be reading a player at all.
+     */
+    var finished: Boolean = false
+        private set
+
+    /** The playhead may only be read while the player is answering, and has somewhere left to go. */
+    fun canReadPosition(): Boolean = !finished &&
+        (state == VideoPlayerState.Playing || state == VideoPlayerState.Paused)
 
     fun canReadDuration(): Boolean = state == VideoPlayerState.Preparing ||
         state == VideoPlayerState.Ready ||
@@ -201,6 +216,7 @@ class VideoPlayback {
         if (state == VideoPlayerState.Playing) {
             state = VideoPlayerState.Paused
             positionMs = durationMs
+            finished = true
         }
     }
 
