@@ -78,6 +78,16 @@ height into an index on the `LazyGridState` that was already there, and the arit
 `domain/model/TimelineRail.kt` where the tests can reach it. Swiping between pages, panning a zoomed photo and
 dragging the rail on a phone are **not** verified.
 
+**UI polish pass:** complete and CI-verified (runs
+[36239261313](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36239261313) — red, one wrong
+`Alignment` argument — and
+[36239792693](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36239792693), 514 unit tests, 0 failed,
+then [36240333864](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36240333864) for the last three
+screens; debug APK built with both TDLib ABIs packaged). Screens only: no ViewModel, repository, schema,
+navigation or backup behaviour was touched. What moved, and why, is in
+[A shared visual language, and what it fixed](#a-shared-visual-language-and-what-it-fixed). Nothing about this
+pass is verified on a phone — it changed exactly the things a JVM test cannot see.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
@@ -704,6 +714,70 @@ behind an offscreen page is still Coil — no GIF or photo code was touched, and
 whether the aspect ratio looks right on a given screen, and whether a hardware decoder that misbehaves on one
 phone behaves better here than `MediaPlayer` did are all questions a phone has to answer. What is covered by
 tests is the state machine, the controller's rules about when a player may be touched, and the error mapping.
+
+## A shared visual language, and what it fixed
+
+Seven screens were reviewed against the goal in PRD section 44 — the photographs are the interface — and the
+changes are worth recording because most of them were not taste. One number or one missing scrim was doing
+something visibly wrong.
+
+- **One scale, in `ui/theme`.** `SpaceXs/Sm/Md/Lg/Xl`, `ScreenEdge`, `GroupCardCorner`, the badge sizes, and
+  three text roles (`sectionHeader`, `sectionDetail`, `itemTitle`). Before this, a day header was
+  `titleMedium` (16 sp regular) on the timeline and 15 sp on the album grid, and every screen padded with a
+  number it had chosen for itself. Screens still never name a colour — `Type.kt` carries no colours at all, so
+  a heading keeps its scheme role.
+- **The grid was half the size it could have been.** `GridCells.Adaptive(110.dp)` fits two columns on a 360 dp
+  phone and three on a 411 dp one: a wall of very large thumbnails. At 96 dp the same devices give three and
+  four, and both grids ask the same question, so a photo is about the same size on the timeline, in the cloud,
+  on a folder cover and in an album.
+- **A glyph on a photograph is drawn on somebody's content, not on the theme.** `MediaGlyph` and `MediaPill`
+  put a scrim behind every mark on a thumbnail, in one place. A bare white play triangle disappears on a snow
+  scene — the badge that says "this is a video" went missing on precisely the brightest photos, which is most
+  of them. The cloud grid draws through the same two components, in the same corners, so a duration means the
+  same thing on both screens.
+- **"In cloud" is not a mark.** Every cell on the cloud screen starts life in the cloud, so labelling all of
+  them with a text badge said nothing and hid the one thing worth saying — which items are also on this device
+  — inside the noise. That is the same rule the timeline already applies to an un-backuped photo: draw the
+  exception, not the default.
+- **The date rail's label was measured in 26 dp and cut off; its pill was anchored to the middle of the whole
+  track, not to the finger.** The rail is now two measures: a reserved strip that owns the gesture and draws
+  ticks, and a transparent overlay wide enough to measure a month's name in. The name also appears for a moment
+  when a scroll settles on a new month, which is the part of "in sync with the visible photos" a tick highlight
+  cannot deliver on its own — and `TimelineRail.fractionFor` is the pure function behind it, tested in the same
+  file as the drag's arithmetic. The per-tick labels and `labelStride` went with it: on a 26 dp strip, thinning
+  labels was a workaround for measuring them in too little space.
+- **Album tiles were cards.** A `Surface` behind two lines of text made each tile a raised, bordered object, and
+  a grid of twelve albums read as twelve boxes. The label sits on the background now. A system tile keeps its
+  icon because a category has no cover of its own and its artwork must not change when a photo arrives; the
+  disc behind that icon went from 56 dp to 40 dp, which is what made those tiles look mostly empty.
+- **Map pins were two scales of the same drawable** — osmdroid's 44 dp teardrop per photo beside a text bubble
+  per cluster. Both are text chips now, from one font size: a dot for a photo, the count for a cluster, both in
+  the app's accent. The strip behind them got a backing and was lifted clear of the attribution line, which is
+  the one thing on that screen a provider's terms ask to keep readable.
+- **The viewer's chrome was white on white.** A band of scrim fades down from the top while the chrome is up, and
+  the metadata sheet's label column is fixed width with the value right-aligned beside it, so a long camera name
+  no longer wraps under itself while a short resolution sits alone on the other side.
+- **Two dead ends now offer a way out.** Photos' permission gate and Cloud's failure state draw through
+  `PlaceholderScreen` with an action, so the app says "Allow access" and "Try again" in the same shape it uses
+  everywhere else — and the card that used to wrap every empty state is gone, because a card means "one item of
+  content" where there is none.
+- **The grid leaves room for its own selection bar.** `PhotosScreen` decided the strip's visibility in one place
+  and used it twice: the last row of photos no longer ends up under a button, which is not a cosmetic miss when
+  the covered cell is the one the user was reaching for.
+
+**What this pass did not do.** It changed no ViewModel, repository, Room schema, navigation route or backup
+path — the brief for this work was visual, and the two places it edged into behaviour are stated in the commit
+messages: an entry row's tick became a chevron (a tick on "Diagnostics" claims nothing true), and the Albums
+"create" action moved from a stretched button at the head of the screen into the heading of the section it adds
+to. Album detail, folder picking, Free Up Space and the diagnostics list keep their existing layouts where a
+change would have touched logic. Onboarding keeps all six steps, its auth and permission flows and its error
+banner untouched.
+
+**None of it is verified on a phone.** This is the class of work that JVM tests cannot see at all: 514 unit
+tests pass before and after, and the only gate that says anything about these files is the compiler. Whether the
+timeline really fits four columns on a specific device, whether the rail's pill clears the notch on a 20 dp
+bezel, whether a 96 dp cell is too small for a library of screenshots heavy with text — all device questions,
+and none of them claimed.
 
 ## Toolchain
 
