@@ -116,4 +116,63 @@ class ViewerZoomTest {
             0.001,
         )
     }
+
+    @Test
+    fun fitScaleKeepsTheAspectInsideTheViewport() {
+        assertEquals(
+            "a portrait photo is height-constrained: 2000 px of picture into 1000 px of viewport",
+            0.5,
+            ViewerZoom.fitScale(1000f, 2000f, viewportWidthPx = 500f, viewportHeightPx = 1000f).toDouble(),
+            0.001,
+        )
+        assertEquals(
+            "landscape is the other axis: width constrains",
+            0.25,
+            ViewerZoom.fitScale(4000f, 1000f, viewportWidthPx = 1000f, viewportHeightPx = 400f).toDouble(),
+            0.001,
+        )
+        assertEquals(
+            "a picture not measured yet, or a viewport not laid out yet, cannot be fitted",
+            0.0,
+            ViewerZoom.fitScale(0f, 100f, viewportWidthPx = 100f, viewportHeightPx = 100f).toDouble(),
+            0.0,
+        )
+    }
+
+    @Test
+    fun doubleTapKeepsTheTappedDetailUnderTheFinger() {
+        // Square picture filling a 1000 px viewport, tap the far right edge, zoom to 3x: the content
+        // point under the finger sits 500 past the centre, so the layer must move 500·(1−3) = −1000 —
+        // exactly the fitted rectangle's own overhang limit, i.e. the edge point stays put.
+        val (x, y) = ViewerZoom.offsetAfterZoomTowards(
+            tapX = 1000f,
+            tapY = 500f,
+            viewportWidthPx = 1000f,
+            viewportHeightPx = 1000f,
+            fittedWidthPx = 1000f,
+            fittedHeightPx = 1000f,
+            newScale = 3f,
+        )
+        assertEquals(-1000.0, x.toDouble(), 0.001)
+        assertEquals(0.0, y.toDouble(), 0.0)
+
+        // The same tap on a tall photo letterboxed sideways — fitted 400 wide — has no horizontal
+        // overhang worth 1000 px: the answer is the content edge, not the viewport-wide pan the old
+        // clamp-by-viewport arithmetic allowed (which dragged the photo into black).
+        val (letterboxedX, _) = ViewerZoom.offsetAfterZoomTowards(
+            tapX = 1000f,
+            tapY = 500f,
+            viewportWidthPx = 1000f,
+            viewportHeightPx = 1000f,
+            fittedWidthPx = 400f,
+            fittedHeightPx = 1000f,
+            newScale = 3f,
+        )
+        assertEquals(
+            "(400·3 − 1000)/2 = 100 px of real overhang is all the pan there is",
+            -100.0,
+            letterboxedX.toDouble(),
+            0.001,
+        )
+    }
 }

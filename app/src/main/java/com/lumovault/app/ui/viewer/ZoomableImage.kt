@@ -12,6 +12,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,7 +28,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImagePainter
 import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
 import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Size
@@ -85,6 +88,20 @@ fun ZoomableImage(
     var offset by remember(contentUri) { mutableStateOf(Offset.Zero) }
     var viewport by remember { mutableStateOf(Offset.Zero) }
 
+    // The image's own pixel size, as Coil painted it. Pan limits and double-tap offsets are measured
+    // against the fitted rectangle this implies, not the viewport: with `ContentScale.Fit` the photo is
+    // narrower than the screen on one axis, and clamping by the viewport lets it be dragged sideways
+    // into black.
+    var imageSize by remember(contentUri) { mutableStateOf(Offset.Zero) }
+
+    /** The fitted width/height in the requested axis's own pixels; pre-measure, the viewport itself. */
+    fun limit(axisImage: Float, axisViewport: Float): Float =
+        if (imageSize.x <= 0f || imageSize.y <= 0f || viewport.x <= 0f) {
+            axisViewport
+        } else {
+            axisImage * ViewerZoom.fitScale(imageSize.x, imageSize.y, viewport.x, viewport.y)
+        }
+
     val transformable = rememberTransformableState { zoomChange, panChange, _ ->
         val newScale = ViewerZoom.clampScale(scale * zoomChange)
         offset = if (newScale <= ViewerZoom.MIN_SCALE) {
@@ -93,13 +110,13 @@ fun ZoomableImage(
             Offset(
                 x = ViewerZoom.clampTranslation(
                     raw = offset.x + panChange.x,
-                    contentPx = viewport.x,
+                    contentPx = limit(imageSize.x, viewport.x),
                     viewportPx = viewport.x,
                     scale = newScale,
                 ),
                 y = ViewerZoom.clampTranslation(
                     raw = offset.y + panChange.y,
-                    contentPx = viewport.y,
+                    contentPx = limit(imageSize.y, viewport.y),
                     viewportPx = viewport.y,
                     scale = newScale,
                 ),
@@ -131,7 +148,18 @@ fun ZoomableImage(
                             offset = Offset.Zero
                         } else {
                             scale = target
-                            offset = centredToward(point, viewport, target)
+                            // The tapped detail stays under the finger; the fitted rectangle, not the
+                            // viewport, says how far that may take the image.
+                            val (x, y) = ViewerZoom.offsetAfterZoomTowards(
+                                tapX = point.x,
+                                tapY = point.y,
+                                viewportWidthPx = viewport.x,
+                                viewportHeightPx = viewport.y,
+                                fittedWidthPx = limit(imageSize.x, viewport.x),
+                                fittedHeightPx = limit(imageSize.y, viewport.y),
+                                newScale = target,
+                            )
+                            offset = Offset(x, y)
                         }
                     },
                 )
@@ -156,26 +184,20 @@ fun ZoomableImage(
                     modifier = Modifier.padding(24.dp),
                 )
             },
+            content = { state ->
+                // What Coil actually painted, in pixels: the gesture math clamps by this once it is
+                // known, and by the viewport until then.
+                val loaded = (state as? AsyncImagePainter.State.Success)?.painter
+                LaunchedEffect(loaded) {
+                    val size = loaded?.intrinsicSize ?: return@LaunchedEffect
+                    if (size.width > 0f && size.height > 0f) {
+                        imageSize = Offset(size.width, size.height)
+                    }
+                }
+                SubcomposeAsyncImageContent()
+            },
         )
     }
-}
-
-/**
- * Zooming in toward the tapped point.
- *
- * Whatever was under the finger stays under it, until the pan limit says otherwise — which is the only version
- * of the gesture that lets a person read the corner they just tapped. At scale 1 the limit is zero, so the
- * first double tap on a photo that already fits simply centres it: an image with no overhang has nowhere to
- * move, and pretending otherwise is how a viewer ends up showing black where the photograph should be.
- */
-private fun centredToward(point: Offset, viewport: Offset, scale: Float): Offset {
-    if (viewport.x <= 0f || viewport.y <= 0f) return Offset.Zero
-    val centre = Offset(viewport.x / 2f, viewport.y / 2f)
-    val desired = (point - centre) * -scale
-    return Offset(
-        x = ViewerZoom.clampTranslation(desired.x, viewport.x, viewport.x, scale),
-        y = ViewerZoom.clampTranslation(desired.y, viewport.y, viewport.y, scale),
-    )
 }
 
 private fun originalSizeRequest(context: Context, contentUri: String): ImageRequest =

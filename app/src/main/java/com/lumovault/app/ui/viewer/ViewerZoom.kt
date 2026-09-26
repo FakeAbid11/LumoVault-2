@@ -2,6 +2,7 @@ package com.lumovault.app.ui.viewer
 
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * The zoom and pan arithmetic of the viewer, kept away from the gestures that feed it.
@@ -66,6 +67,57 @@ object ViewerZoom {
         val limit = maxTranslation(contentPx = contentPx, viewportPx = viewportPx, scale = scale)
         return raw.coerceIn(-limit, limit)
     }
+
+    /**
+     * The ratio at which a picture fits inside the viewport keeping its aspect — the arithmetic
+     * `ContentScale.Fit` performs.
+     *
+     * Pan limits belong to the fitted rectangle, not to the viewport: a tall photo in a wide screen
+     * letterboxes sideways, and clamping against the viewport width lets that photo be dragged far
+     * enough across to show black where the photograph should be. A side the viewport has not
+     * measured yet answers 0, which callers read as "nothing to clamp by yet", not as a crash.
+     */
+    fun fitScale(
+        imageWidthPx: Float,
+        imageHeightPx: Float,
+        viewportWidthPx: Float,
+        viewportHeightPx: Float,
+    ): Float {
+        if (imageWidthPx <= 0f || imageHeightPx <= 0f) return 0f
+        if (viewportWidthPx <= 0f || viewportHeightPx <= 0f) return 0f
+        return min(viewportWidthPx / imageWidthPx, viewportHeightPx / imageHeightPx)
+    }
+
+    /**
+     * Where a double-tap zoom from 1× to [newScale] puts the image, so the tapped point stays under the
+     * finger rather than sliding to the centre.
+     *
+     * At scale 1 with no offset, the content point under the finger *is* the finger; holding it there
+     * after the jump to k needs the layer moved by `t·(1−k)` from the centre — not `−t·k`, which zooms
+     * toward the screen's middle and reads as the photo leaping away from the tap. Each axis is then
+     * clamped by the fitted rectangle's overhang, so a corner tap near the letterbox edge stops at real
+     * content instead of promising an offset the pan limits refuse.
+     */
+    fun offsetAfterZoomTowards(
+        tapX: Float,
+        tapY: Float,
+        viewportWidthPx: Float,
+        viewportHeightPx: Float,
+        fittedWidthPx: Float,
+        fittedHeightPx: Float,
+        newScale: Float,
+    ): Pair<Float, Float> =
+        clampTranslation(
+            raw = (tapX - viewportWidthPx / 2f) * (1f - newScale),
+            contentPx = fittedWidthPx,
+            viewportPx = viewportWidthPx,
+            scale = newScale,
+        ) to clampTranslation(
+            raw = (tapY - viewportHeightPx / 2f) * (1f - newScale),
+            contentPx = fittedHeightPx,
+            viewportPx = viewportHeightPx,
+            scale = newScale,
+        )
 
     /**
      * The offset a scale change should keep.

@@ -217,12 +217,20 @@ fun ReadyScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // "Start backup" only when finishing will start one: with no session or the source "Not now",
+    // completing the flow writes a flag and schedules nothing, and a button named after work that
+    // will not happen is the last lie a setup screen tells.
+    val willStartBackup = summary.telegramItem.status == ChecklistStatus.Done &&
+        summary.backupSourceItem.status == ChecklistStatus.Done
+
     OnboardingScaffold(
         step = 6,
         totalSteps = ONBOARDING_STEPS,
         title = stringResource(R.string.ready_title),
         description = stringResource(R.string.ready_description),
-        primaryLabel = stringResource(R.string.ready_action),
+        primaryLabel = stringResource(
+            if (willStartBackup) R.string.ready_action else R.string.ready_action_finish,
+        ),
         onPrimary = onStartBackup,
         onBack = onBack,
         modifier = modifier,

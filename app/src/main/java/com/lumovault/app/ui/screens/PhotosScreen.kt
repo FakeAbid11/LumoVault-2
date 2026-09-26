@@ -1,9 +1,8 @@
 package com.lumovault.app.ui.screens
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
+import com.lumovault.app.util.openAppDetailsSettings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -482,15 +481,6 @@ private fun LimitedAccessNotice() {
             Text(stringResource(R.string.photos_limited_access_action))
         }
     }
-}
-
-private fun Context.openAppDetailsSettings() = runCatching {
-    startActivity(
-        Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", packageName, null),
-        ),
-    )
 }
 
 @Composable

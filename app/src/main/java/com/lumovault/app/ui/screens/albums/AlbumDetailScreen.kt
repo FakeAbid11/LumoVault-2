@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -487,6 +488,12 @@ private fun ConfirmDialog(title: Int, body: Int, action: Int, onDismiss: () -> U
     )
 }
 
+/** The add-sheet ticks, saved as their ids joined by commas: everything a Bundle can carry. */
+private val ChosenIdsSaver = Saver<Set<Long>, String>(
+    save = { ids -> ids.joinToString(",") },
+    restore = { text -> if (text.isEmpty()) emptySet() else text.split(",").map { it.toLong() }.toSet() },
+)
+
 /**
  * The picker that adds items to a user album.
  *
@@ -501,7 +508,9 @@ private fun AddMediaSheet(
     onDismiss: () -> Unit,
     onConfirm: (Collection<Long>) -> Unit,
 ) {
-    var chosen by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    // A Set<Long> is not bundle-able, so the ticks ride as their own ids joined — the sheet survives
+    // rotation with the same rows selected, which is the work the user was doing.
+    var chosen by rememberSaveable(saver = ChosenIdsSaver) { mutableStateOf<Set<Long>>(emptySet()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

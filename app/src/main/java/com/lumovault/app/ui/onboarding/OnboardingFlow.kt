@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.OptionalStepDecision
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import com.lumovault.app.util.openAppDetailsSettings
 
 /** The seven routes behind the six onboarding screens — folder picking is a sub-screen, not a step. */
 internal enum class OnboardingStep(val route: String) {
@@ -201,15 +201,6 @@ fun OnboardingFlow(
  */
 private fun Context.openBatterySettings() = runCatching {
     startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-}
-
-private fun Context.openAppDetailsSettings() = runCatching {
-    startActivity(
-        Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", packageName, null),
-        ),
-    )
 }
 
 private fun Activity.shouldShowPermissionRationaleAny(permissions: List<String>): Boolean =

@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -43,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -185,9 +189,12 @@ private fun ViewerPager(
     val albums by viewModel.userAlbums.collectAsStateWithLifecycle()
 
     var chromeVisible by remember { mutableStateOf(true) }
-    var showingDetails by remember { mutableStateOf(false) }
-    var choosingAlbum by remember { mutableStateOf(false) }
-    var confirmingTrash by remember { mutableStateOf(false) }
+    // Saveable, not remembered: the activity recreates on rotation and on theme toggle, and a sheet
+    // the user was filling in — or a trash confirmation they were about to answer — is their context,
+    // not the pixels'. These are plain Booleans, which is what the default saver can carry.
+    var showingDetails by rememberSaveable { mutableStateOf(false) }
+    var choosingAlbum by rememberSaveable { mutableStateOf(false) }
+    var confirmingTrash by rememberSaveable { mutableStateOf(false) }
 
     // The pager owns "which item". Reading the settled page back is what keeps the action row, the details
     // sheet and the on-demand EXIF read from ever disagreeing with the picture on screen.
@@ -220,7 +227,13 @@ private fun ViewerPager(
             val item = items.getOrNull(page) ?: return@HorizontalPager
             ViewerPage(
                 media = item,
-                isCurrentPage = page == pagerState.settledPage,
+                // `targetPage`, not `settledPage`: held to the settled page, the outgoing clip keeps
+                // playing its audio for the whole swipe animation while the incoming one waits as a
+                // silent poster — two pages are "current" for the length of a swipe and only one of
+                // them is what the user is pointing at. (A modal does *not* go through this flag:
+                // deactivating releases the player, and restarting a half-watched clip from zero to
+                // close a details sheet is a worse interruption than hearing it under the sheet.)
+                isCurrentPage = page == pagerState.targetPage,
                 onTap = { chromeVisible = !chromeVisible },
                 onClose = onNavigateUp,
             )
@@ -491,8 +504,17 @@ private fun ViewerActionBar(
             ) {
                 Icon(
                     imageVector = ViewerFormatting.backupIcon(status),
-                    contentDescription = null,
-                    tint = if (status == ViewerBackupStatus.BackedUp) BackedUpAccent else OnMedia,
+                    // The label the row draws beside this is the button's own name for TalkBack;
+                    // without it the only backup control in the viewer is an anonymous button.
+                    contentDescription = stringResource(ViewerFormatting.backupLabel(status)),
+                    // An explicit tint bypasses the content alpha a disabled control gets by itself,
+                    // so the dimming the "wait" state needs is spelled out: `Busy` disables the button
+                    // and the icon must look disabled with it.
+                    tint = when {
+                        !enabled -> OnMedia.copy(alpha = DisabledContentAlpha)
+                        status == ViewerBackupStatus.BackedUp -> BackedUpAccent
+                        else -> OnMedia
+                    },
                 )
             }
             Text(
@@ -524,7 +546,14 @@ private fun AlbumChooserDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.viewer_add_to_album)) },
         text = {
-            Column {
+            // Scrollable and bounded: a library with forty albums currently renders forty rows and the
+            // last few below the dialog's own bottom edge, unreachable — the list is the choice, so
+            // the choice has to fit.
+            Column(
+                modifier = Modifier
+                    .heightIn(max = AlbumChooserMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 albums.forEach { (albumId, name) ->
                     TextButton(
                         onClick = { onChoose(albumId) },
@@ -674,6 +703,12 @@ private const val LOAD_AHEAD = 6
  * carries, so the fade ends below the words rather than through the middle of them.
  */
 private val ChromeScrimHeight = 104.dp
+
+/** Material's own disabled content alpha, spelled out because the explicit tint bypasses the default. */
+private const val DisabledContentAlpha = 0.38f
+
+/** How much of the screen the album list may take before it scrolls rather than runs off. */
+private val AlbumChooserMaxHeight = 360.dp
 
 /** The metadata sheet's label column. Wide enough for "Exposure programme", narrow enough to leave a value room. */
 private val DetailLabelWidth = 116.dp

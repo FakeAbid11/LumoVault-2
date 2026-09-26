@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.map
 
+import android.app.Activity
 import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,11 +29,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -55,6 +58,7 @@ import com.lumovault.app.domain.map.MapClustering
 import com.lumovault.app.domain.model.MapBounds
 import com.lumovault.app.domain.map.MapPlacement
 import com.lumovault.app.domain.map.MapPin
+import com.lumovault.app.util.openAppDetailsSettings
 import com.lumovault.app.domain.model.MapPhoto
 import java.text.DateFormat
 import java.util.Date
@@ -114,6 +118,11 @@ fun MapScreen(
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var previews by remember { mutableStateOf<List<MapPhoto>>(emptyList()) }
 
+    // A refusal Android will not ask about again is the one answer a "Allow photo locations" button
+    // must not keep giving: remembered (and saveable, because the rotation between the dialog and the
+    // answer is the normal path) so the card can change what its button does, not just sit there.
+    var askedAndRefused by rememberSaveable { mutableStateOf(false) }
+
     /**
      * Bumped on every resume, because osmdroid clears what it was given.
      *
@@ -126,7 +135,10 @@ fun MapScreen(
     val density = LocalDensity.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { viewModel.onPermissionResult() }
+    ) { granted ->
+        if (!granted) askedAndRefused = true
+        viewModel.onPermissionResult()
+    }
 
     // The map is only worth reading positions for while it is being looked at, so the pass is started by the
     // screen appearing rather than by a scheduled job that would run against nobody's interest.
@@ -321,8 +333,27 @@ fun MapScreen(
                         modifier = Modifier.padding(top = 8.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        Button(onClick = { permissionLauncher.launch(viewModel.permissionToRequest()) }) {
-                            Text(stringResource(R.string.map_locations_action))
+                        // "Don't ask again" makes the system dialog permanently invisible; the request
+                        // button would be a dead end that keeps promising a dialog. Settings is the
+                        // page that can still act — the same switch the limited-access photo card makes.
+                        val activity = LocalContext.current as? Activity
+                        val systemWillAskAgain = !askedAndRefused ||
+                            activity?.shouldShowRequestPermissionRationale(viewModel.permissionToRequest()) == true
+                        Button(
+                            onClick = {
+                                if (systemWillAskAgain) {
+                                    permissionLauncher.launch(viewModel.permissionToRequest())
+                                } else {
+                                    LocalContext.current.openAppDetailsSettings()
+                                }
+                            },
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (systemWillAskAgain) R.string.map_locations_action
+                                    else R.string.map_locations_settings_action,
+                                ),
+                            )
                         }
                     }
                 }
@@ -448,11 +479,18 @@ private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel, 
                 // Zooming into a cluster rather than listing it: the point of a cluster is that there is too
                 // much to show, and a list is the map's own answer to that problem, one level closer.
                 is MapPin.Cluster -> {
-                    viewModel.clearSelection()
-                    map.controller.setCenter(GeoPoint(target.latitude, target.longitude))
-                    map.setZoomLevel(
-                        (map.zoomLevelDouble + ZOOM_PER_CLUSTER_TAP).coerceAtMost(map.maxZoomLevel),
-                    )
+                    val current = map.zoomLevelDouble
+                    val next = (current + ZOOM_PER_CLUSTER_TAP).coerceAtMost(map.maxZoomLevel)
+                    if (next - current < ZOOM_EPSILON) {
+                        // Already fully zoomed: there is nowhere closer to go, so the tap lists what
+                        // the cluster hides — the same preview card a single pin opens — instead of
+                        // centring the map on the spot it was already centred on and saying nothing.
+                        viewModel.select(target)
+                    } else {
+                        viewModel.clearSelection()
+                        map.controller.setCenter(GeoPoint(target.latitude, target.longitude))
+                        map.setZoomLevel(next)
+                    }
                 }
             }
             true
@@ -637,6 +675,9 @@ private const val PREVIEW_LIMIT = 4
 
 /** How much closer a tap on a cluster gets. Two levels separates a city from its streets in one gesture. */
 private const val ZOOM_PER_CLUSTER_TAP = 2.0
+
+/** Below this, a "zoom" moved nothing — the map is at its ceiling and the tap must do something else. */
+private const val ZOOM_EPSILON = 0.01
 
 /** A pan is continuous; the query should not be. */
 private const val VIEWPORT_DEBOUNCE_MILLIS = 250L
