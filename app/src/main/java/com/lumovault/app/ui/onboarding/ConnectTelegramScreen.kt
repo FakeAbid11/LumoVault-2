@@ -292,7 +292,7 @@ private fun CodeFields(
         // banner to the thing being corrected.
         isError = state.telegram is TelegramAuthState.Failed,
         // Digits at heading size with room between them: an OTP reads as a code, not as a sentence.
-        textStyle = MaterialTheme.typography.headlineSmall.copyWith(letterSpacing = 0.3.em),
+        textStyle = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 0.3.em),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Go,
