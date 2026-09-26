@@ -199,6 +199,7 @@ private fun ViewerPager(
                 isCurrentPage = page == pagerState.settledPage,
                 onTap = { chromeVisible = !chromeVisible },
                 onZoomChanged = { zoomed -> zoomedPage = if (zoomed) page else null },
+                onClose = onNavigateUp,
             )
         }
 
@@ -290,14 +291,17 @@ private fun ViewerPage(
     isCurrentPage: Boolean,
     onTap: () -> Unit,
     onZoomChanged: (Boolean) -> Unit,
+    onClose: () -> Unit,
 ) {
     when (ViewerPresentation.rendererFor(media.type)) {
-        // Only the visible page holds a player, which is what keeps a swipe from leaving three decoders
-        // running. The neighbours are not blank: they show a frame through the image path until they are current.
+        // Only the visible page holds a player: the others draw the clip's own first frame and allocate
+        // nothing, which is what keeps a swipe from leaving three decoders running behind the finger.
         ViewerRenderer.Video -> VideoStage(
             contentUri = media.contentUri,
+            mediaStoreId = media.id,
             isActive = isCurrentPage,
             onTap = onTap,
+            onClose = onClose,
         )
 
         ViewerRenderer.ZoomableImage, ViewerRenderer.AnimatedImage -> ZoomableImage(
