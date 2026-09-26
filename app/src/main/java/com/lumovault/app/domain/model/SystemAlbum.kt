@@ -65,11 +65,15 @@ enum class SystemAlbum {
      */
     fun covers(normalizedPath: String): Boolean {
         val pattern = pathLikePattern ?: return false
-        val core = pattern.trim('%')
-        return if (pattern.startsWith('%')) {
+        // Written with the `String` overloads rather than the `Char` ones, and with the wildcard removed
+        // rather than trimmed: this decides whether a person sees the same folder twice on one screen, and
+        // a rule that depends on which `startsWith` was picked is a rule that cannot be read.
+        val middle = pattern.startsWith("%")
+        val core = pattern.replace("%", "").trim('/')
+        return if (middle) {
             normalizedPath.contains("$core/")
         } else {
-            normalizedPath.startsWith(core)
+            normalizedPath.startsWith("$core/")
         }
     }
 

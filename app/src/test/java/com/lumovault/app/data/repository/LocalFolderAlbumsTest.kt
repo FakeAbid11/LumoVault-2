@@ -83,8 +83,19 @@ class LocalFolderAlbumsTest {
 
     @Test
     fun nestedFoldersUnderASystemAlbumPathAreCoveredByThatAlbum() {
-        assertTrue(SystemAlbum.Screenshots.covers("DCIM/Screenshots/Old/"))
-        assertTrue(SystemAlbum.Camera.covers("DCIM/Camera/Bursts/"))
+        // Each case names itself, because the last failure of this rule said only `AssertionError`.
+        assertTrue(
+            "the middle pattern claims a folder under any parent: ${SystemAlbum.Screenshots.pathLikePattern}",
+            SystemAlbum.Screenshots.covers("DCIM/Screenshots/Old/"),
+        )
+        assertTrue(
+            "a prefix pattern claims what is filed beneath it",
+            SystemAlbum.Camera.covers("DCIM/Camera/Bursts/"),
+        )
+        assertTrue(
+            "and the same pattern claims the folder it is named after",
+            SystemAlbum.Screenshots.covers("Pictures/Screenshots/"),
+        )
         assertFalse(
             "a folder that merely shares a prefix is a different folder",
             SystemAlbum.Camera.covers("DCIM/CameraX/"),
