@@ -545,7 +545,7 @@ private fun Working(title: String, detail: String) {
             .fillMaxSize()
             .padding(horizontal = SpaceXl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.Center),
+        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
         Text(text = title, style = LumoVaultType.sectionHeader)

@@ -163,22 +163,36 @@ class TimelineRailTest {
         // Two months of equal weight split the rail in half, so their centres are a quarter of the way down
         // and three quarters. The pill is drawn at these numbers: a month named at fraction 0 would float
         // above the first tick it is supposed to be labelling, and one named at its last item would sit over
-        // the month below it.
+        // the month below it. (Doubles rather than floats because that is the `assertEquals` overload JUnit
+        // has had longest.)
         val months = TimelineRail.months(library)
 
-        assertEquals(0.25f, TimelineRail.fractionFor(months, months[0]), 0.001f)
-        assertEquals(0.75f, TimelineRail.fractionFor(months, months[1]), 0.001f)
+        assertEquals(0.25, TimelineRail.fractionFor(months, months[0]).toDouble(), 0.001)
+        assertEquals(0.75, TimelineRail.fractionFor(months, months[1]).toDouble(), 0.001)
     }
 
     @Test
     fun theCentreOfAWholeLibraryIsItsOwnMiddle() {
         val one = TimelineRail.months(listOf(day(epochDay = epochDay(2024, 3, 1), photos = 9)))
 
-        assertEquals("one month on the rail is the whole rail", 0.5f, TimelineRail.fractionFor(one, one[0]), 0.001f)
-        assertEquals("a month from a list it is not in names nothing",
-            0f, TimelineRail.fractionFor(one, RailMonth(YearMonth.of(2020, 1), firstItemIndex = 0, itemCount = 1)),
-            0.001f)
-        assertEquals(0f, TimelineRail.fractionFor(emptyList(), RailMonth(YearMonth.of(2024, 3), 0, 0)), 0.001f)
+        assertEquals(
+            "one month on the rail is the whole rail",
+            0.5,
+            TimelineRail.fractionFor(one, one[0]).toDouble(),
+            0.001,
+        )
+        assertEquals(
+            "a month from a list it is not in names nothing",
+            0.0,
+            TimelineRail.fractionFor(one, RailMonth(YearMonth.of(2020, 1), firstItemIndex = 0, itemCount = 1))
+                .toDouble(),
+            0.001,
+        )
+        assertEquals(
+            0.0,
+            TimelineRail.fractionFor(emptyList(), RailMonth(YearMonth.of(2024, 3), 0, 0)).toDouble(),
+            0.001,
+        )
     }
 
     @Test

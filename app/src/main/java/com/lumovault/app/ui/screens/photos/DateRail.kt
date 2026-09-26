@@ -118,7 +118,8 @@ fun DateRail(
             .onSizeChanged { size -> trackPx = size.height.toFloat() },
     ) {
         // A faint rule behind the ticks, so they read as one instrument rather than as stray marks at the edge
-        // of the screen, and it sits at the tick centres because that is where the eye looks for them.
+        // of the screen. It is drawn at the tick centres, because that is where the eye looks for them, and at
+        // half strength, because a line the photos compete with is a line drawn twice too loudly.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -128,6 +129,9 @@ fun DateRail(
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = GuideAlpha)),
         )
 
+        // The strip is the touch target and it sits at the end, where the grid leaves room for it. The ticks
+        // inside it are drawn [RailTickEndInset] from the screen's edge so the device's own rounding cannot cut
+        // them, while the strip keeps its full width for a thumb.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)

@@ -73,6 +73,9 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import com.lumovault.app.ui.theme.MapNoticeScrim
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXs
+import androidx.compose.ui.graphics.toArgb
 
 /**
  * The photo map: every placed photograph in the rectangle the user is looking at.
@@ -210,9 +213,18 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(mapView, visit, pins) {
+    // Resolved out here because the overlay code below is not a composable and cannot ask the theme for a
+    // colour. A data class, so that a recomposition that changes nothing draws nothing: as an ordinary class
+    // it would be a new instance every frame, and the effect keyed on it would rebuild every marker each time.
+    val markerStyle = MarkerStyle(
+        chipBackground = MaterialTheme.colorScheme.primary.toArgb(),
+        chipText = MaterialTheme.colorScheme.onPrimary.toArgb(),
+        textLabelPx = with(density) { MarkerLabelSize.toPx().toInt() },
+    )
+
+    LaunchedEffect(mapView, visit, pins, markerStyle) {
         val map = mapView ?: return@LaunchedEffect
-        drawPins(map, pins, viewModel)
+        drawPins(map, pins, viewModel, markerStyle)
     }
 
     /**
@@ -352,13 +364,24 @@ fun MapScreen(
         }
 
         if (strip.isNotEmpty() && selected == null) {
+            // The strip is a control, and a control floating over a map needs a backing of its own: without it
+            // the bottom edge of the strip is a row of squares whose bounds the eye cannot find against the
+            // basemap. It is also lifted clear of the attribution, which is the one line on this screen that
+            // must stay readable — and a strip laid over it satisfies the provider's condition of use less
+            // well than it satisfies the user's.
             LazyRow(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp),
+                    .padding(
+                        start = SpaceSm,
+                        end = SpaceSm,
+                        bottom = AttributionReserve,
+                    )
+                    .background(MapNoticeScrim, RoundedCornerShape(StripCorner))
+                    .padding(horizontal = SpaceSm, vertical = SpaceSm),
+                horizontalArrangement = Arrangement.spacedBy(SpaceXs),
+                contentPadding = PaddingValues(horizontal = SpaceXs),
             ) {
                 items(items = strip, key = { photo -> photo.mediaStoreId }) { photo ->
                     StripThumbnail(photo = photo, onClick = { onOpenMedia(photo.mediaStoreId) })
@@ -388,21 +411,27 @@ fun MapScreen(
  * for single photos — and the list is bounded by [MapViewModel.PHOTO_LIMIT] divided into cells, which is
  * hundreds of objects at worst. A diff would be more clever and would not survive a photo being deleted out
  * from under a marker.
+ *
+ * Every pin is drawn through `setTextIcon`, which is osmdroid's own text-chip route (checked in the artifact's
+ * sources: it builds a bitmap the size of the measured text and anchors it at the centre). That is what makes
+ * the two kinds of pin one family instead of two scales of the same drawable — the default teardrop is 44 dp
+ * of bitmap per photo, and on a view of a city with three hundred photos in it that is a red crowd, not a map.
+ * A dot for a photo and a count for a cluster, both from [MarkerStyle.textLabelPx], both in the app's accent.
  */
-private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel) {
+private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel, style: MarkerStyle) {
     map.overlays.removeAll { it is Marker }
 
     pins.forEach { pin ->
         val marker = Marker(map)
         marker.position = GeoPoint(pin.latitude, pin.longitude)
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         marker.relatedObject = pin
-        if (pin is MapPin.Cluster) {
-            // The count *is* the icon. A drawn bubble would need a drawable, a tint and a measured font
-            // radius; osmdroid's text icon already puts the number where the marker goes, and the number is
-            // the only thing about a cluster the user needs to read.
-            marker.setTextIcon(pin.count.toString())
-        }
+        // Set before `setTextIcon`, which reads them as it builds the bitmap.
+        marker.setTextLabelBackgroundColor(style.chipBackground)
+        marker.setTextLabelForegroundColor(style.chipText)
+        marker.setTextLabelFontSize(style.textLabelPx)
+        // The count *is* the icon for a cluster: the number is the only thing about it the user needs to read.
+        // A single photo carries no number, so it carries a dot — the same chip, emptied of text.
+        marker.setTextIcon((pin as? MapPin.Cluster)?.count?.toString() ?: PhotoMark)
         marker.setOnMarkerClickListener { clicked, _ ->
             val target = clicked.relatedObject as? MapPin ?: return@setOnMarkerClickListener false
             when (target) {
@@ -423,6 +452,22 @@ private fun drawPins(map: MapView, pins: List<MapPin>, viewModel: MapViewModel) 
     }
     map.invalidate()
 }
+
+/** How a pin is drawn, resolved from the theme and the screen's density away from the overlay code. */
+private data class MarkerStyle(
+    val chipBackground: Int,
+    val chipText: Int,
+    val textLabelPx: Int,
+)
+
+/**
+ * A filled circle, not a bullet.
+ *
+ * U+25CF is a *geometric* shape whose box is the font size, so it scales with the label exactly as the digits
+ * beside it do. U+2022, the typographic bullet, is drawn small and centred high inside the same box — two
+ * marks of visibly different sizes on one map, which is the opposite of why this file draws both the same way.
+ */
+private const val PhotoMark = "●"
 
 /** Reads where the map is looking and tells the model, in the units the query and the clustering need. */
 private fun publishViewport(map: MapView, viewModel: MapViewModel) {
@@ -590,4 +635,18 @@ private const val VIEWPORT_DEBOUNCE_MILLIS = 250L
 /** Deep enough to recognise a place, shallow enough that a cluster has something to separate into. */
 private const val FOCUS_ZOOM = 12.0
 
-private val StripSize = 68.dp
+/**
+ * A pin's label, in dp so it scales with density rather than with the user's font setting.
+ *
+ * `setTextLabelFontSize` takes pixels, and its default is 24 of them — on a 3x phone that is 8 dp of text for
+ * a cluster's two digits, and the same call draws a single photo's mark, which is why one number here sets
+ * both. The default *teardrop* it replaces was 44 dp tall per photo.
+ */
+private val MarkerLabelSize = 14.dp
+
+/** A strip small enough to read as a strip and large enough to tap: 56 dp is a target, not a thumbnail wall. */
+private val StripSize = 56.dp
+private val StripCorner = 12.dp
+
+/** How much of the bottom edge belongs to the attribution line, so the strip is lifted above it. */
+private val AttributionReserve = 22.dp

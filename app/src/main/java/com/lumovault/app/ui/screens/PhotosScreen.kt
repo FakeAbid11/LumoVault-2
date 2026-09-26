@@ -490,7 +490,7 @@ private fun Scanning(found: Int) {
             .fillMaxSize()
             .padding(horizontal = SpaceXl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.Center),
+        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
         Text(
