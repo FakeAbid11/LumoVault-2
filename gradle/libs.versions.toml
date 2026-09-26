@@ -21,6 +21,22 @@ libphonenumber = "9.0.40"
 # devices, and a photo map missing half the library is the worse cost of saving one dependency.
 coil = "3.6.3"
 junit = "4.13.2"
+# Verified against Google Maven's `androidx/media3/group-index.xml`: 1.11.1 is the newest published release
+# (nothing exists at 1.12.x yet), and its own POM pins every sibling module to the same number, so one version
+# here is what keeps exoplayer, ui and common from disagreeing at runtime — a mixed Media3 set does not fail
+# the build, it fails playback. The declarations the viewer uses were read from this version's `-sources.jar`
+# rather than remembered: `ExoPlayer.Builder(Context)`/`build()`, `MediaItem.fromUri(Uri)`,
+# `Player.setMediaItem/prepare/play/pause/seekTo(long)/release/getDuration/getCurrentPosition`,
+# `Player.STATE_IDLE|BUFFERING|READY|ENDED`, `Player.Listener.onPlaybackStateChanged/onIsPlayingChanged/onPlayerError`,
+# `PlaybackException.errorCode` with its `ERROR_CODE_*` set, and `PlayerView.setPlayer/setUseController`.
+# None of those carries `@UnstableApi`, so no opt-in marker and no compiler flag is added for it. `media3-ui`
+# is here for `PlayerView` alone, which is what retires the hand-written `SurfaceHolder.Callback`: Media3's
+# `ExoPlayerImpl` registers that callback itself and nulls the video output on `surfaceDestroyed`.
+# One collision checked rather than assumed: `media3-common` brings full Guava, and WorkManager brings
+# `com.google.guava:listenablefuture:1.0`, which is the same classes in a smaller jar. Guava's own POM asks
+# for `listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`, and Gradle's conflict resolution prefers
+# that over 1.0, so D8 sees one definition of `ListenableFuture` and no exclusion is needed here.
+media3 = "1.11.1"
 # Verified against Maven Central metadata: 6.1.20 is the published release (lastUpdated 2024-08-18) under
 # the unchanged `org.osmdroid` group — `maps.osmdroid` is a 404. Its POM declares NO dependencies at all, so
 # this is one AAR with no transitive weight, Java 8 bytecode, and a manifest that adds no permission and no
@@ -57,6 +73,14 @@ coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "c
 coil-gif = { group = "io.coil-kt.coil3", name = "coil-gif", version.ref = "coil" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# Three modules, and only three: `exoplayer` for the player, `common` for the `Player`/`MediaItem`/
+# `PlaybackException` types the app names directly, `ui` for `PlayerView`. No `media3-session` (no background
+# playback and no media notification, so nothing to publish a session to), no `media3-datasource-okhttp` or
+# any network module (every clip LumoVault plays is a local `content://` file), no `media3-cast`,
+# `media3-extractor`/`container`/`decoder`/`datasource` which `media3-exoplayer` already brings itself.
+androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

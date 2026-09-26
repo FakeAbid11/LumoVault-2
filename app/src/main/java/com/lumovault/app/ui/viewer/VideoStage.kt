@@ -1,10 +1,6 @@
 package com.lumovault.app.ui.viewer
 
-import android.media.MediaPlayer
 import android.net.Uri
-import android.util.Log
-import android.view.SurfaceHolder
-import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -38,49 +34,53 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.lumovault.app.R
-import com.lumovault.app.ui.theme.OnMedia
-import com.lumovault.app.util.formatDuration
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.delay
+import androidx.media3.ui.PlayerView
 import coil3.compose.SubcomposeAsyncImage
-import androidx.compose.ui.layout.ContentScale
+import com.lumovault.app.R
+import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.util.formatDuration
+import kotlinx.coroutines.delay
 
 /**
  * A clip, played — and the reason a clip that cannot be played must not take the process with it.
  *
- * `MediaPlayer` is the tool: one local `content://` file at a time, with play, pause, a seek bar and a
- * duration, so a media library does not need a media *framework*. It is also an object that throws
- * `IllegalStateException` from almost every method when asked in the wrong state, and it delivers its
- * callbacks on its own thread — where a throw kills the process and no `runCatching` around a
- * `@Composable` is anywhere near the stack. So the rules live in [VideoPlayback], which has no Android
- * types in it and is unit-tested, and everything below is the thin, guarded translation of those rules
- * into calls on one player.
+ * The player is Media3's ExoPlayer, reached through [ExoPlayerEngine]; what it may be asked, and when, is
+ * decided by [VideoPlayback] through [VideoSession]. What is left here is the part only Compose can do: hold
+ * one session per visit to one clip, mirror its state onto the screen, and draw the transport this app
+ * already had.
  *
- * Four properties of a surface inside a pager are handled here because none is visible until it is wrong:
+ * That split is the point of the arrangement. A framework player reports its news on a thread no
+ * `runCatching` around a `@Composable` is anywhere near, and every crash this page has had came from acting
+ * on such a report after the page had moved on. So nothing below touches a player: each control asks
+ * [VideoSession], which asks the machine, and a refusal is a tap that changes nothing.
  *
- *  - **Only the visible page owns a player.** A `MediaPlayer` is allocated when this page is looked at and
- *    released when it stops being looked at, so swiping never holds two decoders, and the old one is gone
- *    before the new one is built.
- *  - **The source is checked before it is handed over.** `content://` is only a claim until something opens
- *    it: the file can have been deleted outside the app, or its permission revoked. Opening a descriptor
- *    first turns that into [VideoFailureKind.SourceUnopenable] rather than an asynchronous native IO error
- *    arriving after the user has already left the page. Playback then streams from the resolver — the bytes
- *    are never copied into memory.
- *  - **A surface can die underneath a live player.** Feeding frames to a destroyed surface aborts in native
- *    code, so the holder's callback detaches and re-attaches the display, and the player pauses while there
- *    is nowhere to draw.
- *  - **A failure is shown, and it is the only thing shown.** `MediaPlayer`'s own error path inflates a
- *    framework dialog from resources the app cannot theme or translate; an `OnErrorListener` returning true
- *    suppresses it, and LumoVault's own sentence and a Close button take its place — visible whatever the
- *    viewer's chrome is doing, because a screen that is black with no way out is how a crash looks to
- *    somebody who is not holding a stack trace.
+ * Four properties of a clip inside a pager are still handled here, because none is visible until it is
+ * wrong:
+ *
+ *  - **Only the visible page owns a player.** It is allocated when this page is looked at and released when it
+ *    stops being looked at, so swiping never holds two decoders and the old one is gone before the new one is
+ *    built. A page that comes back gets a new session, because *released* is not a state a player can be taken
+ *    back from.
+ *  - **The source is checked before it is handed over**, in the engine: `content://` is only a claim until
+ *    something opens it. That turns "the file was deleted outside the app" into a named failure instead of an
+ *    asynchronous native IO error arriving after the user has already left. No copy of the clip is ever read
+ *    into memory — the bytes are streamed from the resolver.
+ *  - **The rendering surface belongs to Media3.** `PlayerView` with its controller switched off is a surface
+ *    plus aspect-ratio handling, and it is the library that registers the surface callback and detaches the
+ *    video output before the surface is taken away. The hand-written holder callback this page used to keep is
+ *    one of the reasons the page could crash at all.
+ *  - **A failure is shown, and it is the only thing shown.** `PlayerView` is given no error-message provider,
+ *    so no framework text can reach the person looking at the screen; LumoVault's own sentence and a Close
+ *    button take its place — visible whatever the viewer's chrome is doing, because a screen that is black
+ *    with no way out is how a crash looks to somebody who is not holding a stack trace.
  */
 @Composable
 fun VideoStage(
@@ -97,22 +97,24 @@ fun VideoStage(
     /**
      * Bumped the moment a page that has already released its player becomes the visible one again.
      *
-     * [VideoPlayerState.Released] is terminal — a `MediaPlayer` cannot be taken back from it — so without a
-     * fresh session here, swiping away from a clip and back would leave a page that shows a spinner forever
-     * and never opens anything. One swipe, one player, and a new one for the next visit.
+     * [VideoPlayerState.Released] is terminal, so without a fresh session here, swiping away from a clip and
+     * back would leave a page that shows a spinner forever and never opens anything. One visit, one player,
+     * and a new one for the next.
      */
     var attempt by remember(contentUri) { mutableIntStateOf(0) }
-    val session = remember(contentUri, attempt) { VideoSession() }
+
+    // Keyed on the clip and the visit rather than on the recomposition: this is the identity the player
+    // belongs to, and a page recomposed mid-swipe must not find a new decoder in it.
+    val engine = remember(contentUri, attempt) { ExoPlayerEngine(context, mediaStoreId) }
+    val session = remember(contentUri, attempt, engine) { VideoSession(engine) }
     val machine = session.playback
 
-    // The mirror of the machine's state, so a transition recomposes the screen. Every write below goes
-    // through the machine first, which is what makes the UI unable to claim a state the player does not
-    // have.
+    // The mirror of the machine's state, so a transition recomposes the screen. Every write goes through the
+    // machine first, which is what makes the UI unable to claim a state the player does not have.
     var state by remember(contentUri, attempt) { mutableStateOf(VideoPlayerState.Idle) }
     var durationMs by remember(contentUri, attempt) { mutableLongStateOf(0L) }
     var positionMs by remember(contentUri, attempt) { mutableLongStateOf(0L) }
     var scrubbingTo by remember(contentUri, attempt) { mutableLongStateOf(NO_SCRUB) }
-    var surface by remember(contentUri, attempt) { mutableStateOf<SurfaceHolder?>(null) }
 
     // The one way state reaches the screen: ask the machine, then draw what it says. A refused transition
     // still has to be drawn, or the transport keeps offering a control the player will reject.
@@ -122,27 +124,14 @@ fun VideoStage(
         positionMs = machine.positionMs
     }
 
-    fun destroyPlayer() {
-        val player = session.player
-        session.player = null
-        if (player != null) {
-            runCatching { player.stop() }
-            runCatching { player.reset() }
-            runCatching { player.release() }
-            Log.i(TAG, "VIDEO_RELEASED id=$mediaStoreId")
+    // Declared before anything can report, so no engine event is heard by a page that is not listening, and
+    // cleared on the way out for the same reason in reverse.
+    DisposableEffect(session) {
+        session.onChanged = { sync() }
+        onDispose {
+            session.onChanged = {}
+            session.release()
         }
-    }
-
-    fun MediaPlayer.attachSurface(holder: SurfaceHolder?) = runCatching { setDisplay(holder) }
-
-    fun buildPlayer(): MediaPlayer {
-        session.player?.let { return it }
-        val player = MediaPlayer()
-        session.player = player
-        // Legal only before preparation, which is the state a freshly built player is in.
-        runCatching { player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT) }
-        player.attachSurface(surface)
-        return player
     }
 
     // Decoding starts when the page becomes the visible one, and ends when it stops being visible: the pager
@@ -150,124 +139,40 @@ fun VideoStage(
     // user may never reach.
     LaunchedEffect(isActive, contentUri, attempt) {
         if (!isActive) {
-            if (machine.shouldRelease()) sync()
-            destroyPlayer()
+            session.release()
             return@LaunchedEffect
         }
         if (machine.state == VideoPlayerState.Released) {
             attempt += 1
             return@LaunchedEffect
         }
-        if (machine.state != VideoPlayerState.Idle) return@LaunchedEffect
-
-        val token = machine.open() ?: return@LaunchedEffect
-        sync()
-        Log.i(TAG, "VIDEO_OPEN_STARTED id=$mediaStoreId type=video")
-
-        // `content://` is a claim, not a promise. Opening the descriptor first is what separates "this file
-        // is gone" from "the decoder disliked it", and it costs one syscall rather than a callback that
-        // arrives too late to matter. The descriptor is closed immediately: `setDataSource(context, uri)`
-        // streams the file itself, so no bytes are copied into memory here or anywhere else.
-        val readable = runCatching {
-            context.contentResolver.openAssetFileDescriptor(Uri.parse(contentUri), "r")?.use { true } ?: false
-        }.getOrDefault(false)
-
-        if (!readable) {
-            machine.onSourceRejected(token)
-            sync()
-            Log.w(TAG, "VIDEO_DATASOURCE_FAILED id=$mediaStoreId kind=unopenable")
-            return@LaunchedEffect
-        }
-
-        val player = buildPlayer()
-        if (!machine.onPrepareStarted(token)) {
-            sync()
-            return@LaunchedEffect
-        }
-
-        // Every callback carries the token it was registered under and checks the identity of the player
-        // that fired it. A released MediaPlayer can still deliver one event, and the crash is not the stale
-        // write to state — it is the `duration` call on the object that no longer exists.
-        player.setOnPreparedListener { mp ->
-            if (mp !== player || machine.isCurrent(token).not()) return@setOnPreparedListener
-            val length = runCatching { if (machine.canReadDuration()) mp.duration.toLong() else 0L }.getOrDefault(0L)
-            if (machine.onPrepared(token, length)) {
-                state = machine.state
-                durationMs = machine.durationMs
-                Log.i(TAG, "VIDEO_PREPARED id=$mediaStoreId duration_ms=$durationMs")
-            } else {
-                state = machine.state
-            }
-        }
-        player.setOnCompletionListener { mp ->
-            if (mp !== player) return@setOnCompletionListener
-            machine.onCompletion()
-            sync()
-        }
-        player.setOnErrorListener { mp, _, _ ->
-            // True is what stops the framework dialog. Nothing of the error itself is kept: `what` and
-            // `extra` can name the file, and a filename is personal data.
-            if (mp === player) {
-                machine.onPlayerError(token)
-                sync()
-            }
-            Log.w(TAG, "VIDEO_ERROR id=$mediaStoreId kind=decoder")
-            true
-        }
-
-        val prepared = runCatching {
-            player.setDataSource(context, Uri.parse(contentUri))
-            player.isLooping = false
-            player.prepareAsync()
-        }.isSuccess
-
-        if (prepared) {
-            Log.i(TAG, "VIDEO_PREPARE_STARTED id=$mediaStoreId")
-        } else {
-            machine.onPreparationFailed(token)
-            state = machine.state
-            destroyPlayer()
-            Log.w(TAG, "VIDEO_ERROR id=$mediaStoreId kind=preparation")
-        }
-    }
-
-    // Leaving the viewer, and anything that ends the composition: released once, and never again.
-    DisposableEffect(session) {
-        onDispose {
-            if (machine.shouldRelease()) sync()
-            destroyPlayer()
-        }
+        session.activate(contentUri)
     }
 
     // Screen-off and backgrounding arrive here and change nothing about `isActive` — the page a person is
-    // looking at is still "active" while the phone is in their pocket.
+    // looking at is still "active" while the phone is in their pocket. The clip stops either way, and comes
+    // back to a paused player rather than a running one.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && machine.canPause()) {
-                runCatching { session.player?.pause() }
-                machine.onPauseRequested()
-                sync()
-            }
+            if (event == Lifecycle.Event.ON_STOP) session.pauseForBackground()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // `MediaPlayer` has no progress callback, so the playhead is polled while the clip runs — and only while
-    // it runs, because `getCurrentPosition` on a released player is another `IllegalStateException`.
+    // The playhead is polled rather than subscribed to, and only while the clip is running: a finished clip has
+    // nowhere left to go, and a page that is not the one being looked at has no player to ask.
     LaunchedEffect(state) {
         while (machine.canReadPosition()) {
-            runCatching { session.player?.currentPosition?.toLong() }
-                .getOrNull()
-                ?.let { positionMs = it }
+            session.readPosition()
             delay(POSITION_POLL_MILLIS)
         }
     }
 
-    if (!isActive && state == VideoPlayerState.Idle) {
-        // Coil's video decoder yields the first frame of the same uri, so an offscreen page looks like the
-        // clip it is standing in for rather than like a screen that has lost its content. No description:
-        // this page is not the one being looked at, and the chrome names whatever is.
+    if (!isActive) {
+        // Coil's video decoder yields the first frame of the same uri, so an offscreen page looks like the clip
+        // it is standing in for rather than like a screen that has lost its content. No description: this page
+        // is not the one being looked at, and the chrome names whatever is.
         SubcomposeAsyncImage(
             model = Uri.parse(contentUri),
             contentDescription = null,
@@ -309,8 +214,9 @@ fun VideoStage(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            // One tap on the picture belongs to the viewer, not to the player: the transport row is the
-            // clip's control, the chrome is the screen's.
+            // One tap on the picture belongs to the viewer, not to the player: the transport row is the clip's
+            // control, the chrome is the screen's. A `PlayerView` with no controller is not clickable, so the
+            // gesture reaches this instead of being eaten by the surface.
             .pointerInput(Unit) { detectTapGestures { onTap() } },
     ) {
         Box(
@@ -321,48 +227,18 @@ fun VideoStage(
         ) {
             AndroidView(
                 factory = { viewContext ->
-                    SurfaceView(viewContext).apply {
-                        holder.addCallback(
-                            object : SurfaceHolder.Callback {
-                                override fun surfaceCreated(holder: SurfaceHolder) {
-                                    if (machine.onSurfaceCreated()) {
-                                        surface = holder
-                                        if (machine.canAttachSurface()) {
-                                            runCatching { session.player?.setDisplay(holder) }
-                                        }
-                                        Log.i(TAG, "VIDEO_SURFACE_CREATED id=$mediaStoreId")
-                                    }
-                                }
-
-                                override fun surfaceChanged(
-                                    holder: SurfaceHolder,
-                                    format: Int,
-                                    width: Int,
-                                    height: Int,
-                                ) = Unit
-
-                                override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                    // Detach before the surface goes, or the decoder keeps drawing into
-                                    // memory the compositor has already taken away.
-                                    val live = machine.onSurfaceDestroyed()
-                                    if (live) runCatching { session.player?.setDisplay(null) }
-                                    if (machine.canPause()) runCatching { session.player?.pause() }
-                                    surface = null
-                                    sync()
-                                    Log.i(TAG, "VIDEO_SURFACE_DESTROYED id=$mediaStoreId")
-                                }
-                            },
-                        )
+                    PlayerView(viewContext).apply {
+                        // LumoVault already has a transport and it is the one below. Left on, Media3's own
+                        // control bar would be a second set of buttons over the same clip, in the demo
+                        // player's styling.
+                        useController = false
                     }
                 },
-                // `AndroidView` keeps its view across recompositions while the page's player may not be the
-                // same object, so the attach happens here too — and only when the machine says a display may
-                // be set at all.
-                update = { view ->
-                    if (machine.canAttachSurface()) {
-                        runCatching { session.player?.setDisplay(view.holder) }
-                    }
-                },
+                // The view and the player are built at different moments — the view when the page is composed,
+                // the player when the page is looked at — so the pairing is re-asserted on every recomposition
+                // rather than assumed to have happened in one order.
+                update = { view -> engine.attachView(view) },
+                onRelease = { view -> engine.detachView(view) },
                 modifier = Modifier.fillMaxSize(),
             )
             if (machine.loading) {
@@ -380,30 +256,10 @@ fun VideoStage(
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         ) {
             IconButton(
-                onClick = {
-                    val player = session.player
-                    // The control is drawn before a clip is ready on purpose — it is the one that stays put
-                    // while the spinner comes and goes — so tapping early is too early, not an error, and
-                    // nothing is asked of the player until the machine says it may be asked.
-                    if (player != null && machine.canPause()) {
-                        runCatching { player.pause() }
-                        machine.onPauseRequested()
-                        sync()
-                        Log.i(TAG, "VIDEO_PAUSED id=$mediaStoreId")
-                    } else if (player != null && machine.canPlay()) {
-                        if (runCatching { player.start() }.isSuccess) {
-                            machine.onPlayRequested()
-                            sync()
-                            Log.i(TAG, "VIDEO_STARTED id=$mediaStoreId")
-                        } else {
-                            // `start` can still throw on a decoder that died between the check and the call.
-                            machine.onOperationFailed()
-                            sync()
-                            destroyPlayer()
-                            Log.w(TAG, "VIDEO_ERROR id=$mediaStoreId kind=start_refused")
-                        }
-                    }
-                },
+                // The control is drawn before a clip is ready on purpose — it is the one that stays put while
+                // the spinner comes and goes — so tapping early is too early, not an error, and nothing is
+                // asked of the player until the machine says it may be asked.
+                onClick = { session.togglePlay() },
             ) {
                 Icon(
                     imageVector = if (state == VideoPlayerState.Playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -425,21 +281,12 @@ fun VideoStage(
                         scrubbingTo = value.toLong().coerceIn(0L, durationMs)
                     }
                 },
-                // One seek per drag. Seeking on every frame asks the decoder to resynchronise a dozen
-                // times a second, which is what a scrub on a long clip should not cost.
+                // One seek per drag. Seeking on every frame asks the decoder to resynchronise a dozen times a
+                // second, which is what a scrub on a long clip should not cost.
                 onValueChangeFinished = {
                     val target = scrubbingTo
                     scrubbingTo = NO_SCRUB
-                    if (target != NO_SCRUB) {
-                        val allowed = machine.seekTarget(target)
-                        val player = session.player
-                        if (allowed != null && player != null && runCatching { player.seekTo(allowed.toInt()) }.isSuccess) {
-                            machine.onSeek(allowed)
-                            positionMs = machine.positionMs
-                            state = machine.state
-                            Log.i(TAG, "VIDEO_SEEK id=$mediaStoreId")
-                        }
-                    }
+                    if (target != NO_SCRUB) session.seekTo(target)
                 },
                 valueRange = 0f..(if (durationMs > 0L) durationMs.toFloat() else 1f),
                 enabled = durationMs > 0L && state != VideoPlayerState.Released,
@@ -456,22 +303,8 @@ fun VideoStage(
     }
 }
 
-/**
- * The one mutable thing a page owns: its player, and the machine that decides when it may be touched.
- *
- * Deliberately not `remember { MediaPlayer() }`: the allocation belongs to the moment the page is looked
- * at, not to the moment the pager composes it, so a neighbour costs nothing at all.
- */
-private class VideoSession {
-    val playback = VideoPlayback()
-    var player: MediaPlayer? = null
-}
-
 /** How often the playhead is read while a clip runs. */
 private const val POSITION_POLL_MILLIS = 100L
 
 /** "The thumb is not being held", because position 0 is a place a person can drag to. */
 private const val NO_SCRUB = -1L
-
-/** Ids and categories only — no uri, no path, no framework error text. */
-private const val TAG = "LumoVaultVideo"

@@ -198,6 +198,20 @@ dependencies {
     // makes an animated file move, and a still GIF is a wrong answer that looks right.
     implementation(libs.coil.gif)
 
+    // Video playback. `android.media.MediaPlayer` did this until the viewer's crash fix, and it still would
+    // except that its state machine has to be enforced by the caller: nearly every method throws
+    // `IllegalStateException` in the wrong state, including from callbacks that arrive on a thread no
+    // `runCatching` in a composable is anywhere near. Media3 owns that lifecycle instead of exposing it, and
+    // it owns the surface too — `ExoPlayerImpl` registers the `SurfaceHolder.Callback` behind
+    // `setVideoSurfaceView` and drops the video output when the surface dies, which is what the hand-written
+    // equivalent in this file used to have to guard. Local `content://` playback does not *need* a media
+    // framework; the reason to hold one is that a decoder that behaves differently per device is a bug report
+    // that cannot be reproduced here. `coil-video` stays: it is still what paints a poster for the page the
+    // user is not looking at. See the catalog entry for what was checked before this was added.
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     // Phase 8 reads a photo's own GPS and camera data out of its EXIF block. The platform's
     // android.media.ExifInterface is not the same class: it does not parse the HEIF/HEIC and PNG containers
     // that photos actually arrive in on modern devices, so choosing it would silently drop half a library
