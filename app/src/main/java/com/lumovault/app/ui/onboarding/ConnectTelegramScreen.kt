@@ -44,7 +44,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Country
@@ -59,6 +58,7 @@ import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXs
 
 /**
  * Screen 3, and the only screen that talks to Telegram.
@@ -274,7 +274,7 @@ private fun PhoneFields(
                 // Real spacing, not the trailing space character the label used to carry.
                 Text(
                     text = country.dialPrefix,
-                    modifier = Modifier.padding(end = 4.dp),
+                    modifier = Modifier.padding(end = SpaceXs),
                 )
             }
         },

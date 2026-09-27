@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.lumovault.app.ui.theme.MediaBadgeCorner
 import com.lumovault.app.ui.theme.MediaBadgePadding
+import com.lumovault.app.ui.theme.MediaBadgePaddingVertical
 import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaGlyphIconSize
 import com.lumovault.app.ui.theme.MediaGlyphScrim
@@ -80,7 +80,7 @@ fun MediaPill(
             maxLines = 1,
             softWrap = false,
             textAlign = textAlign,
-            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = MediaBadgePadding, vertical = MediaBadgePaddingVertical),
         )
     }
 }

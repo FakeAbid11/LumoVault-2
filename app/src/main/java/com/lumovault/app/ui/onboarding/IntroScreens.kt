@@ -21,9 +21,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
-import com.lumovault.app.ui.theme.SpaceMd
 
 /** How many onboarding steps there are, shown in the progress header. */
 const val ONBOARDING_STEPS = 6
@@ -45,14 +46,14 @@ fun WelcomeScreen(
     ) {
         Box(
             modifier = Modifier
-                .size(104.dp)
+                .size(HeroMedallion)
                 .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.PhotoLibrary,
                 contentDescription = null,
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(HeroGlyph),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
@@ -118,7 +119,7 @@ private fun StepNode(label: String, emphasised: Boolean = false) {
     Box(
         modifier = Modifier
             .background(container, CircleShape)
-            .padding(horizontal = 28.dp, vertical = 16.dp),
+            .padding(horizontal = StepBadgePadHorizontal, vertical = SpaceLg),
     ) {
         Text(text = label, style = MaterialTheme.typography.titleMedium, color = content)
     }
@@ -133,3 +134,13 @@ private fun Connector() {
         tint = MaterialTheme.colorScheme.outline,
     )
 }
+
+/**
+ * The welcome screen's own art: a medallion with the library glyph inside it. One screen draws it, so
+ * one file owns its two measures rather than inventing a global rung nobody else would use.
+ */
+private val HeroMedallion = 104.dp
+private val HeroGlyph = 52.dp
+
+/** The step chip is a round container around a short label, so its inset is the label's own measure. */
+private val StepBadgePadHorizontal = 28.dp

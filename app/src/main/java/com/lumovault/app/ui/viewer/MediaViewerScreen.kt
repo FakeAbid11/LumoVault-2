@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -69,15 +68,17 @@ import com.lumovault.app.ui.navigation.ViewerTarget
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.distinctUntilChanged
-import com.lumovault.app.ui.theme.MediaBadgeScrim
-import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.BackedUpAccent
 import com.lumovault.app.ui.theme.ChromeScrim
 import com.lumovault.app.ui.theme.FavoriteAccent
-import com.lumovault.app.ui.theme.BackedUpAccent
 import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.MediaBadgeScrim
+import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
+import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
  * The full-screen viewer: one item, the list it came from, and what can be done to it.
@@ -378,7 +379,7 @@ private fun ViewerTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(SpaceXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onNavigateUp) {
@@ -402,7 +403,7 @@ private fun ViewerTopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = SpaceSm),
         )
 
         if (total > 1) {
@@ -410,7 +411,7 @@ private fun ViewerTopBar(
                 text = pluralStringResource(R.plurals.viewer_position, position, position, total),
                 style = MaterialTheme.typography.labelMedium,
                 color = OnMedia,
-                modifier = Modifier.padding(end = 4.dp),
+                modifier = Modifier.padding(end = SpaceXs),
             )
         }
 
@@ -478,12 +479,12 @@ private fun ViewerActionBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(SpaceMd),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = MediaBadgeScrim,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = SpaceXs, vertical = SpaceXxs),
         ) {
             IconButton(onClick = onFavorite) {
                 Icon(

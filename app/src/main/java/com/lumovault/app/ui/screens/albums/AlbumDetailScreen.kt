@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
@@ -53,7 +52,6 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
@@ -64,11 +62,11 @@ import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
-import com.lumovault.app.ui.theme.GroupCardCorner
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxl
 import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
@@ -308,7 +306,7 @@ private fun AlbumHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = SpaceLg, vertical = SpaceSm),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(SpaceXxs),
     ) {
         Text(text = title, style = MaterialTheme.typography.titleLarge)
         Text(
@@ -381,7 +379,7 @@ private fun MediaGrid(
                 text = stringResource(R.string.albums_no_items),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(32.dp),
+                modifier = Modifier.padding(SpaceXxl),
                 textAlign = TextAlign.Center,
             )
         }
@@ -433,7 +431,7 @@ private fun AlbumActionBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(GridSpacing),
-        shape = RoundedCornerShape(GroupCardCorner),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -448,7 +446,7 @@ private fun AlbumActionBar(
             Text(
                 text = stringResource(R.string.album_selected_count, selectionSize),
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(end = 4.dp),
+                modifier = Modifier.padding(end = SpaceXs),
             )
             if (isTrash) {
                 ActionIcon(Icons.Filled.Restore, R.string.trash_restore_action, onRestore)
@@ -588,8 +586,8 @@ private fun NoticeBanner(text: String) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = GridSpacing, vertical = 4.dp),
-        shape = RoundedCornerShape(GroupCardCorner),
+            .padding(horizontal = GridSpacing, vertical = SpaceXs),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Text(

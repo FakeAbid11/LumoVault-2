@@ -511,10 +511,10 @@ private fun CloudViewer(
         Surface(
             modifier = Modifier.fillMaxWidth().padding(SpaceXxl),
             shape = RoundedCornerShape(MediaThumbCorner),
-            tonalElevation = 3.dp,
+            tonalElevation = DialogTonalElevation,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(SpaceLg),
                 verticalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
                 val path = previewPath
@@ -648,6 +648,9 @@ private fun CloudUiState.Preparing.Step.labelRes(): Int = when (this) {
 }
 
 private val ViewerPreviewHeight = 260.dp
+
+/** Material 3's own elevation for a dialog: tone, not shadow, because the scrim already separates it. */
+private val DialogTonalElevation = 3.dp
 
 /** Bigger than a corner mark and smaller than the cell: a placeholder is the whole cell's content. */
 private val PlaceholderIconSize = 22.dp

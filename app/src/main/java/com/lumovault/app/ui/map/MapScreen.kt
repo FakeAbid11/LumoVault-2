@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -76,10 +75,11 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import com.lumovault.app.ui.theme.MapNoticeScrim
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 import androidx.compose.ui.graphics.toArgb
-import com.lumovault.app.ui.theme.SpaceMd
 
 /**
  * The photo map: every placed photograph in the rectangle the user is looking at.
@@ -314,7 +314,7 @@ fun MapScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (viewModel.tilesConfigured) 8.dp else 64.dp)
+                    .padding(top = if (viewModel.tilesConfigured) SpaceSm else NoticeBelowTilesWarning)
                     .padding(horizontal = SpaceMd),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -412,7 +412,7 @@ fun MapScreen(
                         end = SpaceSm,
                         bottom = AttributionReserve,
                     )
-                    .background(MapNoticeScrim, RoundedCornerShape(StripCorner))
+                    .background(MapNoticeScrim, MaterialTheme.shapes.medium)
                     .padding(horizontal = SpaceSm, vertical = SpaceSm),
                 horizontalArrangement = Arrangement.spacedBy(SpaceXs),
                 contentPadding = PaddingValues(horizontal = SpaceXs),
@@ -431,7 +431,7 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .background(MapNoticeScrim)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .padding(horizontal = AttributionPadHorizontal, vertical = SpaceXxs),
             )
         }
     }
@@ -593,7 +593,7 @@ private fun MapPreviewCard(
         Column(modifier = Modifier.padding(SpaceMd)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (first != null) {
-                    StripThumbnail(photo = first, onClick = { onOpen(first.mediaStoreId) }, size = 64.dp)
+                    StripThumbnail(photo = first, onClick = { onOpen(first.mediaStoreId) }, size = CardStripSize)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -700,7 +700,16 @@ private val MarkerLabelSize = 14.dp
 
 /** A strip small enough to read as a strip and large enough to tap: 56 dp is a target, not a thumbnail wall. */
 private val StripSize = 56.dp
-private val StripCorner = 12.dp
 
 /** How much of the bottom edge belongs to the attribution line, so the strip is lifted above it. */
 private val AttributionReserve = 22.dp
+
+/** The location prompt owns the top edge, unless the missing-tiles notice is already there — then it starts
+ * below it, because two notices stacked at the same anchor read as one garbled panel. */
+private val NoticeBelowTilesWarning = 64.dp
+
+/** A selected photo is shown bigger than a strip cell: it is the card's subject, not one of its siblings. */
+private val CardStripSize = 64.dp
+
+/** The attribution line is text on a scrim, not a badge on a photograph, so it takes its own inset. */
+private val AttributionPadHorizontal = 6.dp

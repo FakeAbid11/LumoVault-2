@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -54,7 +53,6 @@ import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
 import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
 import com.lumovault.app.util.toByteText
-import com.lumovault.app.ui.theme.GroupCardCorner
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.MinTouchTarget
@@ -228,7 +226,7 @@ private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
 private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(GroupCardCorner),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = SpaceLg, vertical = SpaceMd),
@@ -306,7 +304,7 @@ private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
 private fun StopCard(reason: BackupStop, onOpenCloudTab: () -> Unit, onConnectTelegram: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(GroupCardCorner),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -817,7 +815,7 @@ private fun FailureRow(failure: BackupFailureItem, onOpen: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MinTouchTarget)
-            .clip(RoundedCornerShape(GroupCardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onOpen)
             .padding(vertical = SpaceXs),
     ) {
@@ -879,7 +877,7 @@ private fun EntryRow(title: String, subtitle: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MinTouchTarget)
-            .clip(RoundedCornerShape(GroupCardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(horizontal = SpaceXs, vertical = SpaceSm),
         verticalAlignment = Alignment.CenterVertically,

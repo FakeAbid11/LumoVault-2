@@ -26,6 +26,9 @@ internal val MediaBadgeCorner = 4.dp
 internal val MediaBadgeInset = 6.dp
 internal val MediaBadgePadding = 4.dp
 
+/** A badge's vertical air is a hairline on purpose: the label's own line height should set the chip's height. */
+internal val MediaBadgePaddingVertical = 1.dp
+
 /** A mark on a photograph: a 16 dp glyph needs the dark disc behind it to survive a bright sky, so the disc,
  * not the glyph, sets the size — and 26 dp is still small against a 100 dp cell. */
 internal val MediaGlyphSize = 26.dp

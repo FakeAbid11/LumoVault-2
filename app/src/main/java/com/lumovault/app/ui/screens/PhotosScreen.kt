@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
@@ -80,9 +79,10 @@ import java.time.LocalDate
 import kotlinx.coroutines.launch
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
-import com.lumovault.app.ui.theme.GroupCardCorner
 import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RailWidth
+import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.RingStrokeBold
 import com.lumovault.app.ui.theme.RingWaiting
 import com.lumovault.app.ui.theme.SpaceLg
@@ -280,7 +280,7 @@ private fun BackupBar(
 ) {
     Surface(
         modifier = modifier.padding(SpaceSm),
-        shape = RoundedCornerShape(GroupCardCorner),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -320,7 +320,7 @@ private fun BackupBar(
                         modifier = Modifier.weight(1f),
                     )
                     if (summary.inFlight > 0) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
                     }
                     TextButton(onClick = onCancel) {
                         Text(stringResource(R.string.backup_cancel))
@@ -459,7 +459,7 @@ private fun LimitedAccessNotice() {
             .padding(start = GridSpacing, end = RailWidth, top = SpaceSm, bottom = SpaceSm)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(GroupCardCorner),
+                MaterialTheme.shapes.medium,
             )
             .padding(horizontal = SpaceMd, vertical = SpaceSm),
         horizontalArrangement = Arrangement.spacedBy(SpaceSm),

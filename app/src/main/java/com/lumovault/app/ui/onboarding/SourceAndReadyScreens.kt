@@ -112,7 +112,7 @@ private fun SourceOption(
                 text = supporting,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 48.dp),
+                modifier = Modifier.padding(start = SublineIndent),
             )
         }
     }
@@ -160,7 +160,7 @@ fun FolderSelectionScreen(
                     Icon(
                         imageVector = Icons.Filled.FolderOff,
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(NoticeGlyphSize),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
@@ -296,3 +296,9 @@ private fun ChecklistStatus.labelRes(): Int = when (this) {
     ChecklistStatus.Missing -> R.string.status_not_set
     ChecklistStatus.Unavailable -> R.string.status_unavailable
 }
+
+/** A sub-line starts under its row's label, not under its radio button, so it clears the control and its gap. */
+private val SublineIndent = 48.dp
+
+/** The empty-folders notice is a statement, not a row glyph, so it is bigger than the mark scale. */
+private val NoticeGlyphSize = 28.dp

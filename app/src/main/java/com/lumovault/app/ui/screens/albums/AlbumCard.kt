@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
@@ -43,6 +42,7 @@ import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
  * The albums' shared look: a cover, and two lines about it on the screen's own background.
@@ -71,7 +71,7 @@ fun AlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(ShapeCorner))
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
@@ -92,7 +92,7 @@ fun AlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = SpaceXs, end = SpaceXs, top = SpaceSm, bottom = SpaceXs),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(SpaceXxs),
         ) {
             Text(
                 text = title,
@@ -187,6 +187,5 @@ val SystemAlbum.icon: ImageVector
         SystemAlbum.RecentlyAdded -> Icons.Filled.Schedule
     }
 
-private val ShapeCorner = 12.dp
 private val BadgeSize = 40.dp
 private val BadgeIconSize = 20.dp

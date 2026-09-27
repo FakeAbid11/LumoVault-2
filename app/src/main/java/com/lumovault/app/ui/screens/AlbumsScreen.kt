@@ -40,6 +40,7 @@ import com.lumovault.app.ui.screens.albums.AlbumNameDialog
 import com.lumovault.app.ui.screens.albums.icon
 import com.lumovault.app.ui.screens.albums.titleRes
 import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.ScreenEdge
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
 
@@ -63,9 +64,9 @@ fun AlbumsScreen(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = CardMinSize),
             state = rememberLazyGridState(),
-            contentPadding = PaddingValues(horizontal = SectionPadding, vertical = SpaceSm),
-            horizontalArrangement = Arrangement.spacedBy(CardGap),
-            verticalArrangement = Arrangement.spacedBy(CardGap),
+            contentPadding = PaddingValues(horizontal = ScreenEdge, vertical = SpaceSm),
+            horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
             modifier = Modifier.fillMaxSize(),
         ) {
             item(key = "system-header", span = { GridItemSpan(maxLineSpan) }) {
@@ -201,5 +202,3 @@ private fun SectionHeader(@StringRes label: Int, modifier: Modifier = Modifier) 
 }
 
 private val CardMinSize = 150.dp
-private val CardGap = 8.dp
-private val SectionPadding = 12.dp

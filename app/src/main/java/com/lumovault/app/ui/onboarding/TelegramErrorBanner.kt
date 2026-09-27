@@ -18,12 +18,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
 import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 
 /**
  * Human-readable authentication failures (PRD section 58). The raw TDLib reason never appears here:
@@ -70,7 +70,7 @@ fun TelegramErrorBanner(
     ) {
         Column(
             modifier = Modifier.padding(SpaceLg),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SpaceMd)) {
                 Icon(
@@ -98,7 +98,7 @@ fun TelegramErrorBanner(
             )
 
             if (onRetry != null) {
-                TextButton(onClick = onRetry, modifier = Modifier.padding(start = 0.dp)) {
+                TextButton(onClick = onRetry) {
                     Text(stringResource(R.string.error_retry))
                 }
             }

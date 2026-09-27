@@ -37,7 +37,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -47,7 +46,11 @@ import coil3.compose.SubcomposeAsyncImage
 import com.lumovault.app.R
 import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.RingWaiting
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
+import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
 
@@ -189,7 +192,7 @@ fun VideoStage(
             modifier = modifier
                 .fillMaxSize()
                 .background(Color.Black),
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -255,7 +258,7 @@ fun VideoStage(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = SpaceSm, vertical = SpaceXxs),
         ) {
             IconButton(
                 // The control is drawn before a clip is ready on purpose — it is the one that stays put while
@@ -299,7 +302,7 @@ fun VideoStage(
                 text = formatDuration(positionMs) + " / " + formatDuration(durationMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = OnMedia,
-                modifier = Modifier.padding(start = 8.dp, end = 4.dp),
+                modifier = Modifier.padding(start = SpaceSm, end = SpaceXs),
             )
         }
     }

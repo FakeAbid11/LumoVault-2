@@ -15,13 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.restore.RestoreFailureKind
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreState
 import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RingStroke
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.util.toByteText
 
 /**
@@ -44,7 +45,7 @@ internal fun RestoreAction(
 ) {
     val live = job?.takeIf { it.state.isLive }
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SpaceSm)) {
         when (job?.state) {
             null, RestoreState.Failed, RestoreState.Cancelled -> {
                 Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
@@ -77,7 +78,7 @@ internal fun RestoreAction(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                 ) {
                     if (live != null) {
                         CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
@@ -96,7 +97,7 @@ internal fun RestoreAction(
             RestoreState.Downloading -> Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
                 Text(
