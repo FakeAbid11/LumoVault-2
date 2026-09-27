@@ -136,14 +136,18 @@ class AppContainer(context: Context) {
 
     val mediaRepository: MediaRepository by lazy {
         MediaRepositoryImpl(
-            database = database,
             dao = database.mediaDao(),
             source = MediaStoreDataSource(appContext.contentResolver),
             organization = mediaOrganizationDao,
             albums = albumDao,
-            settings = settingsStore,
-            nowSeconds = ::unixNow,
             metadata = mediaMetadataDao,
+            inTransaction = { block -> database.withTransaction(block) },
+            // A callback rather than the store itself so the stamp happens inside the sync's own transaction:
+            // "last scan" has to name an index the caller can already see, and a pass that was refused by the
+            // provider must not leave one behind that says otherwise.
+            stampScan = {
+                settingsStore.update { current -> current.copy(lastScanSeconds = unixNow()) }
+            },
         )
     }
 

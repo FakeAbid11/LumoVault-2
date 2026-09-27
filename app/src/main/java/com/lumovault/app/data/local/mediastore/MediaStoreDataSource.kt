@@ -26,26 +26,35 @@ import kotlinx.coroutines.withContext
  * minSdk is 29, so `RELATIVE_PATH`, `IS_PENDING` and the `Files` collection need no version guard —
  * which is also why this file has no legacy `MediaColumns.DATA` path.
  */
-class MediaStoreDataSource(private val resolver: ContentResolver) {
+class MediaStoreDataSource(private val resolver: ContentResolver) : MediaIndexSource {
 
     /**
-     * Returns the current index as rows tagged with [scanId]. The repository upserts these and then
-     * deletes anything the scan did not touch, which is how removals are detected without
-     * rebuilding the table.
+     * Returns the current index as rows tagged with [scanId]. The repository upserts these and then deletes
+     * anything the scan did not touch, which is how removals are detected without rebuilding the table.
+     *
+     * The return type is the careful part. Two physical outcomes look identical as a list and are not
+     * interchangeable at the prune: a provider that could not answer, and a library that is genuinely empty.
+     * The first used to be reported as the second.
      */
-    suspend fun scan(scanId: Long): List<MediaEntity> = withContext(Dispatchers.IO) {
+    override suspend fun scan(scanId: Long): MediaIndexScan = withContext(Dispatchers.IO) {
         val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
-        resolver.query(collection, PROJECTION, SELECTION, SELECTION_ARGS, SORT_ORDER)
-            ?.use { cursor ->
-                if (cursor.count <= 0) return@use emptyList()
-                buildList(capacity = cursor.count.coerceAtMost(MAX_INITIAL_CAPACITY)) {
-                    while (cursor.moveToNext()) {
-                        cursor.toMediaEntity(collection, scanId)?.let { add(it) }
-                    }
+        // Null is the provider failing, not the answer being nothing. Every other line of this function is a
+        // read that can only be trusted because this one distinguishes them.
+        val cursor = resolver.query(collection, PROJECTION, SELECTION, SELECTION_ARGS, SORT_ORDER)
+            ?: return@withContext MediaIndexScan.CouldNotConclude
+
+        val rows: List<MediaEntity> = cursor.use {
+            buildList(capacity = it.count.coerceAtMost(MAX_INITIAL_CAPACITY)) {
+                while (it.moveToNext()) {
+                    it.toMediaEntity(collection, scanId)?.let { row -> add(row) }
                 }
             }
-            ?: emptyList()
+        }
+
+        // Empty after a cursor that opened is still an answer: either nothing matched the projection or every
+        // row that did was unindexable, and in both cases the files are not in the library.
+        if (rows.isEmpty()) MediaIndexScan.EmptyLibrary else MediaIndexScan.Found(rows)
     }
 
     /**

@@ -23,11 +23,14 @@ interface MediaRepository {
     fun observeFolders(): Flow<List<String>>
 
     /**
-     * Synchronises the index with MediaStore: new rows inserted, changed rows updated, rows that
-     * no longer exist removed. Idempotent, and never a wipe-and-rebuild.
+     * Synchronises the index with MediaStore: new rows inserted, changed rows updated, rows that no longer
+     * exist removed. Idempotent, and never a wipe-and-rebuild.
      *
-     * Returns the number of items indexed. Does not hash file contents — that is the backup
-     * engine's job in Phase 6.
+     * Returns the number of items indexed. Does not hash file contents — that is the backup engine's job in
+     * Phase 6.
+     *
+     * Not every call reaches MediaStore at all. When the provider could not answer, nothing is written and the
+     * result says so, because the rows this removes cannot be recovered by the next scan.
      */
     suspend fun sync(): SyncResult
 
@@ -46,7 +49,17 @@ interface MediaRepository {
     suspend fun clear()
 }
 
+/**
+ * What one sync did to the index.
+ *
+ * [reconciled] is the field a caller needs: false means the device was never asked, so the index is still
+ * whatever it was and nothing about the library has been learned. That is not the same statement as
+ * `indexed = 0, removed = 0`, which is what a phone with genuinely no photos reports — and folding the two
+ * together is exactly how a provider that could not answer came to look like an empty album.
+ */
 data class SyncResult(
     val indexed: Int,
     val removed: Int,
+    /** False when the scan could not conclude and the index was deliberately left as it was. */
+    val reconciled: Boolean = true,
 )

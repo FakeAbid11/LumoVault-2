@@ -1,14 +1,13 @@
 package com.lumovault.app.data.repository
 
-import androidx.room.withTransaction
-import com.lumovault.app.data.local.LumoVaultDatabase
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
-import com.lumovault.app.data.local.mediastore.MediaStoreDataSource
+import com.lumovault.app.data.local.mediastore.MediaIndexScan
+import com.lumovault.app.data.local.mediastore.MediaIndexSource
+import com.lumovault.app.data.local.mediastore.prunesIndex
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.metadata.MediaMetadataDao
-import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
@@ -22,24 +21,35 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Keeps the Room index in step with MediaStore.
  *
- * A sync tags every row it saw with a scan id, upserts them, then deletes rows whose tag is older. That
- * is what makes removal detectable without a `NOT IN (…)` list — a library of tens of thousands of items
- * would blow past SQLite's variable limit — and without clearing the table, which would throw away the
- * timeline on every refresh.
+ * A sync tags every row it saw with a scan id, upserts them, then deletes rows whose tag is older. That is what
+ * makes removal detectable without a `NOT IN (…)` list — a library of tens of thousands of items would blow past
+ * SQLite's variable limit — and without clearing the table, which would throw away the timeline on every refresh.
  *
- * The prune is also the moment the app learns that a file left the device for good, so the two
- * organisation sweeps run in the same transaction: a favourite or an album membership for a MediaStore
- * id that no longer resolves is invisible to every query but never stops accumulating.
+ * The prune is also the moment the app learns that a file left the device for good, so the two organisation
+ * sweeps run in the same transaction: a favourite or an album membership for a MediaStore id that no longer
+ * resolves is invisible to every query but never stops accumulating.
+ *
+ * Both of those facts are why an inconclusive scan stops here rather than syncing. The sweeps are written as
+ * `NOT IN (SELECT media_store_id FROM media)`, which over an emptied `media` is true of every row they own — so
+ * a scan that did not answer would take the user's favourites, archive marks, trash timestamps, album
+ * memberships and every GPS position with it, in one commit, permanently. Nothing downstream can undo it, because
+ * none of it is derivable from MediaStore.
  */
 class MediaRepositoryImpl(
-    private val database: LumoVaultDatabase,
     private val dao: MediaDao,
-    private val source: MediaStoreDataSource,
+    private val source: MediaIndexSource,
     private val organization: MediaOrganizationDao,
     private val albums: AlbumDao,
     private val metadata: MediaMetadataDao,
-    private val settings: AppSettingsStore,
-    private val nowSeconds: () -> Long = System::currentTimeMillis,
+    private val inTransaction: suspend (suspend () -> Unit) -> Unit,
+    /**
+     * Stamps the settings row, from inside the transaction the prune ran in.
+     *
+     * A callback rather than the settings store so the ordering is kept by the caller: "last scan" has to name
+     * an index the caller can already see, and a pass that was refused by the provider must not leave a stamp
+     * behind claiming it was not.
+     */
+    private val stampScan: suspend () -> Unit,
 ) : MediaRepository {
 
     /**
@@ -71,13 +81,21 @@ class MediaRepositoryImpl(
 
     override suspend fun sync(): SyncResult = syncLock.withLock {
         val scanId = System.currentTimeMillis()
-        val scanned = source.scan(scanId)
+        val scan = source.scan(scanId)
 
-        database.withTransaction {
+        // Decided before anything is written, and it is the only guard the destructive half of this function
+        // has. The scan id is generated but unused on this path, so the previous pass's tags are left exactly
+        // as they were and the next period is an ordinary scan rather than a recovery from a wipe.
+        if (!scan.prunesIndex()) return@withLock SyncResult(indexed = 0, removed = 0, reconciled = false)
+
+        val rows = (scan as? MediaIndexScan.Found)?.rows.orEmpty()
+        var removed = 0
+
+        inTransaction {
             // Chunked so one sync cannot hold the write transaction long enough to starve the
             // timeline query of a scroll in progress.
-            scanned.chunked(UPSERT_CHUNK).forEach { dao.upsertAll(it) }
-            val removed = dao.pruneBefore(scanId)
+            rows.chunked(UPSERT_CHUNK).forEach { dao.upsertAll(it) }
+            removed = dao.pruneBefore(scanId)
             organization.cleanupOrphans()
             albums.cleanupOrphanMemberships()
             // EXIF belongs to the file, not to a row that happened to survive a scan. A position read out
@@ -88,15 +106,16 @@ class MediaRepositoryImpl(
             // Stamped inside the same transaction as the prune, so "last scan" cannot name a scan whose
             // rows never landed. Diagnostics asks this question, and a timestamp written a moment later by a
             // second statement could be true while the index it describes was not.
-            settings.update { current -> current.copy(lastScanSeconds = nowSeconds()) }
-            SyncResult(indexed = scanned.size, removed = removed)
+            stampScan()
         }
+
+        SyncResult(indexed = rows.size, removed = removed)
     }
 
     override suspend fun local(mediaStoreId: Long): Media? = dao.rowFor(mediaStoreId)?.toMedia()
 
     override suspend fun clear() {
-        database.withTransaction { dao.clear() }
+        inTransaction { dao.clear() }
     }
 
     private companion object {
