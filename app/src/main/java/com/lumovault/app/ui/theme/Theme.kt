@@ -18,7 +18,15 @@ private val LumoVaultDarkColors = darkColorScheme(
     onSurface = DarkOnSurface,
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkOnSurfaceVariant,
+    surfaceContainerLowest = DarkSurfaceContainerLowest,
+    surfaceContainerLow = DarkSurfaceContainerLow,
+    surfaceContainer = DarkSurfaceContainer,
+    surfaceContainerHigh = DarkSurfaceContainerHigh,
+    surfaceContainerHighest = DarkSurfaceContainerHighest,
+    surfaceDim = DarkSurfaceDim,
+    surfaceBright = DarkSurfaceBright,
     outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
     error = DarkError,
     onError = DarkOnError,
     errorContainer = DarkErrorContainer,
@@ -38,7 +46,15 @@ private val LumoVaultLightColors = lightColorScheme(
     onSurface = LightOnSurface,
     surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceVariant,
+    surfaceContainerLowest = LightSurfaceContainerLowest,
+    surfaceContainerLow = LightSurfaceContainerLow,
+    surfaceContainer = LightSurfaceContainer,
+    surfaceContainerHigh = LightSurfaceContainerHigh,
+    surfaceContainerHighest = LightSurfaceContainerHighest,
+    surfaceDim = LightSurfaceDim,
+    surfaceBright = LightSurfaceBright,
     outline = LightOutline,
+    outlineVariant = LightOutlineVariant,
     error = ErrorRed,
     onError = OnErrorRed,
     errorContainer = LightErrorContainer,
@@ -48,7 +64,7 @@ private val LumoVaultLightColors = lightColorScheme(
 )
 
 /**
- * Single entry point for colors and typography: screens read the scheme, never a literal color.
+ * Single entry point for colours, shapes and typography: screens read the scheme, never a literal color.
  *
  * Dynamic color is deliberately not used — LumoVault's identity is a fixed blue accent
  * (PRD section 44), and wallpaper-derived palettes would wash it out.
@@ -66,6 +82,7 @@ fun LumoVaultTheme(
 
     MaterialTheme(
         colorScheme = if (useDark) LumoVaultDarkColors else LumoVaultLightColors,
+        shapes = LumoVaultShapes,
         typography = LumoVaultTypography,
         content = content,
     )

@@ -26,6 +26,41 @@ internal val LightPrimaryContainer = Color(0xFFD3E3FF)
 internal val LightOnPrimaryContainer = Color(0xFF00296B)
 internal val LightOutline = Color(0xFF66748C)
 
+/*
+ * The raised-surface ramp, in both schemes.
+ *
+ * Five screens already draw panels with `surfaceContainerHigh` — the map's pin card, the album cover's
+ * badge, the album detail and timeline bars — while `Theme.kt` never defined the container tiers, so
+ * Material 3 answered with its baseline *neutral grey*. That is the one thing a photo library cannot
+ * afford: a grey panel sitting beside a navy one reads as two apps, and it is most visible exactly where
+ * the eye rests, on the cards over the pictures.
+ *
+ * These are the same hue family as `surface`, stepped in tone rather than shifted in colour, and ordered
+ * so a higher tier is always the more raised one — `ThemePaletteTest` asserts that ordering and the
+ * contrast of text on each step, because a ramp nobody can see the difference in is decoration, not a
+ * system. `dim` recesses and `bright` lifts against `surface` in both schemes, which is what a bottom bar
+ * and a dialog respectively need.
+ */
+internal val DarkSurfaceContainerLowest = Color(0xFF010307)
+internal val DarkSurfaceDim = Color(0xFF060A12)
+internal val DarkSurfaceContainerLow = Color(0xFF0B1120)
+internal val DarkSurfaceContainer = Color(0xFF101828)
+internal val DarkSurfaceContainerHigh = Color(0xFF16203A)
+internal val DarkSurfaceContainerHighest = Color(0xFF1D2B4A)
+internal val DarkSurfaceBright = Color(0xFF24334F)
+
+/** Hairlines and dividers: quieter than [DarkOutline], which is the icon colour and has to stay at 3:1. */
+internal val DarkOutlineVariant = Color(0xFF3E4C68)
+
+internal val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
+internal val LightSurfaceBright = Color(0xFFFBFDFF)
+internal val LightSurfaceContainerLow = Color(0xFFF8FBFF)
+internal val LightSurfaceContainer = Color(0xFFEFF5FD)
+internal val LightSurfaceContainerHigh = Color(0xFFE6EEF9)
+internal val LightSurfaceContainerHighest = Color(0xFFDCE9FA)
+internal val LightSurfaceDim = Color(0xFFD3E0F1)
+internal val LightOutlineVariant = Color(0xFFC3CFE0)
+
 // Drawn on top of a photograph, so these cannot come from the colour scheme: a surface colour chosen for a
 // dark or light app background is the wrong value for a badge over whatever the user's picture happens to be.
 // They live here rather than in each screen because four screens need them and two had already drifted apart.
