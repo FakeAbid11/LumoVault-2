@@ -117,3 +117,37 @@ internal val DarkInverseSurface = Color(0xFF2A3140)
 internal val DarkOnInverseSurface = Color(0xFFE6EDF8)
 internal val LightInverseSurface = Color(0xFF253A57)
 internal val LightOnInverseSurface = Color(0xFFEDF2FB)
+
+/*
+ * The secondary roles, which were never defined at all.
+ *
+ * `FilledTonalButton` paints itself with `secondaryContainer`, and with that role unset Material 3 answered
+ * with its baseline purple — the same class of miss as the surface tiers above, and visible in exactly one
+ * place: the primary action of all three cards on the setup step, sitting as a desaturated mauve beside the
+ * correct blue `Continue` pinned at the bottom of the same screen. On the `surfaceVariant` card those buttons
+ * are meant to sit inside, the baseline purple is barely a step away in tone, so the app's most important tap
+ * on the screen read as part of the panel behind it.
+ *
+ * A one-hue brand has nowhere obvious to put a second accent, so this is deliberately *not* an accent: it is a
+ * neutral blue-grey, quieter than `primaryContainer` rather than different from it, because a card action that
+ * matched the screen's own primary button would be two things shouting. Each container carries its scheme's
+ * existing `onSurface` as its label colour — the pairing is then inherited from a text colour the palette test
+ * already proves legible on every surface, instead of being a new value nobody checked.
+ */
+internal val DarkSecondary = Color(0xFFB7C3D6)
+internal val DarkOnSecondary = Color(0xFF233046)
+internal val DarkSecondaryContainer = Color(0xFF3B4A66)
+internal val DarkOnSecondaryContainer = DarkOnSurface
+
+internal val LightSecondary = Color(0xFF4A6289)
+internal val LightOnSecondary = Color(0xFFFFFFFF)
+internal val LightSecondaryContainer = Color(0xFFB0C6E2)
+internal val LightOnSecondaryContainer = LightOnSurface
+
+/**
+ * `tertiary` is left unset on purpose.
+ *
+ * Nothing in the app reads it, and a third accent family invented for completeness is a colour nobody will
+ * defend in review. If a component starts using it, it gets the same treatment as these two: a value chosen
+ * against the surface it has to separate from, and an assertion that says so.
+ */

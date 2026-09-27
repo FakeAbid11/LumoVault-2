@@ -92,14 +92,38 @@ class ThemePaletteTest {
     fun controlsAndIconsClearThreeOnEverySurface() {
         for (surface in DarkSurfaces) {
             assertAtLeast(3.0f, contrast(DarkPrimary, surface), "primary on ${Hex.of(surface)}")
+            assertAtLeast(3.0f, contrast(DarkSecondary, surface), "secondary glyph on ${Hex.of(surface)}")
             assertAtLeast(3.0f, contrast(DarkOutline, surface), "outlined icon on ${Hex.of(surface)}")
             assertAtLeast(3.0f, contrast(DarkError, surface), "error statement on ${Hex.of(surface)}")
         }
         for (surface in LightSurfaces) {
             assertAtLeast(3.0f, contrast(LightPrimary, surface), "primary on ${Hex.of(surface)}")
+            assertAtLeast(3.0f, contrast(LightSecondary, surface), "secondary glyph on ${Hex.of(surface)}")
             assertAtLeast(3.0f, contrast(LightOutline, surface), "outlined icon on ${Hex.of(surface)}")
             assertAtLeast(3.0f, contrast(ErrorRed, surface), "error statement on ${Hex.of(surface)}")
         }
+    }
+
+    @Test
+    fun aTonalControlSeparatesFromThePanelItSitsOn() {
+        // Why the secondary roles had to exist at all: `FilledTonalButton` paints itself with
+        // `secondaryContainer`, and with that role undefined Material answered with its baseline purple —
+        // close enough in tone to the `surfaceVariant` card behind it that the setup screen's primary action
+        // read as part of the panel. WCAG has no rule for "is this control a different rectangle from the
+        // surface it sits on", so the floors below are this file's own and deliberately far below a text
+        // threshold: they assert separateness, not readability.
+        assertAtLeast(1.3f, contrast(DarkSecondaryContainer, DarkSurfaceVariant), "dark tonal button on its card")
+        assertAtLeast(1.3f, contrast(LightSecondaryContainer, LightSurfaceVariant), "light tonal button on its card")
+        assertAtLeast(
+            1.25f,
+            contrast(DarkSecondaryContainer, DarkPrimaryContainer),
+            "dark: a secondary action must not be mistaken for the screen's primary one",
+        )
+        assertAtLeast(
+            1.25f,
+            contrast(LightSecondaryContainer, LightPrimaryContainer),
+            "light: a secondary action must not be mistaken for the screen's primary one",
+        )
     }
 
     @Test
@@ -108,6 +132,16 @@ class ThemePaletteTest {
         assertAtLeast(4.5f, contrast(LightOnErrorContainer, LightErrorContainer), "light error container text")
         assertAtLeast(4.5f, contrast(DarkOnPrimaryContainer, DarkPrimaryContainer), "primary container text")
         assertAtLeast(4.5f, contrast(LightOnPrimaryContainer, LightPrimaryContainer), "light primary container text")
+        assertAtLeast(
+            4.5f,
+            contrast(DarkOnSecondaryContainer, DarkSecondaryContainer),
+            "secondary container text",
+        )
+        assertAtLeast(
+            4.5f,
+            contrast(LightOnSecondaryContainer, LightSecondaryContainer),
+            "light secondary container text",
+        )
         assertAtLeast(4.5f, contrast(DarkOnPrimary, DarkPrimary), "button label")
         assertAtLeast(4.5f, contrast(LightOnPrimary, LightPrimary), "light button label")
         // The floating chip in the date rail: white-ish text on the inverted surface, in both schemes.
