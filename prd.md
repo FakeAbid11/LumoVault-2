@@ -931,6 +931,9 @@ Background backup
 
 into one screen.
 
+Screen 3 may be passed without authenticating (section 35). A deferred account leaves the queue waiting on
+the device rather than backing anything up, which is what the backup and Cloud screens report.
+
 33. Onboarding Screen 1 — Welcome
 
 Content:
@@ -1000,6 +1003,21 @@ to use it as your private cloud storage.
 └─────────────────────────────┘
 
 [ Continue ]
+
+[ Skip for now ]
+
+Optional:
+
+Skip for now
+
+Connecting an account may be deferred from this screen. What does not need Telegram keeps working — the
+local library, albums, favourites, archiving, Trash and the map — and media chosen for backup is queued on
+the device rather than dropped, then sent by the ordinary queue once an account exists. Nothing is uploaded
+and nothing is claimed to be while there is no account.
+
+The Cloud tab states this plainly each time it is opened while no account is connected, and its action
+returns here. A build that cannot reach Telegram at all shows no separate skip: its primary action already
+continues setup, because there is no sign-in available to skip.
 
 36. Country Code Selector
 
