@@ -49,9 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.app.R
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
+import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
 import com.lumovault.app.util.toByteText
 import com.lumovault.app.ui.theme.GroupCardCorner
 import com.lumovault.app.ui.theme.LumoVaultType
@@ -402,10 +404,13 @@ fun BackupHealthScreen(
 @Composable
 fun DiagnosticsScreen(
     onNavigateUp: () -> Unit,
+    /** The numbers above are the size of the problem; a failure is only answerable by looking at the item. */
+    onOpenMedia: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BackupViewModel = viewModel(),
 ) {
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+    val failures by viewModel.failedItems.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
@@ -438,6 +443,29 @@ fun DiagnosticsScreen(
             item { Row(R.string.diag_waiting, current.health.waiting.toString()) }
             item { Row(R.string.diag_uploading, current.health.uploading.toString()) }
             item { Row(R.string.diag_failed, current.health.failed.toString()) }
+            // The count and this list come from the same table through two queries, so the list says plainly
+            // when it is only part of the story: a short list that reads as complete is the worse of the two
+            // failures here.
+            if (failures.isNotEmpty()) {
+                item { SectionLabel(R.string.backup_failure_section) }
+                items(failures, key = { failure -> failure.mediaStoreId }) { failure ->
+                    FailureRow(failure = failure, onOpen = { onOpenMedia(failure.mediaStoreId) })
+                }
+                if (current.health.failed > failures.size) {
+                    item {
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.backup_failure_truncated,
+                                failures.size,
+                                failures.size,
+                            ),
+                            style = LumoVaultType.sectionDetail,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        )
+                    }
+                }
+            }
             item {
                 Row(
                     R.string.diag_last_backup,
@@ -770,6 +798,40 @@ private fun CandidateRow(candidate: FreeUpSpaceCandidate, checked: Boolean, onTo
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/**
+ * One failed item: what it was, how big, and the reason the queue recorded for stopping.
+ *
+ * Identified by name and size rather than a thumbnail because that is what a row on a settings screen has
+ * room for — the picture is one tap away, in the viewer, where that photo's own Retry action already lives.
+ * A null name is the item the index no longer holds, which is said rather than hidden: the failure is still
+ * the user's to read.
+ */
+@Composable
+private fun FailureRow(failure: BackupFailureItem, onOpen: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MinTouchTarget)
+            .clip(RoundedCornerShape(GroupCardCorner))
+            .clickable(onClick = onOpen)
+            .padding(vertical = SpaceXs),
+    ) {
+        Text(
+            text = failure.displayName ?: stringResource(R.string.backup_failure_gone),
+            style = LumoVaultType.itemTitle,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        val reason = backupFailureReasonRes(failure.kind)?.let { stringResource(it) }
+            ?: stringResource(R.string.backup_state_failed)
+        val size = failure.sizeBytes?.toByteText()
+        Text(
+            text = if (size == null) reason else "$reason · $size",
+            style = LumoVaultType.sectionDetail,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -8,6 +8,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.repository.SettingsRepository
@@ -54,6 +55,17 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         container.cloudIndexRepository.observeAssociation(),
     ) { live, auth, association -> backupStopReason(live.pending, auth, association != null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /**
+     * The items the queue gave up on, newest first, for the diagnostics list.
+     *
+     * Its own flow rather than another field on [BackupDiagnostics]: that type's contract is about what it
+     * never carries, and a photo's file name is a new kind of content for it. The list is bounded, and the
+     * screen says so when it truncates — an incomplete list that looks complete is worse than a short one.
+     */
+    val failedItems: StateFlow<List<BackupFailureItem>> =
+        container.backupQueueRepository.observeFailed(FAILED_LIST_LIMIT)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     /**
      * Null until the first read has come back.
@@ -108,6 +120,14 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         val EMPTY = BackupHealth(0, 0, 0, 0, 0, 0, 0, 0L, null, null)
+
+        /**
+         * How many failures the diagnostics list will show.
+         *
+         * A phone that backed up over a metered connection all week can hold thousands of failed rows, and
+         * the screen is a place to start reading, not an export. The count beside it is the whole number.
+         */
+        const val FAILED_LIST_LIMIT = 20
     }
 }
 

@@ -173,7 +173,12 @@ fun LumoVaultNavHost(
             )
         }
         composable(BackupRoutes.DIAGNOSTICS) {
-            DiagnosticsScreen(onNavigateUp = navController::navigateUp)
+            DiagnosticsScreen(
+                onNavigateUp = navController::navigateUp,
+                // A reason on its own is half an answer; the photo it belongs to is one tap away, and the
+                // viewer is where the per-item Retry action already lives.
+                onOpenMedia = { mediaId -> navController.navigate(ViewerRoutes.of(mediaId, ViewerTarget.Photos)) },
+            )
         }
         composable(BackupRoutes.FREE_SPACE) {
             FreeUpSpaceScreen(onNavigateUp = navController::navigateUp)
