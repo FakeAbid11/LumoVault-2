@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.provider.MediaStore.Files.FileColumns
 import com.lumovault.app.data.local.media.MediaEntity
+import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.mediaTypeOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -65,7 +66,14 @@ class MediaStoreDataSource(private val resolver: ContentResolver) {
             mediaType = mediaTypeOf(mimeType, isVideo).storageKey,
             mimeType = mimeType ?: UNKNOWN_MIME_TYPE,
             displayName = optionalString(DISPLAY_NAME) ?: id.toString(),
-            relativePath = optionalString(RELATIVE_PATH).orEmpty(),
+            // Canonical, and blank kept blank: every folder equality in this app compares this column
+            // against a selection normalized on the way in, so a spelling only one provider uses is how a
+            // folder the user ticked ends up matching no photo at all — which looks exactly like a folder
+            // with nothing in it.
+            relativePath = optionalString(RELATIVE_PATH)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(FolderPaths::normalize)
+                .orEmpty(),
             sizeBytes = getLong(requireIndex(SIZE)),
             dateAddedSeconds = getLong(requireIndex(DATE_ADDED)),
             dateModifiedSeconds = getLong(requireIndex(DATE_MODIFIED)),

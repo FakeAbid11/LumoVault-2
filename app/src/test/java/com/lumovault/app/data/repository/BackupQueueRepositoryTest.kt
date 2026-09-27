@@ -8,6 +8,7 @@ import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupRequest
 import com.lumovault.app.domain.backup.MediaIdentity
 import com.lumovault.app.domain.backup.UploadState
+import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.repository.RemoteBackup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -39,6 +40,45 @@ class BackupQueueRepositoryTest {
         assertEquals(2, repository.enqueue(listOf(1L, 2L)))
         assertEquals("a second tap must not queue the same item twice", 0, repository.enqueue(listOf(1L, 2L)))
         assertEquals("an id the index does not know is not queueable", 0, repository.enqueue(listOf(99L)))
+    }
+
+    /**
+     * The two questions the automatic pass asks, answered by the two statements that now exist for them.
+     *
+     * The whole-library answer used to be one query with an `includeAll` flag beside a folder list that was
+     * empty in exactly that case, and Room expands an empty list to `IN ()` — a statement SQLite will not
+     * parse. So "back up everything" was a crash waiting for the first pass, while "these folders" with
+     * nothing ticked had to be refused before the query rather than by it.
+     */
+    @Test
+    fun theWholeLibraryAnswerCarriesNoFolderListAtAll() = runBlocking {
+        // `withItemsIn` stamps each row's added-time with its own id, so newest-first is id-descending.
+        dao.withItemsIn("DCIM/Camera/", 1L, 2L)
+        dao.withItemsIn("Pictures/WhatsApp/", 3L)
+
+        assertEquals(
+            listOf(3L, 2L, 1L),
+            repository.autoBackupCandidates(BackupSource.AllMedia, emptyList(), 10),
+        )
+        assertEquals(
+            "an empty selection is a refusal, not a wildcard",
+            emptyList<Long>(),
+            repository.autoBackupCandidates(BackupSource.SelectedFolders, emptyList(), 10),
+        )
+        assertEquals(
+            "and a folder matches only the canonical spelling the scanner stores",
+            listOf(2L, 1L),
+            repository.autoBackupCandidates(BackupSource.SelectedFolders, listOf("DCIM/Camera/"), 10),
+        )
+        assertEquals(
+            emptyList<Long>(),
+            repository.autoBackupCandidates(BackupSource.NotNow, listOf("DCIM/Camera/"), 10),
+        )
+        assertEquals(
+            "never answered is not permission to scan",
+            emptyList<Long>(),
+            repository.autoBackupCandidates(null, listOf("DCIM/Camera/"), 10),
+        )
     }
 
     /**

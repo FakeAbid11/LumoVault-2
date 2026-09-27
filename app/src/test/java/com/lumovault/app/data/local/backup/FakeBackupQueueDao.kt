@@ -122,14 +122,27 @@ class FakeBackupQueueDao : BackupQueueDao {
     }
 
     /**
-     * Mirrors the automatic-backup frontier: nothing recorded or a record that asserts nothing, not in
-     * Trash, inside a selected folder or everything, newest-added first and bounded.
+     * Mirrors the automatic-backup frontier — the same guards the real table's two statements run: nothing
+     * recorded or a record that asserts nothing, not in Trash, inside a selected folder or everything,
+     * newest-added first and bounded.
+     *
+     * Two methods because the real DAO is two queries, and the shape is the point: the whole-library
+     * question carries no folder clause at all, so an empty selection can never reach SQLite as `IN ()`.
      *
      * `cancelled` is absent from the open states on purpose. It is reachable only through the caller's
      * [openState] argument, which is how the fake keeps the real statement's refusal to re-queue a decision
      * the user already made.
      */
-    override suspend fun autoBackupCandidates(
+    override suspend fun autoBackupAllCandidates(openState: String, limit: Int): List<Long> =
+        frontier(openState, includeAll = true, folders = emptyList(), limit = limit)
+
+    override suspend fun autoBackupFolderCandidates(
+        openState: String,
+        folders: Collection<String>,
+        limit: Int,
+    ): List<Long> = frontier(openState, includeAll = false, folders = folders, limit = limit)
+
+    private fun frontier(
         openState: String,
         includeAll: Boolean,
         folders: Collection<String>,

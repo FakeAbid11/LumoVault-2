@@ -163,18 +163,26 @@ class BackupQueueRepositoryImpl(
         folders: List<String>,
         limit: Int,
     ): List<Long> {
-        // `none` and an unanswered question are the same refusal; `selected_folders` with nothing selected
-        // is a third, and it would otherwise read as "everything" through the empty-list branch below.
-        val includeAll = source == BackupSource.AllMedia
-        if (source == null || source == BackupSource.NotNow || (!includeAll && folders.isEmpty())) {
-            return emptyList()
+        val openState = UploadState.NotBackedUp.storageKey
+        val bounded = limit.coerceAtMost(MAX_AUTO_CANDIDATES).coerceAtLeast(1)
+        return when (source) {
+            BackupSource.AllMedia -> dao.autoBackupAllCandidates(openState = openState, limit = bounded)
+
+            // An empty selection is a refusal, answered here rather than by the query, because a folder
+            // list with nothing in it would reach SQLite as `IN ()` — which is not a statement.
+            BackupSource.SelectedFolders -> if (folders.isEmpty()) {
+                emptyList()
+            } else {
+                dao.autoBackupFolderCandidates(
+                    openState = openState,
+                    folders = folders,
+                    limit = bounded,
+                )
+            }
+
+            // `none` and an unanswered question are the same refusal: nothing was agreed to.
+            BackupSource.NotNow, null -> emptyList()
         }
-        return dao.autoBackupCandidates(
-            openState = UploadState.NotBackedUp.storageKey,
-            includeAll = includeAll,
-            folders = folders,
-            limit = limit.coerceAtMost(MAX_AUTO_CANDIDATES).coerceAtLeast(1),
-        )
     }
 
     override suspend fun releaseUnsentOutside(folders: Collection<String>): Int {

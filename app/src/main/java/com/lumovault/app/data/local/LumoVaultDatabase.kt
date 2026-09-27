@@ -40,7 +40,7 @@ import com.lumovault.app.data.local.restore.MediaRestoreEntity
  * a column and no migration produces it. That mismatch is not a warning; it is a crash on the first launch
  * after an upgrade, on a person's own library.
  */
-internal const val LUMOVAULT_SCHEMA_VERSION = 10
+internal const val LUMOVAULT_SCHEMA_VERSION = 11
 
 @Database(
     entities = [
@@ -463,6 +463,31 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * One canonical spelling for `media.relative_path`.
+         *
+         * The folder selection a backup runs on is normalized (`Pictures/Camera/`), and the SQL that reads
+         * it compares `relative_path` exactly, so a provider that ever reports the same directory without
+         * its trailing separator makes a folder the user ticked match nothing — which looks identical to a
+         * folder with no photos in it. The scanner now writes the canonical form, and this brings the rows
+         * that predate it along before the next scan would.
+         *
+         * A value-only migration, which is the one kind Room's schema validation cannot see: no column is
+         * added or moved, so nothing here fails at build time or on open, and a wrong predicate would be a
+         * runtime fact only. The statement deliberately does the one thing that matters — append the
+         * separator where it is missing — and not full normalization, because the scan rewrites every row
+         * through [com.lumovault.app.domain.model.FolderPaths] anyway; an empty path is left empty rather
+         * than turned into the root, which is what the folder list's `relative_path <> ''` filter expects.
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "UPDATE media SET relative_path = relative_path || '/' " +
+                        "WHERE relative_path <> '' AND relative_path NOT LIKE '%/'",
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -473,6 +498,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
+            MIGRATION_10_11,
         )
     }
 }
