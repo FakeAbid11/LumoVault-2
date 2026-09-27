@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -70,6 +71,7 @@ import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.cloud.RestoreAction
 import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.CloudViewModel
+import com.lumovault.app.ui.screens.cloud.shouldOfferConnectDialog
 import com.lumovault.app.util.DayDistance
 import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.toByteText
@@ -110,6 +112,10 @@ fun CloudScreen(
     val restoreJob by viewModel.restoreJob.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var selected by remember { mutableStateOf<CloudMedia?>(null) }
+    // `remember`, not `rememberSaveable`: the ask belongs to this visit, and it comes back on the next one
+    // while the account is still missing. Persisting it would let a single dismissal silence the tab
+    // forever, which is not what a skipped account deserves.
+    var connectDialogDismissed by remember { mutableStateOf(false) }
 
     // Re-sync on every resume: session, channel and account can each change while LumoVault is
     // backgrounded, and an answer remembered from last time would be wrong.
@@ -183,6 +189,32 @@ fun CloudScreen(
                 restoreJobs = restoreJobs,
             )
         }
+    }
+
+    // Asked once per visit, because "skip for now" was a choice and this tab has no business arguing with
+    // it every frame. Dismissing costs nothing: the placeholder behind the dialog keeps the same button for
+    // as long as the user stays on the screen.
+    if (shouldOfferConnectDialog(state, connectDialogDismissed)) {
+        AlertDialog(
+            onDismissRequest = { connectDialogDismissed = true },
+            title = { Text(stringResource(R.string.cloud_connect_dialog_title)) },
+            text = { Text(stringResource(R.string.cloud_connect_dialog_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        connectDialogDismissed = true
+                        onConnectTelegram()
+                    },
+                ) {
+                    Text(stringResource(R.string.cloud_connect_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { connectDialogDismissed = true }) {
+                    Text(stringResource(R.string.cloud_connect_dialog_dismiss))
+                }
+            },
+        )
     }
 
     // The sheet already dismisses on a tap anywhere outside the picture, but the system back gesture was

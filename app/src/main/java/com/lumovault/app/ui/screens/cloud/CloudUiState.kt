@@ -126,3 +126,18 @@ fun deriveCloudState(
         }
     }
 }
+
+/**
+ * Whether the Cloud tab should ask, in its own words, for the sign-in it cannot do without.
+ *
+ * [CloudUiState.NeedsSignIn] alone: the one state where there is nothing on screen *and* a door still open.
+ * [CloudUiState.NotAvailable] is excluded because a build without TDLib has no sign-in to offer, which is
+ * the same reason its placeholder carries no button — a dialog pointing at a screen that cannot work is
+ * worse than silence. A cached `Library` is excluded because that person is reading their own photos and
+ * the offline line above them already tells the truth about freshness.
+ *
+ * [dismissedThisVisit] is per visit rather than per installation: the interruption returns the next time the
+ * tab is opened while the account is still missing, and stops the moment it is not.
+ */
+fun shouldOfferConnectDialog(state: CloudUiState, dismissedThisVisit: Boolean): Boolean =
+    !dismissedThisVisit && state is CloudUiState.NeedsSignIn

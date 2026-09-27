@@ -6,11 +6,14 @@ import com.lumovault.app.domain.restore.RestoreFailureKind
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreState
 import com.lumovault.app.domain.telegram.AuthCodeChannel
+import com.lumovault.app.domain.telegram.CloudFailure
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
+import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.canStartRestore
 import com.lumovault.app.ui.screens.cloud.labelRes
+import com.lumovault.app.ui.screens.cloud.shouldOfferConnectDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -190,6 +193,44 @@ class BackupScreenRulesTest {
             3,
             BackupStop.entries.map { it.titleRes }.distinct().size,
         )
+    }
+
+    /**
+     * The Cloud tab's ask, once per visit, and never where there is no door.
+     *
+     * `NotAvailable` is the case worth pinning: a build without TDLib has no sign-in to reach, so a dialog
+     * offering one would be the app pointing at a screen it cannot make work — the same reason its inline
+     * placeholder carries no button. A cached library is the other way round: there is something to read, so
+     * the offline line is enough.
+     */
+    @Test
+    fun theCloudTabAsksForSignInOnlyWhereSigningInIsPossible() {
+        assertTrue(shouldOfferConnectDialog(CloudUiState.NeedsSignIn, dismissedThisVisit = false))
+        assertFalse(
+            "a visit asks once, and the placeholder behind it keeps the button",
+            shouldOfferConnectDialog(CloudUiState.NeedsSignIn, dismissedThisVisit = true),
+        )
+
+        val silent = listOf(
+            CloudUiState.Idle,
+            CloudUiState.NotAvailable,
+            CloudUiState.Preparing(CloudUiState.Preparing.Step.Searching),
+            CloudUiState.Scanning(found = 0),
+            CloudUiState.NoMedia,
+            CloudUiState.Failed(CloudFailure(CloudFailure.Kind.Unexpected)),
+            CloudUiState.Library(
+                days = emptyList(),
+                counts = emptyList(),
+                totalCount = 12,
+                fromCache = true,
+                refreshing = false,
+                localMatches = emptySet(),
+                hasMoreToLoad = false,
+            ),
+        )
+        silent.forEach { state ->
+            assertFalse("a dialog over $state has nothing to offer", shouldOfferConnectDialog(state, false))
+        }
     }
 
     @Test

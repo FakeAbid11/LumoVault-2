@@ -181,6 +181,10 @@
     <string name="cloud_not_available_body">Your synced cloud library will appear here once Telegram backup is enabled in this app.</string>
     <string name="cloud_needs_signin_title">Connect Telegram to see your cloud</string>
     <string name="cloud_needs_signin_body">Sign in to your Telegram account to load your LumoVault Backup library.</string>
+    <!-- The ask that follows a skipped setup: one sentence about what has not been happening, one about what signing in starts. -->
+    <string name="cloud_connect_dialog_title">Telegram is not connected</string>
+    <string name="cloud_connect_dialog_body">You set up without an account, so nothing has been backing up. Sign in and the photos waiting on this phone go to your LumoVault Backup channel, which then loads here.</string>
+    <string name="cloud_connect_dialog_dismiss">Not now</string>
     <string name="cloud_connect_action">Connect Telegram</string>
     <string name="cloud_preparing_title">Setting up your cloud</string>
     <string name="cloud_step_searching">Looking for your LumoVault Backup channel…</string>
