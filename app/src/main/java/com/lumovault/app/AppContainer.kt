@@ -447,7 +447,14 @@ class AppContainer(context: Context) {
             upload = telegramUploadRepository,
             stager = mediaStager,
             recognition = recognizeBackup,
-            resolveChannel = { cloudIndexRepository.association()?.chatId ?: NO_CHANNEL },
+            // The saved channel if there is one, and otherwise the one this account already has on
+            // Telegram — adopted here rather than awaited. Without the second half, a phone that finished
+            // onboarding and never opened the Cloud tab had a queue nothing could ever drain.
+            resolveChannel = {
+                cloudIndexRepository.association()?.chatId
+                    ?: cloudSync.ensureChannel()?.chatId
+                    ?: NO_CHANNEL
+            },
             // The pass opens its own session rather than relying on a screen having done it: WorkManager
             // runs this in a process that has never shown the sign-in flow, and TDLib refuses every request
             // until its parameters have been handed over once.

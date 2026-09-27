@@ -432,4 +432,49 @@ class SynchronizeCloudUseCaseTest {
         assertTrue("cancellation must not be swallowed into a state", thrown is kotlinx.coroutines.CancellationException)
         assertEquals("and it must not leave a channel behind", 0, telegram.created)
     }
+
+    @Test
+    fun theQueueAdoptsAChannelAndReadsNoHistoryToGetIt() = runBlocking {
+        // The step the upload pass was missing: a phone that finished onboarding and never opened the
+        // Cloud tab had rows in `queued` and no chat id, and nothing in the app could ever have drained
+        // them. Paging the history is deliberately not part of this.
+        val telegram = FakeTelegram(pages = listOf(listOf(9, 8, 7)))
+        val index = FakeIndex()
+
+        val adopted = useCase(telegram, index).ensureChannel()
+
+        assertEquals(CHAT_ID, adopted?.chatId)
+        assertEquals(CHAT_ID, index.saved?.chatId)
+        assertEquals("no history page was asked for", emptyList<Long>(), telegram.requestedFrom)
+    }
+
+    @Test
+    fun theQueueUsesASavedChannelBeforeItAsksTelegramForOne() = runBlocking {
+        val telegram = FakeTelegram(pages = emptyList(), discovery = ChannelDiscovery.Absent)
+        val index = FakeIndex(
+            initial = CloudAssociation(chatId = CHAT_ID, ownerUserId = 11L, protocolVersion = 1),
+        )
+
+        assertEquals(CHAT_ID, useCase(telegram, index).ensureChannel()?.chatId)
+        assertEquals("a warm association is not a reason to search", 0, telegram.discoveries)
+        assertEquals(0, telegram.created)
+    }
+
+    @Test
+    fun theQueueCreatesOnlyOnAnAnswerAndNeverOnASilence() = runBlocking {
+        val absent = FakeTelegram(pages = emptyList(), discovery = ChannelDiscovery.Absent)
+        val absentIndex = FakeIndex()
+        assertEquals(CHAT_ID, useCase(absent, absentIndex).ensureChannel()?.chatId)
+        assertEquals("discovery concluded there was nothing, so this is the one branch that may create", 1, absent.created)
+
+        val loading = FakeTelegram(
+            pages = emptyList(),
+            discovery = ChannelDiscovery.InProgress(ChannelDiscovery.Reason.ChatListLoading),
+        )
+        val loadingIndex = FakeIndex()
+
+        assertNull(useCase(loading, loadingIndex).ensureChannel())
+        assertEquals("an empty answer is not an answer about Telegram", 0, loading.created)
+        assertNull("and nothing is written on the way out", loadingIndex.saved)
+    }
 }

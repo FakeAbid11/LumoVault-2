@@ -81,7 +81,58 @@ class SynchronizeCloudUseCase(
         }
     }
 
+    /**
+     * The channel to back up into, adopting one if this account has none — and nothing else.
+     *
+     * The queue needs exactly this step and none of the others. A send cannot invent a chat id (that is
+     * the whole reason [QueueRun.NoChannel] exists), and until now the only way one ever appeared was for
+     * somebody to open the Cloud tab: a phone that finished onboarding with folders chosen had a full
+     * queue and no drain, because the screen that adopts the channel was the one screen nobody visited.
+     *
+     * Deliberately absent: the history scan. Paging the channel is the screen's job — the dedup pass in
+     * the queue works from the hashes this app recorded when it uploaded, so a send does not wait on a
+     * walk through 50,000 messages.
+     *
+     * The three-verdict rule is unchanged: only a discovery that concluded [ChannelDiscovery.Absent] may
+     * create anything, and an answer that came back empty because TDLib is still loading its chat list
+     * stops here rather than orphaning the user's real channel behind a new empty one.
+     */
+    suspend fun ensureChannel(): CloudAssociation? {
+        if (!telegram.isUsable) {
+            _state.value = CloudInitState.TelegramUnavailable
+            return null
+        }
+        if (!isAuthenticated()) {
+            _state.value = CloudInitState.WaitingForTelegram
+            return null
+        }
+
+        return try {
+            adoptChannel(createIfMissing = true)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: CloudFailureException) {
+            _state.value = failure.toState()
+            null
+        } catch (error: Exception) {
+            _state.value = CloudInitState.Failed(CloudFailure(CloudFailure.Kind.Unexpected))
+            null
+        }
+    }
+
     private suspend fun run(createIfMissing: Boolean): CloudAssociation? {
+        val association = adoptChannel(createIfMissing) ?: return null
+
+        scan(association)
+        _state.value = CloudInitState.Ready
+        return association
+    }
+
+    /**
+     * The saved channel if it is still this account's storage, else the one discovery finds — else the
+     * one creation makes, and only when discovery has *concluded* that there is nothing to find.
+     */
+    private suspend fun adoptChannel(createIfMissing: Boolean): CloudAssociation? {
         val userId = telegram.accountUserId()
 
         _state.value = CloudInitState.ValidatingChannel
@@ -138,8 +189,6 @@ class SynchronizeCloudUseCase(
             recover("CLOUD_CHANNEL_ASSOCIATION_FOUND chat_id=${association.chatId}")
         }
 
-        scan(association)
-        _state.value = CloudInitState.Ready
         return association
     }
 
