@@ -35,6 +35,34 @@ interface BackupQueueDao {
     fun observeCounts(): Flow<List<BackupStateCountRow>>
 
     /**
+     * The items currently failed, newest refusal first, with what each one can be identified by.
+     *
+     * Driven by `state`, never by `failure <> ''`: `moveAll` changes a row's state without touching its
+     * recorded reason, so `requeueFailed` leaves a *queued* item holding the text from the attempt that
+     * failed. Filtering on the reason would therefore show the user a failure for a photo that is on its way
+     * to Telegram right now, which is the opposite of what this list is for.
+     *
+     * A `LEFT JOIN` on `media`, in [newestIn]'s shape and for its reason: a scan can prune the file behind a
+     * queue row, and a null name is how the caller learns to say "no longer in the library" rather than
+     * invent one.
+     *
+     * Bounded by [limit] because the list is a screen, not an export — and a library whose every upload was
+     * refused can hold tens of thousands of these rows.
+     */
+    @Query(
+        """
+        SELECT b.media_store_id AS mediaStoreId, b.failure AS failureKey,
+               m.display_name AS displayName, m.size_bytes AS sizeBytes
+        FROM backup_queue b
+        LEFT JOIN media m ON m.media_store_id = b.media_store_id
+        WHERE b.state = :failedState
+        ORDER BY b.updated_at DESC, b.media_store_id DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeFailed(failedState: String, limit: Int): Flow<List<FailedBackupRow>>
+
+    /**
      * Enqueues ids that have no row yet, and only those that exist in the media index — a queue row
      * for an item the scanner never indexed could never be staged, so refusing it here is more honest
      * than failing it later. Tapping "Back Up" twice therefore changes nothing the second time.
@@ -505,7 +533,8 @@ data class BackupStateCountRow(
     val itemCount: Int,
 )
 
-/** Projection of [BackupQueueDao.newestIn]. Everything from `media` is nullable because the join is a
+/**
+ * Projection of [BackupQueueDao.newestIn]. Everything from `media` is nullable because the join is a
  * left join, and a null there means the item has left the index. */
 data class ClaimedBackupRow(
     val mediaStoreId: Long,
@@ -531,6 +560,21 @@ data class ClaimedBackupRow(
     val width: Int?,
     val height: Int?,
     val durationMillis: Long?,
+)
+
+/**
+ * Projection of [BackupQueueDao.observeFailed].
+ *
+ * [failureKey] is a [com.lumovault.app.domain.backup.BackupFailureKind] name as stored — never Telegram's
+ * own words, which are dropped at the upload boundary — and the `media` columns are nullable for the same
+ * left-join reason as [ClaimedBackupRow]'s: the file can be gone while its failed row is still what the
+ * user is asking about.
+ */
+data class FailedBackupRow(
+    val mediaStoreId: Long,
+    val failureKey: String,
+    val displayName: String?,
+    val sizeBytes: Long?,
 )
 
 /**

@@ -92,6 +92,17 @@ class FakeBackupQueueDao : BackupQueueDao {
         bump()
     }
 
+    /**
+     * A failed row carrying the reason that ended it, which is the pair `settle` writes and nothing else
+     * here can express: a state change on its own leaves `failure` empty, and the read under test exists to
+     * report the reason.
+     */
+    suspend fun withFailedItem(id: Long, failureKey: String, at: Long = 500L) {
+        if (id !in media) withItem(id)
+        if (id !in rows) insertMissing(listOf(id), UploadState.Queued.storageKey, at)
+        settle(id, UploadState.Failed.storageKey, attempts = 1, failure = failureKey, now = at)
+    }
+
     override fun observeStatesFor(ids: Collection<Long>): Flow<List<BackupItemState>> = snapshots().map {
             current -> current.filter { it.mediaStoreId in ids }.map { BackupItemState(it.mediaStoreId, it.state) }
     }
@@ -100,6 +111,29 @@ class FakeBackupQueueDao : BackupQueueDao {
         current.groupingBy { it.state }.eachCount()
             .map { (state, count) -> BackupStateCountRow(state, count) }
     }
+
+    /**
+     * Mirrors [BackupQueueDao.observeFailed]: the failed rows only — never a row that merely still
+     * remembers why it failed once — newest refusal first, bounded. The left join is the same one, so a
+     * dropped media row surfaces with a null name exactly as it would on a phone.
+     */
+    override fun observeFailed(failedState: String, limit: Int): Flow<List<FailedBackupRow>> =
+        snapshots().map { current ->
+            current.filter { it.state == failedState }
+                .sortedWith(
+                    compareByDescending<BackupQueueEntity> { it.updatedAt }.thenByDescending { it.mediaStoreId },
+                )
+                .take(limit)
+                .map { row ->
+                    val item = media[row.mediaStoreId]
+                    FailedBackupRow(
+                        mediaStoreId = row.mediaStoreId,
+                        failureKey = row.failure,
+                        displayName = item?.displayName(row.mediaStoreId),
+                        sizeBytes = item?.sizeBytes,
+                    )
+                }
+        }
 
     override suspend fun insertMissing(ids: Collection<Long>, queuedState: String, now: Long) {
         recordBatch(ids)
