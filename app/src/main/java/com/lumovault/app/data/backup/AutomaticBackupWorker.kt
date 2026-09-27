@@ -1,9 +1,11 @@
 package com.lumovault.app.data.backup
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.lumovault.app.domain.usecase.RunAutomaticBackupUseCase
+import kotlinx.coroutines.CancellationException
 
 /**
  * The periodic pass: notice new media and put it in the queue.
@@ -28,26 +30,41 @@ class AutomaticBackupWorker(
     private val runPass: suspend () -> RunAutomaticBackupUseCase.Outcome,
 ) : CoroutineWorker(context, parameters) {
 
-    override suspend fun doWork(): Result = when (val outcome = runPass()) {
-        // The grant can come back without another periodic period elapsing, so this is worth another try
-        // rather than a silent success over a library nobody scanned — but a bounded number of them. A
-        // person who chose "Don't allow" and meant it would otherwise be woken every backoff interval,
-        // forever, by work that can only ever come back with the same answer.
-        RunAutomaticBackupUseCase.Outcome.NoMediaAccess ->
-            if (runAttemptCount < ACCESS_RETRY_LIMIT) Result.retry() else Result.success()
+    override suspend fun doWork(): Result = try {
+        when (val outcome = runPass()) {
+            // The grant can come back without another periodic period elapsing, so this is worth another try
+            // rather than a silent success over a library nobody scanned — but a bounded number of them. A
+            // person who chose "Don't allow" and meant it would otherwise be woken every backoff interval,
+            // forever, by work that can only ever come back with the same answer.
+            RunAutomaticBackupUseCase.Outcome.NoMediaAccess ->
+                if (runAttemptCount < ACCESS_RETRY_LIMIT) Result.retry() else Result.success()
 
-        // Off, or never configured: nothing to do, and nothing to retry.
-        RunAutomaticBackupUseCase.Outcome.Disabled,
-        RunAutomaticBackupUseCase.Outcome.NoSourceSelected,
-        -> Result.success()
+            // Off, or never configured: nothing to do, and nothing to retry.
+            RunAutomaticBackupUseCase.Outcome.Disabled,
+            RunAutomaticBackupUseCase.Outcome.NoSourceSelected,
+            -> Result.success()
 
-        is RunAutomaticBackupUseCase.Outcome.Queued ->
-            // More work remains only when the window filled, which is the pass saying "keep going" to
-            // itself rather than the app pretending a hundred-thousand-photo library was one pass.
-            if (outcome.moreRemaining) Result.retry() else Result.success()
+            is RunAutomaticBackupUseCase.Outcome.Queued ->
+                // More work remains only when the window filled, which is the pass saying "keep going" to
+                // itself rather than the app pretending a hundred-thousand-photo library was one pass.
+                if (outcome.moreRemaining) Result.retry() else Result.success()
+        }
+    } catch (cancelled: CancellationException) {
+        // The system stopping the worker is not the pass failing, and WorkManager already knows the
+        // difference: a cancelled coroutine ends the work as cancelled.
+        throw cancelled
+    } catch (error: Exception) {
+        // WorkManager logs a throwable whole on the way to `Result.failure()`; a MediaStore or SQLite
+        // message can quote a path, so only the class name is kept. The outcome is the one WorkManager
+        // would have produced anyway — this pass failed, and the next period decides again — because
+        // reporting success over a scan that threw would promise a scan that never ran.
+        Log.w(TAG, "automatic backup pass failed: ${error.javaClass.simpleName}")
+        Result.failure()
     }
 
     private companion object {
+        private const val TAG = "LumoVaultAutoBackup"
+
         /** Roughly an hour of retries at this worker's backoff curve, then the next period decides. */
         const val ACCESS_RETRY_LIMIT = 6
     }

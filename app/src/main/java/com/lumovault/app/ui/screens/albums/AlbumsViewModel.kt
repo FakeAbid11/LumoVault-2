@@ -7,6 +7,7 @@ import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.model.LocalFolder
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.domain.organization.SystemAlbumCounts
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -62,15 +63,24 @@ class AlbumsViewModel(application: Application) : AndroidViewModel(application) 
      * A blank name never gets here — the dialog keeps its own button disabled until there is text — so a
      * null from the repository is the *other* refusal: a name that was only whitespace, which the field
      * accepted and the repository trimmed away. Nothing is created in that case, and the screen stays put
-     * rather than opening an album the user cannot find again.
+     * rather than opening an album the user cannot find again. A write that throws ends the same way the
+     * refusal does: no album, so no navigation, and the dialog still showing what was typed.
      */
     fun create(name: String, onCreated: (Long) -> Unit) {
         viewModelScope.launch {
-            container.albumRepository.create(name)?.let(onCreated)
+            try {
+                container.albumRepository.create(name)?.let(onCreated)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // Class name only: an IO message can quote a path.
+                android.util.Log.w(TAG, "album create failed: ${error.javaClass.simpleName}")
+            }
         }
     }
 
     companion object {
+        private const val TAG = "LumoVaultAlbums"
         private val STOP_POLICY = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS)
         private const val STOP_TIMEOUT_MILLIS = 5_000L
     }

@@ -137,7 +137,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Re-reads the grant after a permission dialog, without forcing a rescan. */
     fun refreshAccess() {
-        viewModelScope.launch {
+        launchWrite("permission read") {
             access.value = container.permissionRepository.mediaStatus()
         }
     }
@@ -183,7 +183,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
         val ids = selection.value
         if (ids.isEmpty()) return
 
-        viewModelScope.launch {
+        launchWrite("backup enqueue") {
             container.backupQueueRepository.enqueue(ids)
             selection.value = emptySet()
             container.backupScheduler.start()
@@ -200,7 +200,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun setFavoriteSelected(favorite: Boolean) {
         val ids = selection.value
         if (ids.isEmpty()) return
-        viewModelScope.launch { container.mediaOrganizationRepository.setFavorite(ids, favorite) }
+        launchWrite("favorite write") { container.mediaOrganizationRepository.setFavorite(ids, favorite) }
     }
 
     /**
@@ -212,7 +212,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun archiveSelected() {
         val ids = selection.value
         if (ids.isEmpty()) return
-        viewModelScope.launch {
+        launchWrite("archive write") {
             container.mediaOrganizationRepository.setArchived(ids, true)
             selection.value = emptySet()
         }
@@ -222,7 +222,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun moveToTrashSelected() {
         val ids = selection.value
         if (ids.isEmpty()) return
-        viewModelScope.launch {
+        launchWrite("trash write") {
             container.mediaOrganizationRepository.moveToTrash(ids)
             selection.value = emptySet()
         }
@@ -230,12 +230,32 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Withdraws everything still waiting. An upload already in flight is left to finish. */
     fun cancelPending() {
-        viewModelScope.launch { container.runBackupQueue.cancelPending() }
+        launchWrite("cancel pending") { container.runBackupQueue.cancelPending() }
     }
 
     fun retryFailed() {
-        viewModelScope.launch {
+        launchWrite("retry failed") {
             if (container.runBackupQueue.retryFailed() > 0) container.backupScheduler.start()
+        }
+    }
+
+    /**
+     * Runs a write the grid has already committed to, and stays honest when it throws.
+     *
+     * Cancellation is rethrown; everything else is one class-name log line, because a SQLite message can
+     * quote a path. What the screen draws comes from the database, so a failed write leaves every shown
+     * state as it still is — including the selection, which is only cleared *after* the write lands, so
+     * an action bar never stops naming rows it did not act on.
+     */
+    private fun launchWrite(description: String, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                android.util.Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+            }
         }
     }
 

@@ -82,6 +82,7 @@ import com.lumovault.app.domain.usecase.RunAutomaticBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
 import com.lumovault.app.domain.usecase.SynchronizeCloudUseCase
 import java.io.File
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -102,7 +103,20 @@ import kotlinx.coroutines.launch
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val applicationScope = CoroutineScope(
+        SupervisorJob() +
+            Dispatchers.Default +
+            // Without a handler, a failure in anything launched here — the TDLib receive loop, the cloud
+            // recovery collector, a restore started outside a screen — is an uncaught exception and takes
+            // the process with it. The class name is the whole of what is logged, as everywhere else: the
+            // message of an exception from this layer can quote a path or a TDLib token.
+            CoroutineExceptionHandler { _, error ->
+                android.util.Log.w(
+                    "LumoVaultScope",
+                    "background work failed: ${error.javaClass.simpleName}",
+                )
+            },
+    )
 
     val database: LumoVaultDatabase by lazy {
         Room.databaseBuilder(appContext, LumoVaultDatabase::class.java, "lumovault.db")

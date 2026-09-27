@@ -2,6 +2,7 @@ package com.lumovault.app.data.backup
 
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -10,6 +11,7 @@ import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.usecase.QueueRun
 import com.lumovault.app.domain.usecase.RecognizeBackupUseCase
 import com.lumovault.app.domain.usecase.RunBackupQueueUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.supervisorScope
@@ -99,6 +101,18 @@ class BackupUploadWorker(
                     Result.failure()
                 }
             }
+        } catch (cancelled: CancellationException) {
+            // The system stopping this worker is not a failed upload; rethrowing is what lets WorkManager
+            // record it as stopped rather than as a refusal.
+            throw cancelled
+        } catch (error: Exception) {
+            // WorkManager would log this throwable whole on the way to `Result.failure()`, and a SQLite
+            // or MediaStore message can quote a path — so only the class name. The result is the one
+            // WorkManager produces for an escaping exception anyway: this chain ends, and the queued rows
+            // stay queued for the next pass to reconcile. `PassDirective` has no case for a crash, and
+            // inventing one on the spot would be a state no screen has words for.
+            Log.w(TAG, "upload pass failed: ${error.javaClass.simpleName}")
+            Result.failure()
         } finally {
             notifier.cancel()
         }
@@ -106,6 +120,7 @@ class BackupUploadWorker(
 
     private companion object {
         const val NOTIFICATION_ID = 4100
+        const val TAG = "LumoVaultUpload"
     }
 }
 

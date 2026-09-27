@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.viewer
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
@@ -11,6 +12,7 @@ import com.lumovault.app.domain.model.MediaMetadata
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.ui.navigation.ViewerTarget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,7 +133,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
                 val uri = media.contentUri
                 container.mediaMetadataRepository.observe(id).map { found ->
                     if (found == null && metadataReadAttempted.add(id)) {
-                        viewModelScope.launch {
+                        launchWrite("metadata read") {
                             container.extractMediaMetadata.readOne(MetadataCandidate(id, uri))
                         }
                     }
@@ -156,9 +158,17 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
         // is plainly there: a first-window-only lookup was the bug that told people their photo had
         // left the device because they had scrolled further than the viewer had loaded.
         openJob = viewModelScope.launch {
-            val limit = windowCovering(target, mediaStoreId)
-            loadedLimit.value = limit
-            request.value = OpenRequest(mediaStoreId, target)
+            try {
+                val limit = windowCovering(target, mediaStoreId)
+                loadedLimit.value = limit
+                request.value = OpenRequest(mediaStoreId, target)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // A probe that throws makes no request, so the screen keeps drawing what it already has:
+                // Loading — never a false "this photo is gone" from a window that was never measured.
+                Log.w(TAG, "window probe failed: ${error.javaClass.simpleName}")
+            }
         }
     }
 
@@ -220,7 +230,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
      */
     fun backUpCurrent() {
         val id = currentItem.value?.id ?: return
-        viewModelScope.launch {
+        launchWrite("backup enqueue") {
             container.backupQueueRepository.enqueue(listOf(id))
             container.backupScheduler.start()
         }
@@ -229,7 +239,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     /** A failed item re-queued through the queue's own rules rather than restarted from here. */
     fun retryCurrent() {
         val id = currentItem.value?.id ?: return
-        viewModelScope.launch {
+        launchWrite("backup retry enqueue") {
             container.backupQueueRepository.enqueue(listOf(id))
             container.backupScheduler.start()
         }
@@ -238,7 +248,9 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     /** Favourites the shown item. Nothing on this path can enqueue an upload: the two tables never meet. */
     fun setFavorite(favorite: Boolean) {
         val id = currentItem.value?.id ?: return
-        viewModelScope.launch { container.mediaOrganizationRepository.setFavorite(listOf(id), favorite) }
+        launchWrite("favorite write") {
+            container.mediaOrganizationRepository.setFavorite(listOf(id), favorite)
+        }
     }
 
     /**
@@ -250,19 +262,23 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     fun archiveCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
-        viewModelScope.launch { container.mediaOrganizationRepository.setArchived(listOf(id), true) }
+        launchWrite("archive write", onFailure = { retiring = false }) {
+            container.mediaOrganizationRepository.setArchived(listOf(id), true)
+        }
     }
 
     /** Trashed, not deleted: the item still exists, so the viewer keeps browsing. See [archiveCurrent]. */
     fun moveToTrashCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
-        viewModelScope.launch { container.mediaOrganizationRepository.moveToTrash(listOf(id)) }
+        launchWrite("trash write", onFailure = { retiring = false }) {
+            container.mediaOrganizationRepository.moveToTrash(listOf(id))
+        }
     }
 
     fun addToAlbum(albumId: Long) {
         val id = currentItem.value?.id ?: return
-        viewModelScope.launch { container.albumRepository.addMedia(albumId, listOf(id)) }
+        launchWrite("add-to-album write") { container.albumRepository.addMedia(albumId, listOf(id)) }
     }
 
     /**
@@ -272,8 +288,34 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
      */
     fun requestMapFocus() {
         val id = currentItem.value?.id ?: return
-        viewModelScope.launch {
+        launchWrite("map focus read") {
             container.mediaMetadataRepository.locationFor(id)?.let { container.mapFocus.request(it) }
+        }
+    }
+
+    /**
+     * Runs a write the screen has already committed to, and stays honest when it throws.
+     *
+     * Cancellation is rethrown — the scope is shutting down, which is not a failure of the write — and
+     * everything else is one log line of the class name, because a SQLite or MediaStore message can quote
+     * a path. The states these writes produce are observed from the database, so on failure the screen
+     * simply keeps drawing what is still true. [onFailure] exists for the flags this class sets *before*
+     * asking: `retiring` would otherwise wait forever for a row that never leaves the query.
+     */
+    private fun launchWrite(
+        description: String,
+        onFailure: () -> Unit = {},
+        block: suspend () -> Unit,
+    ) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+                onFailure()
+            }
         }
     }
 
@@ -293,6 +335,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private companion object {
+        const val TAG = "LumoVaultViewer"
         const val WINDOW_START = 300
         const val WINDOW_STEP = 300
 

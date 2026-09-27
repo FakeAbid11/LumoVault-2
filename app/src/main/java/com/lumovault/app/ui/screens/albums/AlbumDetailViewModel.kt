@@ -172,12 +172,12 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     fun addMedia(ids: Collection<Long>) {
         val albumId = (target.value as? AlbumTarget.User)?.albumId ?: return
         if (ids.isEmpty()) return
-        viewModelScope.launch { container.albumRepository.addMedia(albumId, ids) }
+        launchWrite("add media") { container.albumRepository.addMedia(albumId, ids) }
     }
 
     fun rename(name: String) {
         val albumId = (target.value as? AlbumTarget.User)?.albumId ?: return
-        viewModelScope.launch { container.albumRepository.rename(albumId, name) }
+        launchWrite("rename album") { container.albumRepository.rename(albumId, name) }
     }
 
     /**
@@ -185,11 +185,12 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
      *
      * The callback rather than a flag in the state because this is the one action that makes the screen
      * itself invalid, and a boolean the composable polls would be a race with the flow that still names
-     * the album it just removed.
+     * the album it just removed. A deletion that throws never calls it, so the screen stays put on an
+     * album that is still there.
      */
     fun deleteAlbum(onDeleted: () -> Unit) {
         val albumId = (target.value as? AlbumTarget.User)?.albumId ?: return
-        viewModelScope.launch {
+        launchWrite("delete album") {
             container.albumRepository.delete(albumId)
             onDeleted()
         }
@@ -325,12 +326,33 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         selection.update { current -> if (mediaId in current) current - mediaId else current + mediaId }
     }
 
+    /**
+     * Runs one selected-item action and clears the selection only once it has landed.
+     *
+     * Clearing before the write would tell the action bar its rows were handled while Room was still
+     * deciding; clearing in the success path only means a refusal leaves every id selected, which is
+     * still true. Cancellation is rethrown, everything else is one class-name log line — a SQLite
+     * message can quote a path.
+     */
     private fun withSelected(action: suspend (Collection<Long>) -> Unit) {
         val ids = selection.value
         if (ids.isEmpty()) return
-        viewModelScope.launch {
+        launchWrite("selection action") {
             action(ids)
             selection.value = emptySet()
+        }
+    }
+
+    /** Companion to [withSelected] for the actions that name their own write in the log. */
+    private fun launchWrite(description: String, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+            }
         }
     }
 

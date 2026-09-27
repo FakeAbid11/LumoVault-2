@@ -117,6 +117,23 @@ class RestoreCloudMediaUseCase(
             // The download layer has already told TDLib to stop. What is left is the honest state.
             restores.cancel(target.chatId, target.messageId)
             throw cancelled
+        } catch (unexpected: Exception) {
+            // The path through transfer that could leave a row unsettled: an exception from the scan or a
+            // Room write, neither of which has a decision about this restore to make. The row still gets its
+            // answer — a job sitting in a live state draws a progress bar that will never advance — and
+            // TDLib's cache copy is dropped the same way the startup sweep drops it, because the recorded id
+            // is the only handle on it. Logged by class name like everywhere else; the raw message can quote
+            // a file name.
+            android.util.Log.w(
+                TAG,
+                "restore transfer failed: ${unexpected.javaClass.simpleName}",
+            )
+            val recorded = restores.job(target.chatId, target.messageId)?.tdlibFileId ?: 0
+            if (recorded > 0 && downloads.isUsable) {
+                downloads.release(OriginalDownload.Ready(recorded, "", 0L))
+            }
+            restores.fail(target.chatId, target.messageId, RestoreFailureKind.Unknown)
+            RestoreOutcome.Refused(RestoreFailure(RestoreFailureKind.Unknown))
         } finally {
             running.remove(target.chatId to target.messageId, owner)
         }
@@ -268,3 +285,5 @@ class RestoreCloudMediaUseCase(
     private fun String.matches(landed: String): Boolean? =
         takeIf { isNotBlank() }?.let { equals(landed, ignoreCase = true) }
 }
+
+private const val TAG = "LumoVaultRestore"
