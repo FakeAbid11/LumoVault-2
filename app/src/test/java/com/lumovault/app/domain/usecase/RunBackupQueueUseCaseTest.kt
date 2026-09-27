@@ -2,6 +2,7 @@ package com.lumovault.app.domain.usecase
 
 import com.lumovault.app.domain.backup.BackupFailure
 import com.lumovault.app.domain.backup.BackupFailureKind
+import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.backup.BackupIdentityCandidate
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupQueueSummary
@@ -427,6 +428,13 @@ private class FakeQueue : BackupQueueRepository {
         flowOf(emptyMap())
 
     override fun observeSummary(): Flow<BackupQueueSummary> = flowOf(BackupQueueSummary())
+
+    /**
+     * The failed list is a screen's read and the pass under test never asks for it. It is asserted where it
+     * is the whole subject: `BackupQueueRepositoryTest`'s failures, against the same DAO fake this file
+     * drives.
+     */
+    override fun observeFailed(limit: Int): Flow<List<BackupFailureItem>> = flowOf(emptyList())
 
     override suspend fun identityCandidates(
         includeWholeLibrary: Boolean,

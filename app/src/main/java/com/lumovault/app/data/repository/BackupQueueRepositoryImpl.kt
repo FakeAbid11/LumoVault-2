@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.backup.BackupQueueDao
 import com.lumovault.app.data.local.backup.ClaimedBackupRow
 import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.domain.backup.BackupFailure
+import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.backup.BackupItemState
 import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.BackupIdentityCandidate
@@ -78,6 +79,21 @@ class BackupQueueRepositoryImpl(
                 }
             }
         }
+
+    override fun observeFailed(limit: Int): Flow<List<BackupFailureItem>> = if (limit <= 0) {
+        flowOf(emptyList())
+    } else {
+        dao.observeFailed(UploadState.Failed.storageKey, limit).map { rows ->
+            rows.map { row ->
+                BackupFailureItem(
+                    mediaStoreId = row.mediaStoreId,
+                    kind = BackupFailureKind.fromStorageKey(row.failureKey),
+                    displayName = row.displayName,
+                    sizeBytes = row.sizeBytes,
+                )
+            }
+        }
+    }
 
     override suspend fun enqueue(mediaStoreIds: Collection<Long>): Int {
         if (mediaStoreIds.isEmpty()) return 0
@@ -391,13 +407,11 @@ class BackupQueueRepositoryImpl(
 }
 
 /**
- * An unknown stored name is [BackupFailureKind.Unknown] rather than a crash: the failure field is a
- * diagnostic, and losing it after an app downgrade must not make a queue row unreadable.
+ * The one spelling rule for a stored reason, which now lives on the enum itself
+ * ([BackupFailureKind.fromStorageKey]) because two readers need it: the worker, to decide whether to try
+ * again, and the screen, to say why an item stopped.
  */
-private fun String?.toFailure(): BackupFailure? {
-    val key = this?.takeIf { it.isNotBlank() } ?: return null
-    return BackupFailure(BackupFailureKind.entries.firstOrNull { it.name == key } ?: BackupFailureKind.Unknown)
-}
+private fun String?.toFailure(): BackupFailure? = BackupFailureKind.fromStorageKey(this)?.let(::BackupFailure)
 
 /** Queue rows keyed the way every caller wants them: id to state. */
 private fun List<BackupItemState>.associateById(): Map<Long, UploadState> =

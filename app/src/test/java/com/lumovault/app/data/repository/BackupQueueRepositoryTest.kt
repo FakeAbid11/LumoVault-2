@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.backup.FakeBackupQueueDao
 import com.lumovault.app.data.local.backup.QueueClock
 import com.lumovault.app.domain.backup.BackupFailure
 import com.lumovault.app.domain.backup.BackupFailureKind
+import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.backup.BackupRequest
 import com.lumovault.app.domain.backup.MediaIdentity
@@ -495,6 +496,80 @@ class BackupQueueRepositoryTest {
 
         assertEquals(0, repository.releaseUnsentOutside(listOf(screenshots)))
         assertEquals(UploadState.Queued.storageKey, dao.row(1L).state)
+    }
+
+    /**
+     * The failed list, which is the only read that answers "which photo, and why".
+     *
+     * The two cases nothing an error message says can be inferred from are asserted here: a reason this
+     * build cannot name (a newer app's enum, or none at all) must not become a guessed one, and a row the
+     * user retried still holds its previous reason in the column — so listing by that column would put a
+     * stuck label on a photo that is on its way to Telegram.
+     */
+    @Test
+    fun aFailedItemCarriesTheReasonThatEndedIt() = runBlocking {
+        dao.withFailedItem(1L, BackupFailureKind.Network.name, at = 30L)
+        dao.withFailedItem(2L, BackupFailureKind.InsufficientSpace.name, at = 40L)
+
+        val failures = repository.observeFailed(limit = 10).first()
+
+        assertEquals("newest refusal first", listOf(2L, 1L), failures.map { it.mediaStoreId })
+        assertEquals(BackupFailureKind.InsufficientSpace, failures.first().kind)
+        assertEquals("IMG_2.jpg", failures.first().displayName)
+        assertEquals(FakeBackupQueueDao.DEFAULT_SIZE, failures.first().sizeBytes)
+    }
+
+    @Test
+    fun aReasonThisBuildCannotNameIsReportedAsUnknownRatherThanAsNothing() = runBlocking {
+        dao.withFailedItem(1L, "FloodWaitFromANewerBuild")
+
+        assertEquals(
+            "a name from a later build is a fact this one cannot translate, not an absence of one",
+            BackupFailureKind.Unknown,
+            repository.observeFailed(limit = 10).first().single().kind,
+        )
+    }
+
+    @Test
+    fun aFailedRowWithNoRecordedReasonCarriesNoneRatherThanAnInventedOne() = runBlocking {
+        dao.withMedia(1L)
+        dao.insertMissing(listOf(1L), UploadState.Queued.storageKey, 5L)
+        // A state change that never went through `settle`: failed, with no reason written at any point.
+        dao.forceRawState(1L, UploadState.Failed.storageKey)
+
+        assertNull(repository.observeFailed(limit = 10).first().single().kind)
+    }
+
+    @Test
+    fun aRetriedFailureIsNoLongerReportedAsOne() = runBlocking {
+        dao.withFailedItem(1L, BackupFailureKind.Network.name)
+        assertEquals(1, repository.requeueFailed())
+
+        assertEquals(
+            "the column still holds last attempt's text, and reading that as a current failure would be " +
+                "the app inventing a problem",
+            emptyList<BackupFailureItem>(),
+            repository.observeFailed(limit = 10).first(),
+        )
+    }
+
+    @Test
+    fun aPrunedFileStillShowsItsFailureWithoutAnInventedName() = runBlocking {
+        dao.withFailedItem(1L, BackupFailureKind.SourceMissing.name)
+        dao.dropMedia(1L)
+
+        val item = repository.observeFailed(limit = 10).first().single()
+        assertNull("no media row behind the queue row", item.displayName)
+        assertNull(item.sizeBytes)
+    }
+
+    @Test
+    fun theFailedListIsBoundedAndAScreenAskedForNothingGetsNothing() = runBlocking {
+        dao.withFailedItem(1L, BackupFailureKind.Network.name, at = 10L)
+        dao.withFailedItem(2L, BackupFailureKind.Network.name, at = 20L)
+
+        assertEquals(1, repository.observeFailed(limit = 1).first().size)
+        assertEquals(0, repository.observeFailed(limit = 0).first().size)
     }
 
     /** Queues one item and claims it, which is the only way to be in `PREPARING` legitimately. */

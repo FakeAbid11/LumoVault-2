@@ -145,6 +145,22 @@ enum class BackupFailureKind(val retryable: Boolean) {
     /** Something this build cannot classify; bounded by the attempt cap rather than retried forever. */
     Unknown(retryable = true),
     ;
+
+    companion object {
+        /**
+         * The stored form is the enum's own name, because the raw TDLib text is dropped at the upload
+         * boundary and only this vocabulary may reach a screen.
+         *
+         * Blank answers null — that is a failed row whose reason was never recorded, and the honest rendering
+         * of that is no reason at all rather than "Unknown". A name this build does not have answers
+         * [Unknown] rather than crashing: the field is a diagnostic, and losing it after a downgrade must
+         * not make a queue row unreadable.
+         */
+        fun fromStorageKey(key: String?): BackupFailureKind? {
+            val name = key?.takeIf { it.isNotBlank() } ?: return null
+            return entries.firstOrNull { it.name == name } ?: Unknown
+        }
+    }
 }
 
 data class BackupFailure(val kind: BackupFailureKind) {

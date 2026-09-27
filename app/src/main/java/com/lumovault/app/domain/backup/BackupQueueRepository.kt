@@ -79,6 +79,24 @@ data class BackupItemState(
 }
 
 /**
+ * One photo the queue gave up on, and the reason it recorded.
+ *
+ * [kind] is null when the row has no reason stored — which is a real case, not a gap: a row can reach
+ * `failed` through the attempt cap after a state change that never wrote one. The screen then says the item
+ * failed and nothing more, because inventing a cause for it would be the app claiming knowledge it does not
+ * have.
+ *
+ * [displayName] and [sizeBytes] are null when the media index no longer holds the file: the item can be
+ * deleted or pruned while its failed row stays, and the reason is still worth reading.
+ */
+data class BackupFailureItem(
+    val mediaStoreId: Long,
+    val kind: BackupFailureKind?,
+    val displayName: String?,
+    val sizeBytes: Long?,
+)
+
+/**
  * The queue as Room persists it — the brief's "do not keep the queue only in memory", made concrete
  * by every read and write going through here.
  *
@@ -93,6 +111,18 @@ interface BackupQueueRepository {
     fun observeStatesFor(mediaStoreIds: Collection<Long>): Flow<Map<Long, UploadState>>
 
     fun observeSummary(): Flow<BackupQueueSummary>
+
+    /**
+     * The failed items, newest refusal first, at most [limit] of them.
+     *
+     * Selected by state rather than by "has a reason", because a retried row still carries the reason from
+     * the attempt that failed it — reporting that as a current failure would tell the user a photo is stuck
+     * when it is on its way to Telegram.
+     *
+     * Bounded because this is a screen's list, not an export: a library whose every upload was refused can
+     * hold tens of thousands of these, and the caller has to be able to say how many it left out.
+     */
+    fun observeFailed(limit: Int): Flow<List<BackupFailureItem>>
 
     /**
      * Adds records for items that have none and moves recognised ones into the queue, returning how many

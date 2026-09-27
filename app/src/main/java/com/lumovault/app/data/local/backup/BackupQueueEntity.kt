@@ -59,9 +59,14 @@ data class BackupQueueEntity(
     val attempts: Int = 0,
 
     /**
-     * [com.lumovault.app.domain.backup.BackupFailureKind.name] — the enum's own name rather than a
-     * separate key, because these are never shown to a user and a rename is caught by the parser
-     * falling back to `unknown`, not by a migration.
+     * [com.lumovault.app.domain.backup.BackupFailureKind.name] — the enum's own name rather than a separate
+     * key, and rather than anything Telegram said. What the server sent is reduced to that vocabulary at the
+     * upload boundary and dropped, so nothing a screen reads out of this column can carry a chat title, a
+     * file path or an error string from someone else's service; the screen maps the name to its own words.
+     *
+     * It belongs to the `failed` state only. A row moved on by `requeueFailed` or `cancelQueued` still holds
+     * the previous attempt's reason here, because those writes change state and nothing else — so a reader
+     * asks "is this failed", never "does this have a reason".
      */
     @ColumnInfo(name = "failure", defaultValue = "")
     val failure: String = "",
