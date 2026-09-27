@@ -225,7 +225,7 @@ enum class BackupStop(
  * A session problem still outranks a preference. It is the one a person has to act on, and it would still be
  * true the second the phone is put on its charger.
  */
-fun backupStopReason(
+internal fun backupStopReason(
     pending: Int,
     auth: TelegramAuthState,
     channelAdopted: Boolean,

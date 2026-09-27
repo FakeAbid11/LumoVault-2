@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
  * minSdk is 29, so `RELATIVE_PATH`, `IS_PENDING` and the `Files` collection need no version guard —
  * which is also why this file has no legacy `MediaColumns.DATA` path.
  */
-class MediaStoreDataSource(private val resolver: ContentResolver) : MediaIndexSource {
+internal class MediaStoreDataSource(private val resolver: ContentResolver) : MediaIndexSource {
 
     /**
      * Returns the current index as rows tagged with [scanId]. The repository upserts these and then deletes

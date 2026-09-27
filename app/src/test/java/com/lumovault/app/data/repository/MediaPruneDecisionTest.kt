@@ -173,7 +173,7 @@ class MediaPruneDecisionTest {
          * member of a `fun interface` — a shape worth avoiding when the alternative is one line longer and a
          * compile error is a whole build cycle away.
          */
-        fun answering(
+        private fun answering(
             scanIdToScan: suspend (Long) -> MediaIndexScan,
         ): MediaIndexSource = object : MediaIndexSource {
             override suspend fun scan(scanId: Long): MediaIndexScan = scanIdToScan(scanId)

@@ -35,7 +35,7 @@ import kotlinx.coroutines.sync.withLock
  * memberships and every GPS position with it, in one commit, permanently. Nothing downstream can undo it, because
  * none of it is derivable from MediaStore.
  */
-class MediaRepositoryImpl(
+internal class MediaRepositoryImpl(
     private val dao: MediaDao,
     private val source: MediaIndexSource,
     private val organization: MediaOrganizationDao,
