@@ -51,7 +51,7 @@ class BackupNotifications(private val context: Context) {
         val total = summary.total.coerceAtLeast(1)
         val done = (summary.backedUp + summary.failed).coerceAtMost(total)
 
-        val count = context.getString(R.string.backup_progress_count, done + 1, total)
+        val count = context.getString(R.string.backup_progress_count, minOf(done + 1, total), total)
         val body = when {
             summary.inFlight == 0 && summary.queued > 0 -> context.getString(R.string.backup_preparing)
             percent != null -> context.getString(R.string.backup_progress_percent, percent)

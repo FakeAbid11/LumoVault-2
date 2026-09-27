@@ -15,11 +15,11 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude
-            domain="file"
-            path="tdlib_database" />
+            domain="root"
+            path="app_tdlib_database" />
         <exclude
-            domain="file"
-            path="tdlib_files" />
+            domain="root"
+            path="app_tdlib_files" />
         <exclude
             domain="database"
             path="lumovault.db" />
@@ -27,11 +27,11 @@
 
     <device-transfer>
         <exclude
-            domain="file"
-            path="tdlib_database" />
+            domain="root"
+            path="app_tdlib_database" />
         <exclude
-            domain="file"
-            path="tdlib_files" />
+            domain="root"
+            path="app_tdlib_files" />
         <exclude
             domain="database"
             path="lumovault.db" />

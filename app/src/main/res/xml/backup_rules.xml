@@ -5,12 +5,17 @@
     would claim an account that this install cannot actually use.
 -->
 <full-backup-content>
+    <!--
+        `getDir("tdlib_database")` creates `app_tdlib_database` under the data directory root, not
+        under `files/` — so `domain="root"` is the only domain whose path matches it, and
+        `domain="file"` matched nothing at all.
+    -->
     <exclude
-        domain="file"
-        path="tdlib_database" />
+        domain="root"
+        path="app_tdlib_database" />
     <exclude
-        domain="file"
-        path="tdlib_files" />
+        domain="root"
+        path="app_tdlib_files" />
     <exclude
         domain="database"
         path="lumovault.db" />

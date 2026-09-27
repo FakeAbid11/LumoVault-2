@@ -15,20 +15,26 @@ import kotlinx.coroutines.flow.Flow
  * scrolls a list of them. Both subqueries read through `media`, so an album's count is the number of its
  * members still on the device — a photo deleted outside LumoVault leaves the count as soon as it leaves
  * the index, rather than sitting in an album as a broken thumbnail.
+ *
+ * The trash filter is a `LEFT JOIN` and not a correlated scalar subquery: a member with no
+ * `media_organization` row gives such a subquery no row to read, so it evaluates to NULL, and
+ * `NULL = 0` is not true — which showed every freshly-scanned album as empty. `COALESCE` over the outer
+ * row is the same answer with the missing-row case included, and it is the shape every other
+ * organization filter in this file already uses.
  */
 @Dao
 interface AlbumDao {
     @Query(
         """
         SELECT a.id AS id, a.name AS name, a.created_at AS createdAt,
-               (SELECT COUNT(*) FROM album_media am JOIN media m ON m.media_store_id = am.media_store_id
-                   WHERE am.album_id = a.id
-                     AND (SELECT COALESCE(o.trashed_at, 0) FROM media_organization o
-                          WHERE o.media_store_id = am.media_store_id) = 0) AS itemCount,
-               (SELECT m.content_uri FROM album_media am JOIN media m ON m.media_store_id = am.media_store_id
-                   WHERE am.album_id = a.id
-                     AND (SELECT COALESCE(o.trashed_at, 0) FROM media_organization o
-                          WHERE o.media_store_id = am.media_store_id) = 0
+               (SELECT COUNT(*) FROM album_media am
+                   JOIN media m ON m.media_store_id = am.media_store_id
+                   LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+                   WHERE am.album_id = a.id AND COALESCE(o.trashed_at, 0) = 0) AS itemCount,
+               (SELECT m.content_uri FROM album_media am
+                   JOIN media m ON m.media_store_id = am.media_store_id
+                   LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+                   WHERE am.album_id = a.id AND COALESCE(o.trashed_at, 0) = 0
                    ORDER BY m.date_added_seconds DESC, m.media_store_id DESC LIMIT 1) AS coverUri
         FROM albums a
         ORDER BY a.created_at DESC, a.id DESC
@@ -39,14 +45,14 @@ interface AlbumDao {
     @Query(
         """
         SELECT a.id AS id, a.name AS name, a.created_at AS createdAt,
-               (SELECT COUNT(*) FROM album_media am JOIN media m ON m.media_store_id = am.media_store_id
-                   WHERE am.album_id = a.id
-                     AND (SELECT COALESCE(o.trashed_at, 0) FROM media_organization o
-                          WHERE o.media_store_id = am.media_store_id) = 0) AS itemCount,
-               (SELECT m.content_uri FROM album_media am JOIN media m ON m.media_store_id = am.media_store_id
-                   WHERE am.album_id = a.id
-                     AND (SELECT COALESCE(o.trashed_at, 0) FROM media_organization o
-                          WHERE o.media_store_id = am.media_store_id) = 0
+               (SELECT COUNT(*) FROM album_media am
+                   JOIN media m ON m.media_store_id = am.media_store_id
+                   LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+                   WHERE am.album_id = a.id AND COALESCE(o.trashed_at, 0) = 0) AS itemCount,
+               (SELECT m.content_uri FROM album_media am
+                   JOIN media m ON m.media_store_id = am.media_store_id
+                   LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+                   WHERE am.album_id = a.id AND COALESCE(o.trashed_at, 0) = 0
                    ORDER BY m.date_added_seconds DESC, m.media_store_id DESC LIMIT 1) AS coverUri
         FROM albums a WHERE a.id = :id LIMIT 1
         """,
