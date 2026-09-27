@@ -116,6 +116,13 @@ class SynchronizeCloudUseCaseTest {
 
         override suspend fun association(): CloudAssociation? = saved
 
+        /**
+         * The flow form, answered from the same value. Nothing in this file observes it — the walk acts on
+         * the one-shot [association] — and the screen that does observe it tests its own decision rule in
+         * `BackupScreenRulesTest`, so this exists to keep the interface this fake implements the real one.
+         */
+        override fun observeAssociation(): Flow<CloudAssociation?> = flowOf(saved)
+
         // Recognition's two reads, unused by the walk: the fake answers them so the interface it
         // implements stays the real one rather than a copy frozen at Phase 4.
         override suspend fun remoteBackupFor(contentHash: String): RemoteBackup? = null

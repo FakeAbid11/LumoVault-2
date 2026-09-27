@@ -4,6 +4,8 @@ import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.RestoreFailureKind
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreState
+import com.lumovault.app.domain.telegram.AuthCodeChannel
+import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.screens.cloud.canStartRestore
@@ -11,6 +13,7 @@ import com.lumovault.app.ui.screens.cloud.labelRes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -128,6 +131,65 @@ class BackupScreenRulesTest {
         sizeBytes = bytes,
         mediaType = com.lumovault.app.domain.model.MediaType.Photo,
     )
+
+    @Test
+    fun aWaitingQueueSaysWhichRefusalItIsStuckOn() {
+        assertNull(
+            "nothing is waiting, so there is nothing to explain",
+            backupStopReason(pending = 0, auth = TelegramAuthState.Authenticated, channelAdopted = false),
+        )
+        assertEquals(
+            "signed in, with photos queued and no channel to send them into — the case that used to be " +
+                "invisible because only the Cloud tab ever adopted one",
+            BackupStop.NoChannel,
+            backupStopReason(pending = 4, auth = TelegramAuthState.Authenticated, channelAdopted = false),
+        )
+        assertNull(
+            "connected with a channel: the queue is working, not stuck",
+            backupStopReason(pending = 4, auth = TelegramAuthState.Authenticated, channelAdopted = true),
+        )
+        assertEquals(
+            "a phone prompt, a code awaited or a refused attempt are all a signed-out queue to a backup",
+            BackupStop.SignedOut,
+            backupStopReason(pending = 4, auth = TelegramAuthState.ReadyForPhoneNumber, channelAdopted = true),
+        )
+        assertEquals(
+            BackupStop.SignedOut,
+            backupStopReason(
+                pending = 4,
+                auth = TelegramAuthState.WaitingForCode(AuthCodeChannel.Sms, codeLength = 5),
+                channelAdopted = true,
+            ),
+        )
+        assertEquals(
+            BackupStop.BuildHasNoTelegram,
+            backupStopReason(pending = 4, auth = TelegramAuthState.NotConfigured, channelAdopted = false),
+        )
+        assertNull(
+            "a session not read yet is not a refusal, and a line wrong on the first frame is one the " +
+                "user learns to ignore",
+            backupStopReason(pending = 4, auth = TelegramAuthState.Unknown, channelAdopted = false),
+        )
+        assertNull(backupStopReason(pending = 4, auth = TelegramAuthState.Initializing, channelAdopted = false))
+    }
+
+    @Test
+    fun everyStopHasItsOwnWordsAndOnlyTheUnbuildableOneHasNoDoor() {
+        assertNull(
+            "a build compiled without Telegram has nothing for the user to open",
+            BackupStop.BuildHasNoTelegram.actionRes,
+        )
+        assertEquals(
+            "the other two are one tap from fixed",
+            2,
+            listOf(BackupStop.NoChannel.actionRes, BackupStop.SignedOut.actionRes).count { it != null },
+        )
+        assertEquals(
+            "three different reasons, three different sentences — a copy-paste here is the bug this file exists for",
+            3,
+            BackupStop.entries.map { it.titleRes }.distinct().size,
+        )
+    }
 
     private fun health(pending: Int, failed: Int, backedUp: Int, total: Int) =
         com.lumovault.app.domain.model.BackupHealth(

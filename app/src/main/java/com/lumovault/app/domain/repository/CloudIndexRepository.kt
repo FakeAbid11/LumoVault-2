@@ -37,6 +37,16 @@ interface CloudIndexRepository {
     suspend fun association(): CloudAssociation?
 
     /**
+     * The same association, as a flow.
+     *
+     * [association] is the read a pass makes when it decides what to send to; this is the read a screen
+     * makes when it has to keep saying whether there is a channel at all. A settings page that asked the
+     * suspend one once would report the state of the moment the screen opened, and the whole point of
+     * "no backup channel yet" is that it stops being true the second one is adopted.
+     */
+    fun observeAssociation(): Flow<CloudAssociation?>
+
+    /**
      * The remote message that already holds these exact bytes, or null when the index has none.
      *
      * This is the whole of duplicate prevention: one SHA-256 in, a Telegram message id out. A blank

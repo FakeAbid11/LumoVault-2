@@ -41,6 +41,20 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupPreferences.Default)
 
     /**
+     * Why a queue that has work in it is not moving, or null when there is nothing to explain.
+     *
+     * Live for the same reason the rest of this screen is: a session can be signed out from the system, and
+     * a channel is adopted the moment the Cloud tab — or now the queue itself — gets there. A remembered
+     * answer would keep a line on screen that stopped being true seconds earlier.
+     */
+    val stopReason: StateFlow<BackupStop?> = combine(
+        health,
+        container.telegramAuthRepository.state,
+        container.cloudIndexRepository.observeAssociation(),
+    ) { live, auth, association -> backupStopReason(live.pending, auth, association != null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /**
      * Null until the first read has come back.
      *
      * Not a cosmetic choice: a seeded [BackupDiagnostics] would show `Database version 0` and `0 B` free on
@@ -95,6 +109,64 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
 
 /** How the session reads, in the four words a diagnostics row has room for. */
 enum class TelegramWord { Connected, WaitingForSignIn, NotConfigured, Unavailable }
+
+/**
+ * Why a queue with work in it is not moving.
+ *
+ * Each entry is a refusal the app cannot lift by itself, and each is the sentence that was missing when a
+ * backup simply did not happen: the photos were queued, the pass ran, and it ended without sending — with
+ * nothing anywhere saying which of these three it had ended on.
+ */
+enum class BackupStop(
+    @StringRes val titleRes: Int,
+    @StringRes val bodyRes: Int,
+    /** Null when there is no door to open, which is the honest answer as often as it is a dull one. */
+    @StringRes val actionRes: Int?,
+) {
+    SignedOut(
+        R.string.backup_blocked_signed_out_title,
+        R.string.backup_blocked_signed_out_body,
+        R.string.cloud_connect_action,
+    ),
+    NoChannel(
+        R.string.backup_blocked_no_channel_title,
+        R.string.backup_blocked_no_channel_body,
+        R.string.backup_blocked_no_channel_action,
+    ),
+    BuildHasNoTelegram(
+        R.string.backup_blocked_unbuilt_title,
+        R.string.backup_blocked_unbuilt_body,
+        null,
+    ),
+}
+
+/**
+ * Whether a waiting queue has a reason beside it, decided from the live session and the live association.
+ *
+ * The three refusals are the ones the upload pass can actually end on — see
+ * [com.lumovault.app.domain.usecase.QueueRun] — so this is a match against what the queue really stops on,
+ * not a list of guesses. A state still moving answers null on purpose: a line that is wrong on the first
+ * frame is a line the user learns to ignore, and the handshake finishes in milliseconds next to a queue
+ * that takes minutes.
+ */
+fun backupStopReason(pending: Int, auth: TelegramAuthState, channelAdopted: Boolean): BackupStop? = when {
+    // Nothing is waiting, so there is nothing to explain — the health figures above stay on screen either
+    // way, and an empty queue is not a complaint.
+    pending == 0 -> null
+
+    auth is TelegramAuthState.Authenticated -> if (channelAdopted) null else BackupStop.NoChannel
+    auth is TelegramAuthState.NotConfigured -> BackupStop.BuildHasNoTelegram
+
+    auth is TelegramAuthState.Unknown ||
+        auth is TelegramAuthState.Initializing ||
+        auth is TelegramAuthState.SendingCode ||
+        auth is TelegramAuthState.VerifyingCode ||
+        auth is TelegramAuthState.Authenticating -> null
+
+    // The phone prompt, a code or password Telegram is waiting for, or a refused attempt: all of them mean
+    // the same thing to a queue — nobody is signed in.
+    else -> BackupStop.SignedOut
+}
 
 /**
  * The diagnostics panel's entire input, assembled from state that already exists elsewhere.

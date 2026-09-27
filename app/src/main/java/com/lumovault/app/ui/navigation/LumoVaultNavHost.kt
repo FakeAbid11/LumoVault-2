@@ -157,6 +157,10 @@ fun LumoVaultNavHost(
                 onOpenHealth = { navController.navigate(BackupRoutes.HEALTH) },
                 onOpenDiagnostics = { navController.navigate(BackupRoutes.DIAGNOSTICS) },
                 onOpenFolders = { navController.navigate(BackupRoutes.FOLDERS) },
+                // A queue that cannot send says which refusal it stopped on and offers the door: the tab
+                // that adopts a channel, or the sign-in this app has lost.
+                onOpenCloudTab = { navController.navigateToTab(LumoVaultDestination.Cloud) },
+                onConnectTelegram = { navController.navigate(AccountRoutes.CONNECT_TELEGRAM) },
             )
         }
         composable(BackupRoutes.FOLDERS) {

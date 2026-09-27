@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,9 @@ fun BackupHubScreen(
     onOpenFreeUpSpace: () -> Unit,
     onOpenHealth: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    /** The Cloud tab, which is where a backup channel is adopted — the queue now does it too, and this is the door. */
+    onOpenCloudTab: () -> Unit,
+    onConnectTelegram: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BackupViewModel = viewModel(),
 ) {
@@ -155,6 +159,13 @@ fun BackupHubScreen(
             // hairlines plus their margins were 24 dp of decoration saying what four words already said.
             item { SectionLabel(R.string.backup_hub_section_status) }
             item { HealthSummary(health = health, onOpenDetails = onOpenHealth) }
+
+            // Below the numbers rather than above them: the figures are what the user came to read, and this
+            // is the sentence that explains them when they do not add up.
+            val stop = viewModel.stopReason.collectAsStateWithLifecycle().value
+            if (stop != null) {
+                item { StopCard(reason = stop, onOpenCloudTab = onOpenCloudTab, onConnectTelegram = onConnectTelegram) }
+            }
 
             item { SectionLabel(R.string.backup_hub_section_storage) }
             item {
@@ -261,6 +272,52 @@ private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
                 modifier = Modifier.align(Alignment.Start),
             ) {
                 Text(stringResource(R.string.health_view_issues))
+            }
+        }
+    }
+}
+
+/**
+ * The one thing a stalled queue was never allowed to say: which refusal it stopped on, and the door that
+ * clears it.
+ *
+ * It appears only while work is waiting and the pass cannot proceed — see [backupStopReason] — so a library
+ * that is genuinely up to date is not greeted by a red card, and a queue that has been waiting for an hour
+ * is not left to look like one that is merely slow.
+ */
+@Composable
+private fun StopCard(reason: BackupStop, onOpenCloudTab: () -> Unit, onConnectTelegram: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(GroupCardCorner),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceXs),
+        ) {
+            Text(
+                text = stringResource(reason.titleRes),
+                style = LumoVaultType.itemTitle,
+            )
+            Text(
+                text = stringResource(reason.bodyRes),
+                style = LumoVaultType.sectionDetail,
+            )
+            val action: Pair<String, () -> Unit>? = when (reason) {
+                BackupStop.NoChannel -> stringResource(R.string.backup_blocked_no_channel_action) to onOpenCloudTab
+                BackupStop.SignedOut -> stringResource(R.string.cloud_connect_action) to onConnectTelegram
+                // Nothing to open: this build was compiled without Telegram, which is a fact about the
+                // artifact rather than a step the user forgot.
+                BackupStop.BuildHasNoTelegram -> null
+            }
+            if (action != null) {
+                TextButton(onClick = action.second, modifier = Modifier.align(Alignment.Start)) {
+                    Text(action.first)
+                }
             }
         }
     }

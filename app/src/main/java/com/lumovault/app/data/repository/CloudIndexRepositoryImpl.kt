@@ -62,6 +62,9 @@ class CloudIndexRepositoryImpl(
     override suspend fun association(): CloudAssociation? =
         channel.row(CloudChannelEntity.SINGLETON_ROW_ID)?.toDomain()
 
+    override fun observeAssociation(): Flow<CloudAssociation?> =
+        channel.observeRow(CloudChannelEntity.SINGLETON_ROW_ID).map { row -> row?.toDomain() }
+
     override suspend fun saveAssociation(association: CloudAssociation) {
         database.withTransaction { channel.upsert(association.toEntity()) }
     }

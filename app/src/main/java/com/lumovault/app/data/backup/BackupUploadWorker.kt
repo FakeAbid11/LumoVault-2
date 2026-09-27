@@ -90,7 +90,14 @@ class BackupUploadWorker(
             when (outcome.toPassDirective(runAttemptCount, recognition.stoppedEarly)) {
                 PassDirective.TryAgain -> Result.retry()
                 PassDirective.Finished -> Result.success()
-                PassDirective.Abandoned -> Result.failure()
+
+                // The chain is ending with work still waiting, and the only party that can clear the reason
+                // is somebody who has been told what it is. This call is the whole of that telling — before
+                // it, a `Result.failure()` here was invisible from inside the app and from the shade alike.
+                PassDirective.Abandoned -> {
+                    notifications.notifyStopped(outcome)
+                    Result.failure()
+                }
             }
         } finally {
             notifier.cancel()

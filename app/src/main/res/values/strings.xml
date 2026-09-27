@@ -411,6 +411,15 @@
     <string name="backup_stop_confirm_title">Stop automatic backup?</string>
     <string name="backup_stop_confirm_body">With no folders ticked, nothing new backs up automatically. Photos already in your LumoVault Backup stay there.</string>
     <string name="backup_stop_confirm_action">Stop automatic backup</string>
+    <!-- A queue with work in it that cannot move. Three reasons, each with the door that clears it:
+         these are the words the upload pass could always decide on and never say. -->
+    <string name="backup_blocked_signed_out_title">Telegram sign-in needed</string>
+    <string name="backup_blocked_signed_out_body">Backup is on and photos are waiting, but this device is not signed in to Telegram any more.</string>
+    <string name="backup_blocked_no_channel_title">No LumoVault Backup channel yet</string>
+    <string name="backup_blocked_no_channel_body">Your photos are queued and waiting. LumoVault needs the channel to send them into — it finds one you already have, or creates it, the first time the Cloud tab is opened.</string>
+    <string name="backup_blocked_no_channel_action">Open Cloud</string>
+    <string name="backup_blocked_unbuilt_title">This build cannot reach Telegram</string>
+    <string name="backup_blocked_unbuilt_body">LumoVault was compiled without Telegram credentials, so nothing can be uploaded from it. Your photos stay on this device.</string>
     <plurals name="backup_folders_selected">
         <item quantity="one">%d folder selected</item>
         <item quantity="other">%d folders selected</item>

@@ -53,6 +53,9 @@ class FakeCloudIndexRepository : CloudIndexRepository {
 
     override suspend fun association(): CloudAssociation? = null
 
+    /** The pass under test never reads the association as a flow; [SynchronizeCloudUseCaseTest] does. */
+    override fun observeAssociation(): Flow<CloudAssociation?> = flowOf(null)
+
     override suspend fun saveAssociation(association: CloudAssociation) = Unit
 
     override suspend fun replaceAssociation(association: CloudAssociation) = Unit
