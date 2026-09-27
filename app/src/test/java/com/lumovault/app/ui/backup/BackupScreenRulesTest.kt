@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.backup
 
 import com.lumovault.app.domain.model.BackupPreferences
+import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.restore.RestoreFailureKind
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreState
@@ -189,6 +190,18 @@ class BackupScreenRulesTest {
             3,
             BackupStop.entries.map { it.titleRes }.distinct().size,
         )
+    }
+
+    @Test
+    fun theAutomaticSwitchOnlyAppearsWhereItCouldStartAPass() {
+        assertTrue(BackupSourceLine(BackupSource.AllMedia, folderCount = 0).canEnableAutomatic)
+        assertTrue(BackupSourceLine(BackupSource.SelectedFolders, folderCount = 2).canEnableAutomatic)
+        assertFalse(
+            "these folders with nothing ticked queues nothing, so the switch would be a decoration",
+            BackupSourceLine(BackupSource.SelectedFolders, folderCount = 0).canEnableAutomatic,
+        )
+        assertFalse(BackupSourceLine(BackupSource.NotNow, folderCount = 3).canEnableAutomatic)
+        assertFalse(BackupSourceLine(null, folderCount = 3).canEnableAutomatic)
     }
 
     private fun health(pending: Int, failed: Int, backedUp: Int, total: Int) =

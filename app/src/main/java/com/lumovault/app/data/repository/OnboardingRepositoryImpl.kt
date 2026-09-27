@@ -5,6 +5,7 @@ import com.lumovault.app.data.local.AppSettingsStore
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.OnboardingProgress
 import com.lumovault.app.domain.model.FolderPaths
+import com.lumovault.app.domain.model.canRunAutomatic
 import com.lumovault.app.domain.model.OptionalStepDecision
 import com.lumovault.app.domain.repository.OnboardingRepository
 import kotlinx.coroutines.flow.Flow
@@ -32,8 +33,10 @@ class OnboardingRepositoryImpl(
         store.update {
             it.copy(
                 sourceSelection = source.storageKey,
-                // Only a real selection can enable automatic backup; "Not now" cannot.
-                backupEnabled = source.enablesBackup,
+                // Only a selection that covers something can enable automatic backup: "not now" cannot,
+                // and neither can "these folders" with nothing ticked — a schedule installed under an empty
+                // selection queues nothing, forever, which reads as a feature that does not work.
+                backupEnabled = source.canRunAutomatic(folders.size),
                 selectedFolders = if (source == BackupSource.SelectedFolders) {
                     // Stored as the identity the queue matches on, not as the label the picker showed.
                     // These two columns are read back by `autoBackupCandidates`, whose SQL compares

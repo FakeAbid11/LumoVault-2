@@ -525,10 +525,10 @@ class AppContainer(context: Context) {
         ApplyBackupSelectionUseCase(
             onboarding = onboardingRepository,
             queue = backupQueueRepository,
-            reschedulePasses = { enablesBackup ->
+            reschedulePasses = { runsSomething ->
                 applicationScope.launch {
                     backupScheduler.scheduleAutomaticPasses(settingsRepository.backupPreferences.first())
-                    if (enablesBackup) backupScheduler.scanNow()
+                    if (runsSomething) backupScheduler.scanNow()
                 }
             },
         )

@@ -6,16 +6,26 @@ enum class BackupSource(val storageKey: String) {
     SelectedFolders("folders"),
     NotNow("none");
 
-    /**
-     * Automatic backup is only meaningful when something was selected; "Not now" is a legitimate
-     * completed choice that Settings can change later, not a failure to configure.
-     */
-    val enablesBackup: Boolean
-        get() = this == AllMedia || this == SelectedFolders
-
     companion object {
         fun fromStorageKey(key: String?): BackupSource? = entries.firstOrNull { it.storageKey == key }
     }
+}
+
+/**
+ * Whether this answer is something the background pass can act on.
+ *
+ * [folderCount] belongs in the question, because an answer of "these folders" naming none is not a widened
+ * permission but an empty one: `autoBackupCandidates` matches `relative_path` against the list and returns
+ * nothing, so a schedule installed under that setting runs on its period for ever and queues no photo.
+ * That is indistinguishable, from the phone's point of view, from backup being switched off — which is why
+ * the same rule now decides the write, the schedule and whether the Settings row is a switch at all.
+ *
+ * A null source — never answered — enables nothing, whatever else the row says.
+ */
+fun BackupSource?.canRunAutomatic(folderCount: Int): Boolean = when (this) {
+    BackupSource.AllMedia -> true
+    BackupSource.SelectedFolders -> folderCount > 0
+    BackupSource.NotNow, null -> false
 }
 
 /**

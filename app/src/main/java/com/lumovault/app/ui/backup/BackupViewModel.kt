@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
+import com.lumovault.app.domain.model.canRunAutomatic
 import kotlinx.coroutines.flow.map
 
 /**
@@ -77,6 +78,9 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setAutomatic(enabled: Boolean) {
         viewModelScope.launch {
+            // The switch is only drawn when it can do something; this is the same rule rather than a second
+            // opinion of it, so a stale frame cannot write a column that makes every pass a no-op.
+            if (enabled && !source.value.canEnableAutomatic) return@launch
             container.settingsRepository.setAutomaticBackup(enabled)
             container.refreshAutomaticBackup()
         }
@@ -216,6 +220,16 @@ private fun diagnosticsFlow(container: com.lumovault.app.AppContainer): Flow<Bac
 
 /** The hub's one-line summary of the backup source. */
 data class BackupSourceLine(val source: BackupSource?, val folderCount: Int) {
+    /**
+     * Whether "Automatic backup" is a switch on this answer or a door to the folder screen.
+     *
+     * Turning it on without something to back up writes the column, installs the schedule and queues
+     * nothing — a phone that then scans its library on a period, forever, with no reason anywhere for the
+     * photos not to move.
+     */
+    val canEnableAutomatic: Boolean
+        get() = source.canRunAutomatic(folderCount)
+
     @get:StringRes
     val labelRes: Int
         get() = when {

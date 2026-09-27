@@ -2,6 +2,7 @@ package com.lumovault.app.domain.usecase
 
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.model.BackupSource
+import com.lumovault.app.domain.model.canRunAutomatic
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.OnboardingRepository
 import com.lumovault.app.domain.repository.PermissionRepository
@@ -54,7 +55,9 @@ class RunAutomaticBackupUseCase(
 
         val progress = onboarding.progress.first()
         val source: BackupSource = progress.backupSource ?: return Outcome.NoSourceSelected
-        if (!source.enablesBackup) return Outcome.NoSourceSelected
+        // The count is part of the answer: `SelectedFolders` with nothing in it is not a permission to
+        // scan the library, and queueing nothing on every period is not what "automatic backup" means.
+        if (!source.canRunAutomatic(progress.selectedFolders.size)) return Outcome.NoSourceSelected
 
         media.sync()
 

@@ -394,6 +394,8 @@
     <string name="backup_hub_section_storage">Storage</string>
     <string name="backup_automatic">Automatic backup</string>
     <string name="backup_automatic_note">New photos and videos are queued on their own. Nothing is sent before you choose a folder to back up.</string>
+    <!-- The switch's substitute when there is nothing to switch on: a pass with no selection scans for ever and queues nothing. -->
+    <string name="backup_automatic_choose_first">Choose what to back up first</string>
     <string name="backup_wifi_only">Wi-Fi only</string>
     <string name="backup_wifi_only_note">Unattended uploads wait for an unmetered network. A backup you start by hand does not.</string>
     <string name="backup_charging_only">Charging only</string>

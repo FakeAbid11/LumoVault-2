@@ -3,6 +3,7 @@ package com.lumovault.app.domain.usecase
 import com.lumovault.app.domain.backup.BackupQueueRepository
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.FolderPaths
+import com.lumovault.app.domain.model.canRunAutomatic
 import com.lumovault.app.domain.repository.OnboardingRepository
 
 /**
@@ -55,6 +56,9 @@ class ApplyBackupSelectionUseCase(
         // already inside it.
         if (source == BackupSource.SelectedFolders) queue.releaseUnsentOutside(selected)
 
-        reschedulePasses(source.enablesBackup)
+        // The same question the stored row answers, so the schedule and the setting cannot disagree: an
+        // empty selection re-decides the pass into *not* running rather than installing one that queues
+        // nothing.
+        reschedulePasses(source.canRunAutomatic(selected.size))
     }
 }

@@ -160,6 +160,20 @@ class RunAutomaticBackupUseCaseTest {
     }
 
     @Test
+    fun anEmptyFolderSelectionIsNotReadAsEverythingElse() = runBlocking<Unit> {
+        dao.withItem(1L)
+        permissions.access = MediaAccessStatus.Granted
+        settings.enableAutomatic()
+        // The state a save left behind under the old rule: "these folders", none ticked, automatic on. Every
+        // period then scanned the library to offer it against an empty list.
+        onboarding.set(source = BackupSource.SelectedFolders, folders = emptyList())
+
+        assertEquals(RunAutomaticBackupUseCase.Outcome.NoSourceSelected, useCase().run())
+        assertEquals("an answer that names nothing is not a licence to scan the library", 0, media.syncs)
+        assertFalse(queue.hasQueuedWork())
+    }
+
+    @Test
     fun twoPassesOverTheSameLibraryQueueItOnce() = runBlocking<Unit> {
         dao.withItem(1L)
         permissions.access = MediaAccessStatus.Granted

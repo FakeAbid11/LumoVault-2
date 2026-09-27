@@ -3,6 +3,7 @@ package com.lumovault.app.domain.model
 import com.lumovault.app.domain.telegram.AuthCodeChannel
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -128,8 +129,14 @@ class OnboardingSummaryTest {
 
     @Test
     fun `backup is enabled only when something was actually selected`() {
-        assertTrue(BackupSource.AllMedia.enablesBackup)
-        assertTrue(BackupSource.SelectedFolders.enablesBackup)
-        assertEquals(false, BackupSource.NotNow.enablesBackup)
+        assertTrue(BackupSource.AllMedia.canRunAutomatic(folderCount = 0))
+        assertTrue(BackupSource.SelectedFolders.canRunAutomatic(folderCount = 3))
+        assertFalse(
+            "an answer of \"these folders\" naming none names nothing, and a schedule built on it runs " +
+                "for ever without queueing a photo",
+            BackupSource.SelectedFolders.canRunAutomatic(folderCount = 0),
+        )
+        assertFalse(BackupSource.NotNow.canRunAutomatic(folderCount = 3))
+        assertFalse("never answered is not permission", (null as BackupSource?).canRunAutomatic(folderCount = 3))
     }
 }

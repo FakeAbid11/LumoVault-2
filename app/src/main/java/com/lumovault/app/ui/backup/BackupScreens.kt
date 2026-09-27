@@ -117,12 +117,24 @@ fun BackupHubScreen(
         ) {
             item { SectionLabel(R.string.backup_hub_section_backup) }
             item {
-                ToggleRow(
-                    title = stringResource(R.string.backup_automatic),
-                    subtitle = stringResource(R.string.backup_automatic_note),
-                    checked = preferences.automatic,
-                    onChange = viewModel::setAutomatic,
-                )
+                // A switch that cannot start a pass is not a switch: with nothing chosen to back up, the
+                // honest control is the door to the folders, while somebody with it already on can still
+                // turn it off.
+                val sourceLine = viewModel.source.collectAsStateWithLifecycle().value
+                if (sourceLine.canEnableAutomatic || preferences.automatic) {
+                    ToggleRow(
+                        title = stringResource(R.string.backup_automatic),
+                        subtitle = stringResource(R.string.backup_automatic_note),
+                        checked = preferences.automatic,
+                        onChange = viewModel::setAutomatic,
+                    )
+                } else {
+                    EntryRow(
+                        title = stringResource(R.string.backup_automatic),
+                        subtitle = stringResource(R.string.backup_automatic_choose_first),
+                        onClick = onOpenFolders,
+                    )
+                }
             }
             item {
                 ToggleRow(

@@ -95,7 +95,13 @@ class ApplyBackupSelectionUseCaseTest {
 
         assertEquals(UploadState.NotBackedUp.storageKey, dao.row(1L).state)
         assertEquals(UploadState.NotBackedUp.storageKey, dao.row(2L).state)
-        assertEquals("choosing nothing is still a choice about the schedule", listOf(true), rescheduled)
+        assertEquals(
+            "choosing nothing is still a choice about the schedule — and the choice is that there is " +
+                "nothing for it to run, where an installed pass would scan the library on its period and " +
+                "queue not one photo",
+            listOf(false),
+            rescheduled,
+        )
     }
 
     @Test
