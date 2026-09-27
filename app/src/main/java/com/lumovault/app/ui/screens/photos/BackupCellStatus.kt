@@ -1,5 +1,8 @@
 package com.lumovault.app.ui.screens.photos
 
+import androidx.annotation.StringRes
+import com.lumovault.app.R
+import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.backup.UploadState
 
@@ -36,6 +39,31 @@ fun backupCellStatus(state: UploadState?): BackupCellStatus = when (state) {
     UploadState.Uploading -> BackupCellStatus.Uploading
     UploadState.BackedUp -> BackupCellStatus.BackedUp
     UploadState.Failed -> BackupCellStatus.Failed
+}
+
+/**
+ * The words for why an item stopped, one per kind the queue can record.
+ *
+ * A pure mapping rather than text carried from Telegram, and that is the point: the stored value is an enum
+ * name chosen at the upload boundary, where the server's own message is discarded — so what appears on a
+ * screen is LumoVault's sentence about a failure, never a string someone else's service wrote.
+ *
+ * Null in, null out. A row that failed without a recorded reason draws the plain "Failed" and nothing else;
+ * picking the nearest excuse for it would be the app claiming it knows something it does not.
+ */
+@StringRes
+fun backupFailureReasonRes(kind: BackupFailureKind?): Int? = when (kind) {
+    null -> null
+    BackupFailureKind.SourceMissing -> R.string.backup_failure_source_missing
+    BackupFailureKind.SourceUnreadable -> R.string.backup_failure_source_unreadable
+    BackupFailureKind.SourceChanged -> R.string.backup_failure_source_changed
+    BackupFailureKind.InsufficientSpace -> R.string.backup_failure_insufficient_space
+    BackupFailureKind.ChannelUnavailable -> R.string.backup_failure_channel_unavailable
+    BackupFailureKind.NotAuthenticated -> R.string.backup_failure_not_authenticated
+    BackupFailureKind.Network -> R.string.backup_failure_network
+    BackupFailureKind.RateLimited -> R.string.backup_failure_rate_limited
+    BackupFailureKind.Rejected -> R.string.backup_failure_rejected
+    BackupFailureKind.Unknown -> R.string.backup_failure_unknown
 }
 
 /**

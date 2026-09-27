@@ -228,6 +228,27 @@
         <item quantity="one">%1$d item couldn\'t be backed up</item>
         <item quantity="other">%1$d items couldn\'t be backed up</item>
     </plurals>
+    <!--
+        Why one item stopped, one line per BackupFailureKind. These are the app's own sentences: Telegram's
+        error text is turned into an enum at the upload boundary and discarded there, so nothing written here
+        can ever carry someone else's words, and a kind the app cannot name draws no reason line at all.
+    -->
+    <string name="backup_failure_source_missing">The photo is no longer on this device</string>
+    <string name="backup_failure_source_unreadable">The file could not be read from this device</string>
+    <string name="backup_failure_source_changed">The file changed while it was being backed up</string>
+    <string name="backup_failure_insufficient_space">Not enough free space to prepare this file</string>
+    <string name="backup_failure_channel_unavailable">The LumoVault Backup channel is gone, or can no longer be reached</string>
+    <string name="backup_failure_not_authenticated">Sign in to Telegram again to finish this one</string>
+    <string name="backup_failure_network">There was no connection at the time</string>
+    <string name="backup_failure_rate_limited">Telegram asked LumoVault to wait before sending more</string>
+    <string name="backup_failure_rejected">Telegram refused this file</string>
+    <string name="backup_failure_unknown">Something went wrong, and LumoVault could not tell what</string>
+    <string name="backup_failure_section">Items that could not be backed up</string>
+    <string name="backup_failure_gone">No longer in this library</string>
+    <plurals name="backup_failure_truncated">
+        <item quantity="one">Only the most recent failure is shown</item>
+        <item quantity="other">Only the %1$d most recent failures are shown</item>
+    </plurals>
 
     <!--
         Phase 8: the viewer. The details rows are labels only, because a value the file does not hold is not

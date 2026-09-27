@@ -1,9 +1,12 @@
 package com.lumovault.app.ui.screens.photos
 
+import com.lumovault.app.domain.backup.BackupFailureKind
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.backup.UploadState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -87,5 +90,22 @@ class BackupCellStatusTest {
         val nothingLeft = BackupQueueSummary(backedUp = 4, failed = 1)
         assertEquals(0, nothingLeft.pending)
         assertEquals("a queue that stopped is not active", false, nothingLeft.isActive)
+    }
+
+    @Test
+    fun everyFailureKindHasItsOwnWordsAndAnUnrecordedReasonHasNone() {
+        val resources = BackupFailureKind.entries.map { backupFailureReasonRes(it) }
+
+        assertEquals(
+            "one sentence per kind — a shared fallback would hide the difference between a photo that is " +
+                "gone, a disk that is full and a server that said no",
+            BackupFailureKind.entries.size,
+            resources.distinct().size,
+        )
+        assertTrue("and no kind is left without words", resources.none { it == null })
+        assertNull(
+            "a row that failed with nothing recorded draws no reason at all",
+            backupFailureReasonRes(null),
+        )
     }
 }
