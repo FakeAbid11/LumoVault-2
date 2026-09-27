@@ -44,26 +44,37 @@ fun WelcomeScreen(
         onPrimary = onGetStarted,
         modifier = modifier,
     ) {
-        Box(
-            modifier = Modifier
-                .size(HeroMedallion)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
+        // Centred as one unit rather than as two children. The scaffold's content column is start-aligned
+        // because every other step is a form and a form reads from the margin, but this step is a picture with
+        // a line under it — and a tagline that centres itself beside a start-aligned medallion lands to the
+        // right of the badge instead of below it. The diagram on the next step already centres itself this way,
+        // so the two opening screens now agree.
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(SpaceLg),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Icon(
-                imageVector = Icons.Filled.PhotoLibrary,
-                contentDescription = null,
-                modifier = Modifier.size(HeroGlyph),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            Box(
+                modifier = Modifier
+                    .size(HeroMedallion)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PhotoLibrary,
+                    contentDescription = null,
+                    modifier = Modifier.size(HeroGlyph),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+
+            Text(
+                text = stringResource(R.string.welcome_tagline),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        Text(
-            text = stringResource(R.string.welcome_tagline),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
