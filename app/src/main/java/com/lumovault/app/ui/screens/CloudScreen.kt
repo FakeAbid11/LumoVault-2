@@ -87,6 +87,8 @@ import com.lumovault.app.ui.theme.MediaBadgeInset
 import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.RingStrokeBold
+import com.lumovault.app.ui.theme.RingWaiting
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -601,7 +603,7 @@ private fun Working(title: String, detail: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+        CircularProgressIndicator(modifier = Modifier.size(RingWaiting), strokeWidth = RingStrokeBold)
         Text(text = title, style = LumoVaultType.sectionHeader)
         // The count underneath is the reassuring part: a sync that shows a number going up is working, and a
         // spinner alone cannot tell a first run from a stall.

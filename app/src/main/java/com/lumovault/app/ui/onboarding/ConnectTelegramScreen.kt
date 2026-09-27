@@ -53,6 +53,9 @@ import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.ui.components.CountryPicker
 import com.lumovault.app.util.PhoneNumbers
 import kotlinx.coroutines.delay
+import com.lumovault.app.ui.theme.IconLeading
+import com.lumovault.app.ui.theme.MarkInline
+import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -463,7 +466,7 @@ private fun NotConfiguredCard() {
                 Icon(
                     imageVector = Icons.Filled.Info,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconLeading),
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
@@ -498,7 +501,7 @@ private fun BusyRow(telegram: TelegramAuthState) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
         Text(
             text = stringResource(textRes),
             style = MaterialTheme.typography.bodyMedium,

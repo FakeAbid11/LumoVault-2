@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
+import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 
@@ -75,7 +76,7 @@ fun TelegramErrorBanner(
                 Icon(
                     imageVector = Icons.Filled.ErrorOutline,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconLeading),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
                 Text(

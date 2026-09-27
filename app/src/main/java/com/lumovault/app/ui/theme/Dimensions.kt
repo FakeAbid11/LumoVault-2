@@ -67,3 +67,21 @@ internal val ScreenEdge = 12.dp
 /** Touch targets, because a control under a thumb has to be found before it can be pressed. 48dp is the Android guideline floor. */
 internal val MinTouchTarget = 48.dp
 internal val IconButtonSize = 40.dp
+
+/**
+ * The size of a mark — the glyph or the busy ring that sits inside a layout somebody else pads.
+ *
+ * These were the last numbers the screens wrote themselves, and they had already drifted the way the
+ * paddings did: the checklist's status glyph was 20 dp on one screen and 22 dp on another, a waiting ring
+ * was 32 dp in the timeline and 34 dp over the video stage, and a spinner's stroke was 2 dp in four files
+ * and 3 dp in two. Two roles, not a ladder: a mark that shares a line of text with nothing else around it,
+ * and the icon at the head of a row. A ring that says "this whole surface is waiting" is a third, because
+ * it is the only mark a screen shows on its own.
+ */
+internal val MarkInline = 18.dp
+internal val IconLeading = 20.dp
+internal val RingWaiting = 32.dp
+
+/** A ring's stroke, and the heavier one the large waiting ring needs to stay visible at its own radius. */
+internal val RingStroke = 2.dp
+internal val RingStrokeBold = 3.dp

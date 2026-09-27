@@ -79,15 +79,17 @@ import com.lumovault.app.util.formatDay
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import com.lumovault.app.ui.theme.GridCellMinSize
-import com.lumovault.app.ui.theme.LumoVaultType
-import com.lumovault.app.ui.theme.RailWidth
 import com.lumovault.app.ui.theme.GridSpacing
 import com.lumovault.app.ui.theme.GroupCardCorner
+import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.RailWidth
+import com.lumovault.app.ui.theme.RingStrokeBold
+import com.lumovault.app.ui.theme.RingWaiting
+import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
-import com.lumovault.app.ui.theme.SpaceLg
 
 /**
  * The local library. It reads one value — [PhotosUiState] — and draws that, so a combination the
@@ -542,7 +544,7 @@ private fun Scanning(found: Int) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+        CircularProgressIndicator(modifier = Modifier.size(RingWaiting), strokeWidth = RingStrokeBold)
         Text(
             text = stringResource(R.string.photos_scanning_title),
             style = LumoVaultType.sectionHeader,

@@ -20,11 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.BackgroundBackupStatus
+import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -162,7 +162,7 @@ private fun SetupCard(
                 Icon(
                     imageVector = if (satisfied) Icons.Filled.CheckCircle else Icons.Filled.RemoveCircleOutline,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconLeading),
                     tint = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                 )
                 Text(

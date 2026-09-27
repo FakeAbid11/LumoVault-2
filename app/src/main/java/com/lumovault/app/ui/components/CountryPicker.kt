@@ -32,10 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Country
 import com.lumovault.app.domain.model.search
+import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 
@@ -132,7 +132,7 @@ private fun CountryRow(country: Country, isSelected: Boolean, onClick: () -> Uni
                         Icon(
                             imageVector = Icons.Filled.Check,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(MarkInline),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }

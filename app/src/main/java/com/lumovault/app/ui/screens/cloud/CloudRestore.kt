@@ -20,6 +20,8 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.restore.RestoreFailureKind
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.restore.RestoreState
+import com.lumovault.app.ui.theme.MarkInline
+import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.util.toByteText
 
 /**
@@ -78,7 +80,7 @@ internal fun RestoreAction(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (live != null) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
                     }
                     Text(
                         text = stringResource(label),
@@ -96,7 +98,7 @@ internal fun RestoreAction(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
                 Text(
                     text = job.progressText(),
                     style = MaterialTheme.typography.bodyMedium,

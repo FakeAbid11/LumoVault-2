@@ -45,7 +45,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.app.R
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,17 +56,19 @@ import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
 import com.lumovault.app.util.toByteText
 import com.lumovault.app.ui.theme.GroupCardCorner
 import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.MinTouchTarget
+import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
  * The Phase 9 screens: the backup settings that drive the real scheduler, the health summary, the technical
@@ -636,8 +637,8 @@ fun FreeUpSpaceScreen(
                     ) {
                         if (state.confirming) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(MarkInline),
+                                strokeWidth = RingStroke,
                             )
                         } else {
                             Text(stringResource(R.string.free_space_action))

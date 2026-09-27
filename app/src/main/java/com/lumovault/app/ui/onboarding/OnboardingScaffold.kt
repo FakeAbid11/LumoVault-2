@@ -33,6 +33,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.ui.theme.LumoVaultType
+import com.lumovault.app.ui.theme.MarkInline
+import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceXl
@@ -140,8 +142,8 @@ fun OnboardingScaffold(
             ) {
                 if (primaryBusy) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(MarkInline),
+                        strokeWidth = RingStroke,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {

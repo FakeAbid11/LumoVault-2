@@ -32,9 +32,10 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.ChecklistStatus
 import com.lumovault.app.domain.model.OnboardingSummary
+import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
-import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
 
 /**
@@ -271,7 +272,7 @@ private fun ReadyRow(label: String, status: ChecklistStatus) {
             },
             // The status is announced with the label, so the icon itself stays decorative.
             contentDescription = null,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(IconLeading),
             tint = when (status) {
                 ChecklistStatus.Done -> MaterialTheme.colorScheme.primary
                 ChecklistStatus.Unavailable -> MaterialTheme.colorScheme.error

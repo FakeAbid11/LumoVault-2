@@ -46,9 +46,10 @@ import androidx.media3.ui.PlayerView
 import coil3.compose.SubcomposeAsyncImage
 import com.lumovault.app.R
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.RingWaiting
+import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
-import com.lumovault.app.ui.theme.SpaceXl
 
 /**
  * A clip, played — and the reason a clip that cannot be played must not take the process with it.
@@ -244,7 +245,7 @@ fun VideoStage(
             )
             if (machine.loading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(34.dp),
+                    modifier = Modifier.size(RingWaiting),
                     color = OnMedia,
                 )
             }
