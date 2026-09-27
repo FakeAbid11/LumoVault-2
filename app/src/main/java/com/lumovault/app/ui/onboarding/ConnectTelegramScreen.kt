@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Country
@@ -246,42 +248,51 @@ private fun PhoneFields(
     // The keyboard is the point of this panel: opening it is the screen's job, not the user's.
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    CountryButton(
-        country = state.selectedCountry,
-        onClick = onCountryClick,
-        enabled = !state.busy,
-    )
+    // A number is only wrong on its own account once a country has settled what a valid length is. Before
+    // that, the missing country is the whole of the problem, and it is not the field's fault.
+    val numberRejected = state.phoneInput.isNotEmpty() &&
+        state.selectedCountry != null &&
+        !state.canRequestCode
+    val countryMissing = state.phoneInput.isNotEmpty() && state.selectedCountry == null
 
-    OutlinedTextField(
-        value = state.phoneInput,
-        onValueChange = onPhoneChange,
-        label = { Text(stringResource(R.string.connect_phone_label)) },
-        placeholder = {
-            Text(state.selectedCountry?.let { PhoneNumbers.exampleFor(it.iso2) }.orEmpty())
-        },
-        singleLine = true,
-        enabled = !state.busy,
-        isError = state.phoneInput.isNotEmpty() && !state.canRequestCode,
-        supportingText = {
-            if (state.phoneInput.isNotEmpty() && !state.canRequestCode) {
-                Text(stringResource(R.string.error_phone_invalid_detail))
-            }
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Go),
-        keyboardActions = KeyboardActions(onGo = { if (submitEnabled) onSubmit() }),
-        prefix = {
-            state.selectedCountry?.let { country ->
-                // Real spacing, not the trailing space character the label used to carry.
-                Text(
-                    text = country.dialPrefix,
-                    modifier = Modifier.padding(end = SpaceXs),
-                )
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusRequester(focusRequester),
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        // Top rather than bottom: the field grows a supporting-text line the moment it rejects a number, and a
+        // bottom-aligned chip would visibly slide down while the person is still typing. Both boxes are the
+        // same height, so aligning them at the top is what puts them on one line.
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+    ) {
+        CountryButton(
+            country = state.selectedCountry,
+            onClick = onCountryClick,
+            enabled = !state.busy,
+        )
+
+        OutlinedTextField(
+            value = state.phoneInput,
+            onValueChange = onPhoneChange,
+            label = { Text(stringResource(R.string.connect_phone_label)) },
+            placeholder = {
+                Text(state.selectedCountry?.let { PhoneNumbers.exampleFor(it.iso2) }.orEmpty())
+            },
+            singleLine = true,
+            enabled = !state.busy,
+            isError = numberRejected,
+            supportingText = {
+                when {
+                    numberRejected -> Text(stringResource(R.string.error_phone_invalid_detail))
+                    countryMissing -> Text(stringResource(R.string.connect_country_missing))
+                    else -> Unit
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { if (submitEnabled) onSubmit() }),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+        )
+    }
 }
 
 @Composable
@@ -407,39 +418,41 @@ private fun PasswordField(
     )
 }
 
-/** The country control doubles as the dial-prefix display, so the number field never repeats it. */
+/**
+ * The country, as a compact prefix to the number field beside it: flag and dial code, and nothing else.
+ *
+ * The full name does not fit here without taking the width the number itself needs, and it is one tap away in
+ * the picker, which lists it beside the same flag. This control is the only place the dial code is shown — the
+ * field no longer repeats it in a prefix.
+ *
+ * [CountryFieldHeight] is matched to the outlined field's own box rather than letting the chip size to its
+ * content, so the two sit on one line and the chip cannot move when the field grows a supporting-text line
+ * downward.
+ */
 @Composable
 private fun CountryButton(country: Country?, onClick: () -> Unit, enabled: Boolean) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
             .semantics { role = Role.Button },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = SpaceLg, vertical = SpaceMd),
+                .height(CountryFieldHeight)
+                .padding(horizontal = SpaceMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpaceMd),
+            horizontalArrangement = Arrangement.spacedBy(SpaceXs),
         ) {
             Text(
                 text = country?.flag ?: "?",
                 style = MaterialTheme.typography.titleLarge,
             )
-            Column(modifier = Modifier.weight(1f)) {
+            if (country != null) {
                 Text(
-                    text = country?.name ?: stringResource(R.string.country_picker_title),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = country.dialPrefix,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-                if (country != null) {
-                    Text(
-                        text = country.dialPrefix,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
             Icon(
                 imageVector = Icons.Filled.ExpandMore,
@@ -448,6 +461,9 @@ private fun CountryButton(country: Country?, onClick: () -> Unit, enabled: Boole
         }
     }
 }
+
+/** The Material 3 outlined text field's box height, so the chip and the field line up as one control. */
+private val CountryFieldHeight = 56.dp
 
 @Composable
 private fun NotConfiguredCard() {

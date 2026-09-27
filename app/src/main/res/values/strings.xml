@@ -59,6 +59,9 @@
     <string name="connect_phone_label">Phone number</string>
     <string name="connect_action">Continue</string>
     <string name="connect_country_description">Choose your country</string>
+    <!-- The compact country chip beside the field can no longer spell out "Select country", so the field says
+         it instead — and says it rather than blaming the digits, which are not yet judgeable at all. -->
+    <string name="connect_country_missing">Pick the country first — the code beside this field sets the rest of the number.</string>
     <string name="connect_not_configured">This build cannot reach Telegram yet.</string>
     <string name="connect_not_configured_detail">LumoVault was compiled without the Telegram library or API credentials, so signing in is unavailable. Setup can continue now and the account can be connected later.</string>
     <string name="connect_restoring">Checking your Telegram session…</string>
