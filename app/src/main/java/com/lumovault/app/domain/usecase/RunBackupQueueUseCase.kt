@@ -40,6 +40,10 @@ sealed interface QueueRun {
         val deduplicated: Int = 0,
     ) : QueueRun
     data object NoChannel : QueueRun
+
+    /** TDLib has no session to send with, which is the step before [NoChannel] rather than a kind of it. */
+    data object SignedOut : QueueRun
+
     data object TelegramUnavailable : QueueRun
 }
 

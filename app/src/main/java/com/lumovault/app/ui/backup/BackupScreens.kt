@@ -91,6 +91,7 @@ fun BackupHubScreen(
 ) {
     val health by viewModel.health.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+    val stop by viewModel.stopReason.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
@@ -174,9 +175,9 @@ fun BackupHubScreen(
 
             // Below the numbers rather than above them: the figures are what the user came to read, and this
             // is the sentence that explains them when they do not add up.
-            val stop = viewModel.stopReason.collectAsStateWithLifecycle().value
             if (stop != null) {
-                item { StopCard(reason = stop, onOpenCloudTab = onOpenCloudTab, onConnectTelegram = onConnectTelegram) }
+                val reason = requireNotNull(stop)
+                item { StopCard(reason = reason, onOpenCloudTab = onOpenCloudTab, onConnectTelegram = onConnectTelegram) }
             }
 
             item { SectionLabel(R.string.backup_hub_section_storage) }
