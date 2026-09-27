@@ -31,23 +31,9 @@ class AutomaticBackupWorker(
 ) : CoroutineWorker(context, parameters) {
 
     override suspend fun doWork(): Result = try {
-        when (val outcome = runPass()) {
-            // The grant can come back without another periodic period elapsing, so this is worth another try
-            // rather than a silent success over a library nobody scanned — but a bounded number of them. A
-            // person who chose "Don't allow" and meant it would otherwise be woken every backoff interval,
-            // forever, by work that can only ever come back with the same answer.
-            RunAutomaticBackupUseCase.Outcome.NoMediaAccess ->
-                if (runAttemptCount < ACCESS_RETRY_LIMIT) Result.retry() else Result.success()
-
-            // Off, or never configured: nothing to do, and nothing to retry.
-            RunAutomaticBackupUseCase.Outcome.Disabled,
-            RunAutomaticBackupUseCase.Outcome.NoSourceSelected,
-            -> Result.success()
-
-            is RunAutomaticBackupUseCase.Outcome.Queued ->
-                // More work remains only when the window filled, which is the pass saying "keep going" to
-                // itself rather than the app pretending a hundred-thousand-photo library was one pass.
-                if (outcome.moreRemaining) Result.retry() else Result.success()
+        when (runPass().toAutoPassDirective(runAttemptCount)) {
+            AutoPassDirective.TryAgain -> Result.retry()
+            AutoPassDirective.Finished -> Result.success()
         }
     } catch (cancelled: CancellationException) {
         // The system stopping the worker is not the pass failing, and WorkManager already knows the
@@ -57,15 +43,52 @@ class AutomaticBackupWorker(
         // WorkManager logs a throwable whole on the way to `Result.failure()`; a MediaStore or SQLite
         // message can quote a path, so only the class name is kept. The outcome is the one WorkManager
         // would have produced anyway — this pass failed, and the next period decides again — because
-        // reporting success over a scan that threw would promise a scan that never ran.
+        // reporting success over a scan that threw would promise a scan that never ran. A throw is not an
+        // [RunAutomaticBackupUseCase.Outcome], which is why this stays outside the mapping.
         Log.w(TAG, "automatic backup pass failed: ${error.javaClass.simpleName}")
         Result.failure()
     }
 
     private companion object {
         private const val TAG = "LumoVaultAutoBackup"
-
-        /** Roughly an hour of retries at this worker's backoff curve, then the next period decides. */
-        const val ACCESS_RETRY_LIMIT = 6
     }
 }
+
+/** What one finished scan pass asks for next. */
+internal enum class AutoPassDirective { Finished, TryAgain }
+
+/**
+ * How many times a pass that could not read the library asks again.
+ *
+ * Roughly half an hour of retries at this worker's thirty-second exponential curve (30+60+120+240+480+960
+ * seconds), then the next period decides. Six is not an hour and the count is here so the arithmetic is read
+ * next to the number rather than in a comment about it.
+ */
+internal const val ACCESS_RETRY_LIMIT = 6
+
+/**
+ * What an ended pass means, decided apart from WorkManager so the answer can be tested without a context.
+ *
+ * This is the whole retry policy of the unattended scan, and it used to be inline in [AutomaticBackupWorker]'s
+ * `try`, which meant the one branch a user would ever notice — the queue still half full — was the only one with
+ * no test beside it.
+ */
+internal fun RunAutomaticBackupUseCase.Outcome.toAutoPassDirective(attempt: Int): AutoPassDirective =
+    when (this) {
+        // The grant can come back without another periodic period elapsing, so this is worth another try
+        // rather than a silent success over a library nobody scanned — but a bounded number of them. A person
+        // who chose "Don't allow" and meant it would otherwise be woken every backoff interval, forever, by
+        // work that can only ever come back with the same answer.
+        RunAutomaticBackupUseCase.Outcome.NoMediaAccess ->
+            if (attempt < ACCESS_RETRY_LIMIT) AutoPassDirective.TryAgain else AutoPassDirective.Finished
+
+        // Off, or never configured: nothing to do, and nothing to retry.
+        RunAutomaticBackupUseCase.Outcome.Disabled,
+        RunAutomaticBackupUseCase.Outcome.NoSourceSelected,
+        -> AutoPassDirective.Finished
+
+        // More work remains only when the window filled, which is the pass saying "keep going" to itself
+        // rather than the app pretending a hundred-thousand-photo library was one pass.
+        is RunAutomaticBackupUseCase.Outcome.Queued ->
+            if (moreRemaining) AutoPassDirective.TryAgain else AutoPassDirective.Finished
+    }

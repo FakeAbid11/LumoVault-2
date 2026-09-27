@@ -44,7 +44,7 @@ class BackupScheduler(private val context: Context) {
      * just made in front of it.
      */
     fun start() {
-        enqueueUpload(MANUAL_WORK_NAME, connectedOnly())
+        enqueueUpload(manualSendPlan())
     }
 
     /**
@@ -56,7 +56,7 @@ class BackupScheduler(private val context: Context) {
      * report "waiting" as a state instead of a row of errors.
      */
     fun startAutomatic(preferences: BackupPreferences) {
-        enqueueUpload(AUTOMATIC_WORK_NAME, constraintsFor(preferences.toAutomaticWorkRequest()))
+        enqueueUpload(automaticSendPlan(preferences))
     }
 
     /**
@@ -69,41 +69,49 @@ class BackupScheduler(private val context: Context) {
      * impossible. Two names, two chains: the strict constraints can only ever hold up the work that
      * inherited them from a setting, never work that came from a tap.
      */
-    private fun enqueueUpload(name: String, constraints: Constraints) {
+    private fun enqueueUpload(plan: PassPlan) {
         val request = OneTimeWorkRequestBuilder<BackupUploadWorker>()
-            .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(WORK_TAG)
+            .apply { plan.waitsFor?.let { waits -> setConstraints(constraintsFor(waits)) } }
             .build()
 
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(name, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
+            .enqueueUniqueWork(plan.workName, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
     }
 
     /**
-     * Installs or re-installs the periodic pass.
+     * Installs or re-installs the periodic scan, and takes it back out.
      *
-     * Re-enqueued rather than left running when the settings change, because constraints are fixed on the
-     * request: a user who turns on "back up while charging only" would otherwise wait until the next period
-     * for a phone that is already behaving differently. [ExistingPeriodicWorkPolicy.UPDATE] replaces the
-     * schedule and keeps the period, so the change takes effect without resetting the whole day's plan.
+     * Re-enqueued rather than left running when the settings change because this request either exists or
+     * does not, and only the settings row says which. [ExistingPeriodicWorkPolicy.UPDATE] replaces the
+     * schedule and keeps the period, so a person who has just turned the feature off is not woken by the pass
+     * their previous answer installed.
+     *
+     * It carries no constraints, deliberately. This pass reads MediaStore and writes rows, and neither wants
+     * a network or a charger: Wi-Fi-only and charging-only are promises about *sending*, and they are kept
+     * where the bytes actually move, on [startAutomatic]. Bind this request by them instead and a phone off
+     * the charger stops noticing new photos at all — nothing reaches the queue, so there is no waiting queue
+     * for the Backup screen to explain, and the feature reads as switched off from a screen that says it is
+     * on. [scanNow] runs the same worker with no constraints for the same reason.
      */
     fun scheduleAutomaticPasses(preferences: BackupPreferences) {
         if (!preferences.automatic) {
             cancelAutomaticPasses()
             return
         }
+        val plan = periodicScanPlan()
         val request = PeriodicWorkRequestBuilder<AutomaticBackupWorker>(
             PERIODIC_INTERVAL_HOURS,
             TimeUnit.HOURS,
         )
-            .setConstraints(constraintsFor(preferences.toAutomaticWorkRequest()))
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(WORK_TAG)
+            .apply { plan.waitsFor?.let { waits -> setConstraints(constraintsFor(waits)) } }
             .build()
 
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+            .enqueueUniquePeriodicWork(plan.workName, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     fun cancelAutomaticPasses() {
@@ -128,16 +136,16 @@ class BackupScheduler(private val context: Context) {
      * is a different request under a different name — [startAutomatic].
      */
     fun scanNow() {
+        val plan = immediateScanPlan()
         val request = OneTimeWorkRequestBuilder<AutomaticBackupWorker>()
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, FIRST_BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(WORK_TAG)
+            .apply { plan.waitsFor?.let { waits -> setConstraints(constraintsFor(waits)) } }
             .build()
 
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(SCAN_NOW_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
+            .enqueueUniqueWork(plan.workName, ExistingWorkPolicy.APPEND_OR_REPLACE, listOf(request))
     }
-
-    private fun connectedOnly(): Constraints = constraintsFor(manualWorkRequest)
 
     private fun constraintsFor(request: WorkRequest): Constraints = Constraints.Builder()
         .setRequiredNetworkType(
@@ -161,19 +169,6 @@ class BackupScheduler(private val context: Context) {
     }
 
     private companion object {
-        const val MANUAL_WORK_NAME = "lumovault-backup-queue-manual"
-
-        const val AUTOMATIC_WORK_NAME = "lumovault-backup-queue-automatic"
-
-        /** The periodic scan-and-queue pass. Its own name, so cancelling it never touches a send. */
-        const val PERIODIC_WORK_NAME = "lumovault-automatic-backup"
-
-        /**
-         * The one-shot version of the same pass, asked for by a folder save. Its own name because WorkManager
-         * keys unique work across both kinds: reusing [PERIODIC_WORK_NAME] for a one-time request fails.
-         */
-        const val SCAN_NOW_WORK_NAME = "lumovault-automatic-backup-now"
-
         /**
          * Six hours: long enough that a phone which gains two photos a day is not woken to scan 90,000 rows
          * every fifteen minutes, short enough that a photo taken while the app was closed appears in the
@@ -234,4 +229,51 @@ internal fun BackupPreferences.toAutomaticWorkRequest(): WorkRequest =
 
 /** What a hand-tapped backup is allowed to wait for: nothing but a connection. */
 internal val manualWorkRequest = WorkRequest(requiresUnmeteredNetwork = false, requiresCharging = false)
+
+/**
+ * The chains this app runs, named apart from WorkManager so which one waits for what can be read and tested
+ * without a context or a device.
+ *
+ * These strings are load-bearing rather than labels: WorkManager keys unique work by name, so two passes that
+ * share one name join one chain — and a chain waits for the constraints of the work inside it. That is how a
+ * hand-tapped backup came to be held behind a Wi-Fi network the user had not agreed to use.
+ */
+internal const val MANUAL_WORK_NAME = "lumovault-backup-queue-manual"
+
+/** The unattended send, and the only work the user's Wi-Fi and charging preferences ever bound. */
+internal const val AUTOMATIC_WORK_NAME = "lumovault-backup-queue-automatic"
+
+/** The periodic scan-and-queue pass. Its own name, so cancelling it never touches a send. */
+internal const val PERIODIC_WORK_NAME = "lumovault-automatic-backup"
+
+/**
+ * The one-shot version of the same pass, asked for by a folder save. Its own name because WorkManager keys
+ * unique work across both kinds: reusing [PERIODIC_WORK_NAME] for a one-time request fails.
+ */
+internal const val SCAN_NOW_WORK_NAME = "lumovault-automatic-backup-now"
+
+/**
+ * What one pass asks WorkManager for: which chain it belongs to, and what it will wait for.
+ *
+ * A null [waitsFor] means no constraints at all, which is a decision rather than an omission. The scan passes
+ * only fill the queue and need neither a network nor a charger, so binding them by the user's preferences is how
+ * "charging only" came to mean "nothing is ever noticed" — and a queue that never receives a row is a queue with
+ * nothing for the Backup screen to explain, so the failure was invisible from both ends. These four functions are
+ * the single place that answer is given, which is what lets a test say *which* chain a preference binds rather
+ * than only that the preference was read correctly.
+ */
+internal data class PassPlan(val workName: String, val waitsFor: WorkRequest?)
+
+/** The periodic scan. It takes no preferences on purpose: what it waits for must not depend on them. */
+internal fun periodicScanPlan(): PassPlan = PassPlan(PERIODIC_WORK_NAME, waitsFor = null)
+
+/** The same scan, asked for immediately by a folder save instead of on the period. */
+internal fun immediateScanPlan(): PassPlan = PassPlan(SCAN_NOW_WORK_NAME, waitsFor = null)
+
+/** The unattended send, held by exactly what the user ticked. */
+internal fun automaticSendPlan(preferences: BackupPreferences): PassPlan =
+    PassPlan(AUTOMATIC_WORK_NAME, preferences.toAutomaticWorkRequest())
+
+/** The send a person started by hand: a connection and nothing else, because the tap is the agreement. */
+internal fun manualSendPlan(): PassPlan = PassPlan(MANUAL_WORK_NAME, manualWorkRequest)
 
