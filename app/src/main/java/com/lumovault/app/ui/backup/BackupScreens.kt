@@ -67,6 +67,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
  * The Phase 9 screens: the backup settings that drive the real scheduler, the health summary, the technical
@@ -367,8 +368,8 @@ fun BackupHealthScreen(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
             HealthSummary(health = health, onOpenDetails = onOpenDiagnostics)
             if (health.reclaimableCount > 0) {
@@ -427,14 +428,14 @@ fun DiagnosticsScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceXxs),
         ) {
             val current = diagnostics
             if (current == null) {
                 // Every row below is a fact about the device, and none of it has been read yet. Zeros would
                 // read as a database at version 0 and a full disk, which is inventing both.
-                item { CircularProgressIndicator(modifier = Modifier.padding(top = 24.dp)) }
+                item { CircularProgressIndicator(modifier = Modifier.padding(top = SpaceXl)) }
                 return@LazyColumn
             }
             item { Row(R.string.diag_local_media, current.health.localTotal.toString()) }
@@ -461,7 +462,7 @@ fun DiagnosticsScreen(
                             ),
                             style = LumoVaultType.sectionDetail,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 6.dp),
+                            modifier = Modifier.padding(vertical = SpaceSm),
                         )
                     }
                 }
@@ -520,7 +521,7 @@ fun DiagnosticsScreen(
                     text = stringResource(R.string.diagnostics_secrets_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = SpaceMd),
                 )
             }
         }
@@ -530,7 +531,7 @@ fun DiagnosticsScreen(
 @Composable
 private fun Row(@androidx.annotation.StringRes label: Int, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SpaceSm),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
@@ -617,7 +618,7 @@ fun FreeUpSpaceScreen(
         },
         bottomBar = {
             if (state.candidates.isNotEmpty()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(SpaceLg), verticalArrangement = Arrangement.spacedBy(SpaceSm)) {
                     Text(
                         text = stringResource(
                             R.string.free_space_selected,
@@ -648,8 +649,8 @@ fun FreeUpSpaceScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
             item {
                 Text(
@@ -683,7 +684,7 @@ fun FreeUpSpaceScreen(
             // nothing are different facts, and drawing a spinner for both leaves the screen promising an
             // answer that never arrives while its own header quotes real totals over zero rows.
             if (state.loading) {
-                item { CircularProgressIndicator(modifier = Modifier.padding(top = 24.dp)) }
+                item { CircularProgressIndicator(modifier = Modifier.padding(top = SpaceXl)) }
             } else if (state.candidates.isEmpty() && !state.nothingEligible) {
                 item {
                     Text(
@@ -764,13 +765,13 @@ fun FreeUpSpaceScreen(
 private fun OutcomeCard(text: String, onDismiss: () -> Unit) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(SpaceMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
             Text(
                 text = text,
@@ -785,9 +786,9 @@ private fun OutcomeCard(text: String, onDismiss: () -> Unit) {
 @Composable
 private fun CandidateRow(candidate: FreeUpSpaceCandidate, checked: Boolean, onToggle: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = SpaceSm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
         Checkbox(checked = checked, onCheckedChange = { onToggle() })
         Column(modifier = Modifier.weight(1f)) {

@@ -32,6 +32,10 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.ChecklistStatus
 import com.lumovault.app.domain.model.OnboardingSummary
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceXs
 
 /**
  * Screen 5: one choice, persisted immediately, so leaving the flow mid-way does not lose it.
@@ -95,10 +99,10 @@ private fun SourceOption(
         modifier = Modifier
             .fillMaxWidth()
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(vertical = SpaceSm),
+        verticalArrangement = Arrangement.spacedBy(SpaceXs),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SpaceMd)) {
             RadioButton(selected = selected, onClick = null)
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
         }
@@ -148,8 +152,8 @@ fun FolderSelectionScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(SpaceLg),
+                    verticalArrangement = Arrangement.spacedBy(SpaceSm),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(
@@ -181,9 +185,9 @@ fun FolderSelectionScreen(
                             role = Role.Checkbox,
                             onValueChange = { onToggle(folder.relativePath) },
                         )
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = SpaceSm),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                 ) {
                     Checkbox(checked = checked, onCheckedChange = null)
                     Column(modifier = Modifier.weight(1f)) {
@@ -236,7 +240,7 @@ fun ReadyScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(SpaceMd), modifier = Modifier.fillMaxWidth()) {
             ReadyRow(stringResource(R.string.ready_telegram), summary.telegramItem.status)
             ReadyRow(stringResource(R.string.ready_media), summary.mediaItem.status)
             ReadyRow(stringResource(R.string.ready_notifications), summary.notificationsItem.status)
@@ -255,7 +259,7 @@ fun ReadyScreen(
 private fun ReadyRow(label: String, status: ChecklistStatus) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(

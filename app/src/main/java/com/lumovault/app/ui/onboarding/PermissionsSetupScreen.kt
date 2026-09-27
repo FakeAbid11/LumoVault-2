@@ -25,6 +25,9 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.BackgroundBackupStatus
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 
 /**
  * Screen 4. Media access, notifications and background backup are one screen with three cards
@@ -148,12 +151,12 @@ private fun SetupCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceMd),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
@@ -180,7 +183,7 @@ private fun SetupCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
+            Row(horizontalArrangement = Arrangement.spacedBy(SpaceSm)) { actions() }
         }
     }
 }

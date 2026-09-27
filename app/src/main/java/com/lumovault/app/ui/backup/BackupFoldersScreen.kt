@@ -50,6 +50,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceLg
 
 /**
  * Which folders automatic backup may take media from, as one screen's worth of state.
@@ -195,8 +199,8 @@ fun BackupFoldersScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceXs),
         ) {
             item {
                 Text(
@@ -217,17 +221,17 @@ fun BackupFoldersScreen(
                         viewModel.saveAllMedia()
                         onNavigateUp()
                     },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = SpaceSm),
                 ) {
                     Text(stringResource(R.string.backup_folders_back_up_everything))
                 }
             }
 
-            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = SpaceSm)) }
 
             when {
                 state.loading -> item {
-                    CircularProgressIndicator(modifier = Modifier.padding(top = 12.dp))
+                    CircularProgressIndicator(modifier = Modifier.padding(top = SpaceMd))
                 }
 
                 state.folders.isEmpty() -> item {
@@ -249,9 +253,9 @@ fun BackupFoldersScreen(
                                 role = Role.Checkbox,
                                 onValueChange = { viewModel.toggle(folder.relativePath) },
                             )
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = SpaceSm),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                     ) {
                         Checkbox(checked = checked, onCheckedChange = null)
                         Column(modifier = Modifier.weight(1f)) {

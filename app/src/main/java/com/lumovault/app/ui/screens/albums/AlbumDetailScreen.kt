@@ -65,6 +65,11 @@ import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
 import com.lumovault.app.ui.theme.GroupCardCorner
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
  * One album: its items, and the organisation actions over the ones the user selects.
@@ -302,7 +307,7 @@ private fun AlbumHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = SpaceLg, vertical = SpaceSm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(text = title, style = MaterialTheme.typography.titleLarge)
@@ -316,15 +321,15 @@ private fun AlbumHeader(
                 text = explainer,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = SpaceXs),
             )
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(top = SpaceSm),
+            horizontalArrangement = Arrangement.spacedBy(SpaceSm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isUserAlbum) {
@@ -332,7 +337,7 @@ private fun AlbumHeader(
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Text(
                         text = stringResource(R.string.album_add_media_action),
-                        modifier = Modifier.padding(start = 6.dp),
+                        modifier = Modifier.padding(start = SpaceSm),
                     )
                 }
                 TextButton(onClick = onRename) { Text(stringResource(R.string.album_rename_title)) }
@@ -435,10 +440,10 @@ private fun AlbumActionBar(
             // Scrollable rather than compressed: Trash plus six organisation marks plus a count and a
             // Clear do not fit a narrow phone, and squeezing them shrinks every tap target at once.
             modifier = Modifier
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .padding(horizontal = SpaceMd, vertical = SpaceSm)
                 .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(SpaceXs),
         ) {
             Text(
                 text = stringResource(R.string.album_selected_count, selectionSize),
@@ -458,7 +463,7 @@ private fun AlbumActionBar(
                     ActionIcon(Icons.Filled.PhotoLibrary, R.string.album_remove_from_album_action, onRemoveFromAlbum)
                 }
             }
-            TextButton(onClick = onClear, modifier = Modifier.padding(start = 2.dp)) {
+            TextButton(onClick = onClear, modifier = Modifier.padding(start = SpaceXxs)) {
                 Text(stringResource(R.string.backup_selection_clear))
             }
         }
@@ -537,7 +542,7 @@ private fun AddMediaSheet(
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = GridCellMinSize),
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    contentPadding = PaddingValues(vertical = SpaceSm),
                     horizontalArrangement = Arrangement.spacedBy(GridSpacing),
                     verticalArrangement = Arrangement.spacedBy(GridSpacing),
                     modifier = Modifier
@@ -591,7 +596,7 @@ private fun NoticeBanner(text: String) {
             text = text,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(SpaceMd),
         )
     }
 }

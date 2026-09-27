@@ -21,6 +21,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
 
 /**
  * Human-readable authentication failures (PRD section 58). The raw TDLib reason never appears here:
@@ -66,10 +68,10 @@ fun TelegramErrorBanner(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(SpaceLg),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SpaceMd)) {
                 Icon(
                     imageVector = Icons.Filled.ErrorOutline,
                     contentDescription = null,

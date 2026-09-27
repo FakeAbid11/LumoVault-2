@@ -119,7 +119,7 @@ fun MediaViewerScreen(
         ) {
             IconButton(
                 onClick = onNavigateUp,
-                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(SpaceSm),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
@@ -144,7 +144,7 @@ fun MediaViewerScreen(
             )
             IconButton(
                 onClick = onNavigateUp,
-                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(SpaceSm),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,

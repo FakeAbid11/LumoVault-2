@@ -48,6 +48,7 @@ import com.lumovault.app.R
 import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
+import com.lumovault.app.ui.theme.SpaceXl
 
 /**
  * A clip, played — and the reason a clip that cannot be played must not take the process with it.
@@ -199,7 +200,7 @@ fun VideoStage(
                 text = stringResource(R.string.viewer_video_failed_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp),
+                modifier = Modifier.padding(horizontal = SpaceXl),
             )
             // Not the pager's chrome: the viewer hides its bars on a tap, and a failure the user can only
             // leave by guessing at gestures is not a state, it is a trap.

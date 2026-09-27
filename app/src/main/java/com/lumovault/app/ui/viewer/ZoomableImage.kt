@@ -33,6 +33,7 @@ import coil3.size.Precision
 import coil3.size.Size
 import com.lumovault.app.R
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.SpaceXxl
 
 /**
  * One image, at the size it was taken, under the user's fingers.
@@ -178,7 +179,7 @@ fun ZoomableImage(
                     text = stringResource(R.string.viewer_image_unreadable),
                     style = MaterialTheme.typography.bodyMedium,
                     color = OnMedia,
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(SpaceXxl),
                 )
             },
             // A callback, not a slot: the `loading`/`error` form of this overload has no `content`

@@ -53,6 +53,9 @@ import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.ui.components.CountryPicker
 import com.lumovault.app.util.PhoneNumbers
 import kotlinx.coroutines.delay
+import com.lumovault.app.ui.theme.SpaceLg
+import com.lumovault.app.ui.theme.SpaceMd
+import com.lumovault.app.ui.theme.SpaceSm
 
 /**
  * Screen 3, and the only screen that talks to Telegram.
@@ -333,7 +336,7 @@ private fun CodeFields(
             .focusRequester(focusRequester),
     )
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(SpaceSm)) {
         TextButton(
             onClick = {
                 secondsLeft = waiting?.timeoutSeconds ?: 0
@@ -414,9 +417,9 @@ private fun CountryButton(country: Country?, onClick: () -> Unit, enabled: Boole
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = SpaceLg, vertical = SpaceMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(SpaceMd),
         ) {
             Text(
                 text = country?.flag ?: "?",
@@ -450,12 +453,12 @@ private fun NotConfiguredCard() {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(SpaceLg),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Info,
@@ -493,7 +496,7 @@ private fun BusyRow(telegram: TelegramAuthState) {
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         Text(

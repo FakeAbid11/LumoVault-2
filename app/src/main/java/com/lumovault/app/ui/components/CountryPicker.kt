@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Country
 import com.lumovault.app.domain.model.search
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXl
 
 /**
  * Full country list, searchable, with flags rendered from the ISO code. The list is filtered in
@@ -62,7 +64,7 @@ fun CountryPicker(
             Text(
                 text = stringResource(R.string.country_picker_title),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = SpaceXl, vertical = SpaceSm),
             )
 
             OutlinedTextField(
@@ -83,14 +85,14 @@ fun CountryPicker(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = SpaceXl),
             )
 
             Text(
                 text = pluralStringResource(R.plurals.country_result_count, matches.size, matches.size),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = SpaceXl, vertical = SpaceSm),
             )
 
             if (matches.isEmpty()) {
@@ -98,7 +100,7 @@ fun CountryPicker(
                     text = stringResource(R.string.country_no_results),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                    modifier = Modifier.padding(horizontal = SpaceXl, vertical = SpaceXl),
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -124,7 +126,7 @@ private fun CountryRow(country: Country, isSelected: Boolean, onClick: () -> Uni
             Text(text = country.flag, style = MaterialTheme.typography.titleMedium)
         },
         trailingContent = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 24.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SpaceSm), modifier = Modifier.padding(start = SpaceXl)) {
                     Text(text = country.dialPrefix, style = MaterialTheme.typography.bodyMedium)
                     if (isSelected) {
                         Icon(

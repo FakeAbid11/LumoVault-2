@@ -21,6 +21,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
+import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceMd
 
 /** How many onboarding steps there are, shown in the progress header. */
 const val ONBOARDING_STEPS = 6
@@ -82,7 +85,7 @@ fun HowItWorksScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 8.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = SpaceSm)) {
             StepNode(label = stringResource(R.string.how_your_phone))
             Connector()
             StepNode(label = stringResource(R.string.app_name), emphasised = true)
@@ -90,7 +93,7 @@ fun HowItWorksScreen(
             StepNode(label = stringResource(R.string.how_your_cloud))
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SpaceMd), modifier = Modifier.padding(top = SpaceSm)) {
             Text(text = stringResource(R.string.how_point_local), style = MaterialTheme.typography.bodyLarge)
             Text(text = stringResource(R.string.how_point_backup), style = MaterialTheme.typography.bodyLarge)
             Text(text = stringResource(R.string.how_point_cloud), style = MaterialTheme.typography.bodyLarge)
@@ -126,7 +129,7 @@ private fun Connector() {
     Icon(
         imageVector = Icons.Filled.ArrowDownward,
         contentDescription = null,
-        modifier = Modifier.padding(vertical = 4.dp),
+        modifier = Modifier.padding(vertical = SpaceXs),
         tint = MaterialTheme.colorScheme.outline,
     )
 }

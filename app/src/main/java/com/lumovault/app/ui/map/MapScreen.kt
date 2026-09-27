@@ -79,6 +79,7 @@ import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
 import androidx.compose.ui.graphics.toArgb
+import com.lumovault.app.ui.theme.SpaceMd
 
 /**
  * The photo map: every placed photograph in the rectangle the user is looking at.
@@ -305,7 +306,7 @@ fun MapScreen(
                 text = stringResource(R.string.map_tiles_unconfigured),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp),
+                    .padding(top = SpaceSm),
             )
         }
 
@@ -314,11 +315,11 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (viewModel.tilesConfigured) 8.dp else 64.dp)
-                    .padding(horizontal = 12.dp),
-                shape = RoundedCornerShape(14.dp),
+                    .padding(horizontal = SpaceMd),
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(SpaceMd)) {
                     Text(
                         text = stringResource(R.string.map_locations_title),
                         style = MaterialTheme.typography.titleSmall,
@@ -327,10 +328,10 @@ fun MapScreen(
                         text = stringResource(R.string.map_locations_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = SpaceXs),
                     )
                     Row(
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = SpaceSm),
                         horizontalArrangement = Arrangement.End,
                     ) {
                         // "Don't ask again" makes the system dialog permanently invisible; the request
@@ -370,14 +371,14 @@ fun MapScreen(
                 ),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp),
+                    .padding(top = SpaceSm),
             )
         } else if (!state.hasPins && state.placedCount == 0) {
             MapNotice(
                 text = stringResource(R.string.map_no_positions),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp),
+                    .padding(top = SpaceSm),
             )
         }
 
@@ -392,7 +393,7 @@ fun MapScreen(
                 onDismiss = viewModel::clearSelection,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(horizontal = SpaceMd, vertical = SpaceMd),
             )
         }
 
@@ -586,10 +587,10 @@ private fun MapPreviewCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(SpaceMd)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (first != null) {
                     StripThumbnail(photo = first, onClick = { onOpen(first.mediaStoreId) }, size = 64.dp)
@@ -617,7 +618,7 @@ private fun MapPreviewCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = SpaceSm),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -651,7 +652,7 @@ private fun StripThumbnail(
         contentDescription = photo.displayName,
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .pointerInput(photo.mediaStoreId) { detectTapGestures { onClick() } },
         contentScale = ContentScale.Crop,
@@ -661,14 +662,14 @@ private fun StripThumbnail(
 @Composable
 private fun MapNotice(text: String, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.padding(horizontal = 12.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.padding(horizontal = SpaceMd),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = SpaceMd, vertical = SpaceSm),
         )
     }
 }

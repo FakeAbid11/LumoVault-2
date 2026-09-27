@@ -92,6 +92,7 @@ import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SpaceXxl
 
 /**
  * The cloud library (PRD section 24), drawn from the local cloud index rather than from a message
@@ -506,13 +507,13 @@ private fun CloudViewer(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(SpaceXxl),
             shape = RoundedCornerShape(MediaThumbCorner),
             tonalElevation = 3.dp,
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
                 val path = previewPath
                 if (path.isNullOrBlank()) {

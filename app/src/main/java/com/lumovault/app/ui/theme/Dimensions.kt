@@ -53,11 +53,15 @@ internal val RailTickEndInset = 8.dp
  * number each file happened to reach for. `ScreenEdge` is the one gutters and headers align to, which is what
  * makes a title sit over the first column of photos instead of a few pixels left of it.
  */
+internal val SpaceXxs = 2.dp
 internal val SpaceXs = 4.dp
 internal val SpaceSm = 8.dp
 internal val SpaceMd = 12.dp
 internal val SpaceLg = 16.dp
 internal val SpaceXl = 24.dp
+
+/** The top of the scale, for the surfaces that want real air: a full-bleed empty state's own padding. */
+internal val SpaceXxl = 32.dp
 internal val ScreenEdge = 12.dp
 
 /** Touch targets, because a control under a thumb has to be found before it can be pressed. 48dp is the Android guideline floor. */
