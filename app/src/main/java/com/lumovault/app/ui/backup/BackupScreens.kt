@@ -306,8 +306,19 @@ private fun StopCard(reason: BackupStop, onOpenCloudTab: () -> Unit, onConnectTe
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            // Three of these reasons are things the user chose on this very screen. Painting a queue that is
+            // waiting when it was told to wait in the same red as one that is signed out claims something
+            // broke, which is the one thing this card is not allowed to say about a preference.
+            containerColor = if (reason.urgent) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (reason.urgent) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         ),
     ) {
         Column(
@@ -328,6 +339,13 @@ private fun StopCard(reason: BackupStop, onOpenCloudTab: () -> Unit, onConnectTe
                 // Nothing to open: this build was compiled without Telegram, which is a fact about the
                 // artifact rather than a step the user forgot.
                 BackupStop.BuildHasNoTelegram -> null
+                // Nothing to open here either, and for the opposite reason: the queue needs no fixing, only
+                // the network or the current the user told it to wait for. A button would offer to undo a
+                // choice made one row above this card.
+                BackupStop.WaitingForWifi,
+                BackupStop.WaitingForCharger,
+                BackupStop.WaitingForWifiAndCharger,
+                -> null
             }
             if (action != null) {
                 TextButton(onClick = action.second, modifier = Modifier.align(Alignment.Start)) {

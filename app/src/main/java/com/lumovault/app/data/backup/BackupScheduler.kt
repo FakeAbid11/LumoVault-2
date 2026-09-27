@@ -9,12 +9,15 @@ import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.lumovault.app.AppContainer
 import com.lumovault.app.domain.model.BackupPreferences
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Asks for a pass over the backup queue.
@@ -117,6 +120,22 @@ class BackupScheduler(private val context: Context) {
     fun cancelAutomaticPasses() {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
     }
+
+    /**
+     * Whether the unattended send is currently sitting on a constraint it has not been met.
+     *
+     * Asked of WorkManager rather than deduced from the settings row, because the two are different questions:
+     * the row says the user wants Wi-Fi, and only WorkManager knows whether the request is being held by that
+     * wish right now. A screen that read the row alone would draw "waiting for Wi-Fi" over a queue draining
+     * happily on the network, which is an invented state on the one surface whose job is reporting facts.
+     *
+     * Only the send chain is asked about. The scan chain carries no constraints since a preference bound to
+     * the wrong chain meant photos went unnoticed rather than merely waiting, so it can never be held.
+     */
+    fun sendHeldByConstraints(): Flow<Boolean> =
+        WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWorkFlow(AUTOMATIC_WORK_NAME)
+            .map { infos -> infos.any { it.state == WorkInfo.State.BLOCKED } }
 
     /**
      * One scan-and-queue pass, now, in the background.
@@ -276,4 +295,29 @@ internal fun automaticSendPlan(preferences: BackupPreferences): PassPlan =
 
 /** The send a person started by hand: a connection and nothing else, because the tap is the agreement. */
 internal fun manualSendPlan(): PassPlan = PassPlan(MANUAL_WORK_NAME, manualWorkRequest)
+
+/**
+ * Which promise is holding the unattended send, as far as the Backup screen is concerned.
+ *
+ * `None` covers both "not blocked" and "blocked by having no connection at all". The second of those is not a
+ * sentence worth putting on screen: it names nothing the user asked for, the phone clears it by itself, and a
+ * card that appears and disappears with the radio is a card people learn to ignore.
+ */
+internal enum class SendHold { None, WaitingForUnmetered, WaitingForCharger, WaitingForBoth }
+
+/**
+ * The hold, decided from both halves of the answer rather than one.
+ *
+ * [blocked] is WorkManager's own state and [request] is the user's settings, and neither alone is the truth:
+ * the settings would report a wait that is not happening, and the state could not say what is being waited
+ * for. Taking only the two flags this reads is the same pair [automaticSendPlan] puts on the request, so the
+ * screen cannot drift into naming a constraint the enqueuer never applied.
+ */
+internal fun sendHoldFor(request: WorkRequest, blocked: Boolean): SendHold = when {
+    !blocked -> SendHold.None
+    request.requiresUnmeteredNetwork && request.requiresCharging -> SendHold.WaitingForBoth
+    request.requiresUnmeteredNetwork -> SendHold.WaitingForUnmetered
+    request.requiresCharging -> SendHold.WaitingForCharger
+    else -> SendHold.None
+}
 

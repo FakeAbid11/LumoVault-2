@@ -441,8 +441,11 @@
     <string name="backup_stop_confirm_title">Stop automatic backup?</string>
     <string name="backup_stop_confirm_body">With no folders ticked, nothing new backs up automatically. Photos already in your LumoVault Backup stay there.</string>
     <string name="backup_stop_confirm_action">Stop automatic backup</string>
-    <!-- A queue with work in it that cannot move. Three reasons, each with the door that clears it:
-         these are the words the upload pass could always decide on and never say. -->
+    <!-- A queue with work in it that cannot move, and the six reasons it can. The first three are endings the
+         upload pass could always decide on and never say, each with the door that clears it. The last three are
+         not endings at all — the send has not started, because the user asked it to wait — so they have no door
+         and are drawn without the error colour. None of them carries a count: the health figures above the card
+         already give one, and a number repeated in two sizes on one screen reads as two different numbers. -->
     <string name="backup_blocked_signed_out_title">Telegram sign-in needed</string>
     <string name="backup_blocked_signed_out_body">Backup is on and photos are waiting, but this device is not signed in to Telegram any more.</string>
     <string name="backup_blocked_no_channel_title">No LumoVault Backup channel yet</string>
@@ -450,6 +453,12 @@
     <string name="backup_blocked_no_channel_action">Open Cloud</string>
     <string name="backup_blocked_unbuilt_title">This build cannot reach Telegram</string>
     <string name="backup_blocked_unbuilt_body">LumoVault was compiled without Telegram credentials, so nothing can be uploaded from it. Your photos stay on this device.</string>
+    <string name="backup_blocked_wifi_title">Waiting for Wi-Fi</string>
+    <string name="backup_blocked_wifi_body">Nothing is being sent until the phone is on an unmetered network, because Wi-Fi only is turned on. The queue keeps everything in it and sends on its own once the network arrives.</string>
+    <string name="backup_blocked_charger_title">Waiting for a charger</string>
+    <string name="backup_blocked_charger_body">Nothing is being sent until the phone is charging, because charging only is turned on. The queue keeps everything in it and sends on its own once it is plugged in.</string>
+    <string name="backup_blocked_wifi_charger_title">Waiting for Wi-Fi and a charger</string>
+    <string name="backup_blocked_wifi_charger_body">Nothing is being sent until the phone is charging on an unmetered network, because both Wi-Fi only and charging only are turned on. The queue keeps everything in it and sends on its own once both are true.</string>
     <plurals name="backup_folders_selected">
         <item quantity="one">%d folder selected</item>
         <item quantity="other">%d folders selected</item>

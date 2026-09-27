@@ -1,5 +1,6 @@
 package com.lumovault.app.ui.backup
 
+import com.lumovault.app.data.backup.SendHold
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.restore.RestoreFailureKind
@@ -178,20 +179,89 @@ class BackupScreenRulesTest {
     }
 
     @Test
-    fun everyStopHasItsOwnWordsAndOnlyTheUnbuildableOneHasNoDoor() {
+    fun aQueueWaitingOnAPreferenceSaysWhichOne() {
+        // The stalling reason this screen could never name. The session is fine and the channel exists, so the
+        // old answer for "the send has not started because the user told it to wait" was null — which is the
+        // same thing the screen says about a queue that is working perfectly.
+        for ((hold, expected) in listOf(
+            SendHold.WaitingForUnmetered to BackupStop.WaitingForWifi,
+            SendHold.WaitingForCharger to BackupStop.WaitingForCharger,
+            SendHold.WaitingForBoth to BackupStop.WaitingForWifiAndCharger,
+        )) {
+            assertEquals(
+                "$hold",
+                expected,
+                backupStopReason(
+                    pending = 4,
+                    auth = TelegramAuthState.Authenticated,
+                    channelAdopted = true,
+                    hold = hold,
+                ),
+            )
+        }
         assertNull(
-            "a build compiled without Telegram has nothing for the user to open",
-            BackupStop.BuildHasNoTelegram.actionRes,
+            "connected, adopted and not held: the case the default argument has to keep answering exactly as " +
+                "it always did, or this change is a new wrong answer rather than a fix",
+            backupStopReason(pending = 4, auth = TelegramAuthState.Authenticated, channelAdopted = true),
+        )
+    }
+
+    @Test
+    fun somethingTheUserHasToFixOutranksSomethingTheUserAskedFor() {
+        // A phone can be signed out of Telegram and off its charger at the same time. Only one of those needs
+        // a decision from the person, and naming the other would send them looking for a cable.
+        assertEquals(
+            BackupStop.SignedOut,
+            backupStopReason(
+                pending = 4,
+                auth = TelegramAuthState.WaitingForCode(AuthCodeChannel.Sms, codeLength = 5),
+                channelAdopted = true,
+                hold = SendHold.WaitingForBoth,
+            ),
         )
         assertEquals(
-            "the other two are one tap from fixed",
+            "and a channel that does not exist yet needs the Cloud tab either way",
+            BackupStop.NoChannel,
+            backupStopReason(
+                pending = 4,
+                auth = TelegramAuthState.Authenticated,
+                channelAdopted = false,
+                hold = SendHold.WaitingForCharger,
+            ),
+        )
+        assertNull(
+            "an empty queue is not waiting on anything, however strict the settings are",
+            backupStopReason(
+                pending = 0,
+                auth = TelegramAuthState.Authenticated,
+                channelAdopted = true,
+                hold = SendHold.WaitingForBoth,
+            ),
+        )
+    }
+
+    @Test
+    fun everyStopHasItsOwnWordsAndOnlyTheFixableOnesHaveADoor() {
+        assertEquals(
+            "a signed-out queue and a missing channel are one tap from fixed; a build compiled without " +
+                "Telegram and the three waits the user asked for have nothing to open",
             2,
-            listOf(BackupStop.NoChannel.actionRes, BackupStop.SignedOut.actionRes).count { it != null },
+            BackupStop.entries.count { it.actionRes != null },
         )
         assertEquals(
-            "three different reasons, three different sentences — a copy-paste here is the bug this file exists for",
-            3,
+            "every reason gets its own title — a copy-paste here is the bug this file exists for",
+            BackupStop.entries.size,
             BackupStop.entries.map { it.titleRes }.distinct().size,
+        )
+        assertEquals(
+            "and its own body, because two cards that differ only in their heading are read as one card",
+            BackupStop.entries.size,
+            BackupStop.entries.map { it.bodyRes }.distinct().size,
+        )
+        assertEquals(
+            "exactly the three refusals are drawn as problems; a preference the user set is not",
+            3,
+            BackupStop.entries.count { it.urgent },
         )
     }
 

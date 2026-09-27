@@ -8,6 +8,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.data.backup.SendHold
+import com.lumovault.app.data.backup.sendHoldFor
+import com.lumovault.app.data.backup.toAutomaticWorkRequest
 import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
@@ -43,6 +46,22 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupPreferences.Default)
 
     /**
+     * What the user's own Wi-Fi and charging choices are holding the unattended send back by, or `None`.
+     *
+     * Declared above [stopReason] because the class body runs top to bottom and that flow reads this one.
+     *
+     * The blocked half comes from WorkManager and only the naming half from the settings row, joined here so
+     * the two cannot disagree about which of them was consulted — see [sendHoldFor]. `None` is the seed rather
+     * than a guess: the first frame is one where nothing has been asked yet, and [stopReason] treats "no hold"
+     * exactly as it treated every frame before this flow existed.
+     */
+    private val sendHold: StateFlow<SendHold> = combine(
+        preferences,
+        container.backupScheduler.sendHeldByConstraints(),
+    ) { current, blocked -> sendHoldFor(current.toAutomaticWorkRequest(), blocked) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SendHold.None)
+
+    /**
      * Why a queue that has work in it is not moving, or null when there is nothing to explain.
      *
      * Live for the same reason the rest of this screen is: a session can be signed out from the system, and
@@ -53,7 +72,10 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         health,
         container.telegramAuthRepository.state,
         container.cloudIndexRepository.observeAssociation(),
-    ) { live, auth, association -> backupStopReason(live.pending, auth, association != null) }
+        sendHold,
+    ) { live, auth, association, hold ->
+        backupStopReason(live.pending, auth, association != null, hold)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     /**
@@ -103,12 +125,14 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     fun setChargingOnly(enabled: Boolean) = refresh { setBackupChargingOnly(enabled) }
 
     /**
-     * Writes the column, then re-installs the periodic work.
+     * Writes the column, then re-decides the schedule.
      *
-     * Both halves matter: constraints live on the WorkManager request rather than on the settings row, so a
-     * change that only wrote the column would leave a pass scheduled under the old rules until the next app
-     * start — which is exactly the delay a user who just turned on "Wi-Fi only" would see as it carrying on
-     * over mobile data.
+     * The re-decision is what [setAutomatic] needs: `automatic` is the only setting the periodic pass reads, so
+     * WorkManager cannot notice it change and the request either exists or does not until something says so.
+     * For these two toggles it is a formality rather than a necessity — the scan carries no constraints, and
+     * the send reads the row afresh each time it is enqueued — and it is kept so that every
+     * write to the backup settings leaves by the same reconciliation rather than by three of them that each
+     * remember a different subset of what depends on what.
      */
     private fun refresh(write: suspend SettingsRepository.() -> Unit) {
         viewModelScope.launch {
@@ -137,15 +161,21 @@ enum class TelegramWord { Connected, WaitingForSignIn, NotConfigured, Unavailabl
 /**
  * Why a queue with work in it is not moving.
  *
- * Each entry is a refusal the app cannot lift by itself, and each is the sentence that was missing when a
+ * Each entry is a condition the app cannot lift by itself, and each is the sentence that was missing when a
  * backup simply did not happen: the photos were queued, the pass ran, and it ended without sending — with
- * nothing anywhere saying which of these three it had ended on.
+ * nothing anywhere saying which of these it had ended on.
+ *
+ * The last three are not endings but waits the user asked for, and the distinction is the whole reason
+ * [urgent] exists: a red card drawn over a checkbox is a bug wearing a warning, and "signed out, go fix it"
+ * and "this sends when the phone reaches Wi-Fi" have to look different to be worth reading.
  */
 enum class BackupStop(
     @StringRes val titleRes: Int,
     @StringRes val bodyRes: Int,
     /** Null when there is no door to open, which is the honest answer as often as it is a dull one. */
     @StringRes val actionRes: Int?,
+    /** False when the queue is waiting on a preference the user set, rather than stuck on something broken. */
+    val urgent: Boolean = true,
 ) {
     SignedOut(
         R.string.backup_blocked_signed_out_title,
@@ -162,23 +192,52 @@ enum class BackupStop(
         R.string.backup_blocked_unbuilt_body,
         null,
     ),
+    WaitingForWifi(
+        R.string.backup_blocked_wifi_title,
+        R.string.backup_blocked_wifi_body,
+        null,
+        urgent = false,
+    ),
+    WaitingForCharger(
+        R.string.backup_blocked_charger_title,
+        R.string.backup_blocked_charger_body,
+        null,
+        urgent = false,
+    ),
+    WaitingForWifiAndCharger(
+        R.string.backup_blocked_wifi_charger_title,
+        R.string.backup_blocked_wifi_charger_body,
+        null,
+        urgent = false,
+    ),
 }
 
 /**
- * Whether a waiting queue has a reason beside it, decided from the live session and the live association.
+ * Whether a waiting queue has a reason beside it, decided from the live session, the live association, and
+ * what WorkManager reports about the send.
  *
- * The three refusals are the ones the upload pass can actually end on — see
- * [com.lumovault.app.domain.usecase.QueueRun] — so this is a match against what the queue really stops on,
- * not a list of guesses. A state still moving answers null on purpose: a line that is wrong on the first
- * frame is a line the user learns to ignore, and the handshake finishes in milliseconds next to a queue
- * that takes minutes.
+ * The first three refusals are the ones the upload pass can actually end on — see
+ * [com.lumovault.app.domain.usecase.QueueRun] — so this is a match against what the queue really stops on, not
+ * a list of guesses. The three waits are the reason that match stopped being complete: the pass that never
+ * starts is not in [com.lumovault.app.domain.usecase.QueueRun] at all, and an authenticated session with an
+ * adopted channel answered null for it, which is precisely what a queue held behind a charger looks like.
+ *
+ * A session problem still outranks a preference. It is the one a person has to act on, and it would still be
+ * true the second the phone is put on its charger.
  */
-fun backupStopReason(pending: Int, auth: TelegramAuthState, channelAdopted: Boolean): BackupStop? = when {
+fun backupStopReason(
+    pending: Int,
+    auth: TelegramAuthState,
+    channelAdopted: Boolean,
+    hold: SendHold = SendHold.None,
+): BackupStop? = when {
     // Nothing is waiting, so there is nothing to explain — the health figures above stay on screen either
     // way, and an empty queue is not a complaint.
     pending == 0 -> null
 
-    auth is TelegramAuthState.Authenticated -> if (channelAdopted) null else BackupStop.NoChannel
+    auth is TelegramAuthState.Authenticated ->
+        if (!channelAdopted) BackupStop.NoChannel else hold.toStop()
+
     auth is TelegramAuthState.NotConfigured -> BackupStop.BuildHasNoTelegram
 
     auth is TelegramAuthState.Unknown ||
@@ -190,6 +249,19 @@ fun backupStopReason(pending: Int, auth: TelegramAuthState, channelAdopted: Bool
     // The phone prompt, a code or password Telegram is waiting for, or a refused attempt: all of them mean
     // the same thing to a queue — nobody is signed in.
     else -> BackupStop.SignedOut
+}
+
+/**
+ * The words for a hold, or null when there is none.
+ *
+ * `None` has no card because the absence of a hold is the normal state of a working queue, and a screen that
+ * explains normality has stopped reporting anything.
+ */
+private fun SendHold.toStop(): BackupStop? = when (this) {
+    SendHold.None -> null
+    SendHold.WaitingForUnmetered -> BackupStop.WaitingForWifi
+    SendHold.WaitingForCharger -> BackupStop.WaitingForCharger
+    SendHold.WaitingForBoth -> BackupStop.WaitingForWifiAndCharger
 }
 
 /**

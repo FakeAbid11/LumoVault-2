@@ -235,4 +235,34 @@ class BackupWorkConstraintsTest {
             )
         }
     }
+
+    @Test
+    fun aHoldIsNamedOnlyWhereBothHalvesOfTheAnswerAgree() {
+        // The settings row says what would be waited for and WorkManager says whether anything is being waited
+        // for right now. Either half alone invents a state: the row would report a hold on a queue that is
+        // sending happily, and the flag could not say what it is a hold on.
+        val both = WorkRequest(requiresUnmeteredNetwork = true, requiresCharging = true)
+        val wifi = WorkRequest(requiresUnmeteredNetwork = true, requiresCharging = false)
+        val charger = WorkRequest(requiresUnmeteredNetwork = false, requiresCharging = true)
+        val anyConnection = WorkRequest(requiresUnmeteredNetwork = false, requiresCharging = false)
+
+        assertEquals(SendHold.WaitingForBoth, sendHoldFor(both, blocked = true))
+        assertEquals(SendHold.WaitingForUnmetered, sendHoldFor(wifi, blocked = true))
+        assertEquals(SendHold.WaitingForCharger, sendHoldFor(charger, blocked = true))
+
+        for (request in listOf(both, wifi, charger, anyConnection)) {
+            assertEquals(
+                "$request is no kind of hold while nothing is blocked",
+                SendHold.None,
+                sendHoldFor(request, blocked = false),
+            )
+        }
+
+        assertEquals(
+            "blocked with neither box ticked means there is no connection at all — not a preference, and not " +
+                "a sentence worth a card the radio clears by itself",
+            SendHold.None,
+            sendHoldFor(anyConnection, blocked = true),
+        )
+    }
 }
