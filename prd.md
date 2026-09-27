@@ -1308,6 +1308,15 @@ blue accents
 
 The application should use Material 3 components and Compose-native layouts.
 
+Surfaces are raised by tone, not by shadow, and the tiers belong to the palette: a
+container ramp in the same hue family as `surface`, stepping lighter in the dark theme
+and darker in the light one, with a recessed and a lifted step either side of
+`surface`. Material's default neutral containers are not acceptable here — a grey
+panel beside a navy one reads as two applications.
+
+Contrast is a requirement, not an intention: body text clears 4.5:1 on every surface
+tier, and a control or an icon that carries meaning clears 3:1, in both schemes.
+
 45. Typography
 
 Use Android/Material typography.
@@ -1326,6 +1335,13 @@ accessible contrast
 
 Avoid excessive decorative typography.
 
+The scale must rank a screen. A section heading, a list row and the row's detail line may not share a size:
+a heading the weight of a paragraph is how a timeline ends up looking as important as the photographs in
+it. Roles are therefore named — an empty state's headline, the bar title, a card or sheet title, a list row,
+the quiet detail line, button and tab labels — and a screen takes one of those rather than a size of its
+own. Type carries size, weight and tracking only; colour always comes from the scheme, so no theme can mute
+a heading.
+
 46. Icons
 
 Use Material Symbols/icons where possible.
@@ -1343,6 +1359,12 @@ appropriately sized
 accessible with content descriptions where required
 
 Avoid random icon styles mixed together.
+
+Corners and spacing are a scale the theme owns, not a per-screen decision: a card, a sheet and a menu take
+their radius from the theme's shape ramp, and padding, gutters and section gaps come from the spacing scale.
+A number that means one of those rungs is written as the rung. Geometry that belongs to a single surface — a
+date rail's ticks, a badge's inset, a map strip's thumbnail — stays with that surface and says why, because
+a token used for something it does not mean is worse than a literal with a reason.
 
 47. Backup Engine
 
