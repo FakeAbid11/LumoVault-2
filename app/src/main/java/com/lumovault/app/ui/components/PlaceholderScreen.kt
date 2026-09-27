@@ -60,7 +60,7 @@ fun PlaceholderScreen(
         Box(
             modifier = Modifier
                 .size(HaloSize)
-                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -73,7 +73,9 @@ fun PlaceholderScreen(
         Spacer(Modifier.height(SpaceXl))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            // A screen's heading, not a list row's: this is the only text on the screen, and it has to
+            // carry the weight of explaining why there is nothing else.
+            style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
