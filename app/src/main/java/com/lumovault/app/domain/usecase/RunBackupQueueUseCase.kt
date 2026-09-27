@@ -14,6 +14,8 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** What is happening to the item being sent right now, for whoever is showing progress. */
 data class BackupProgress(val mediaStoreId: Long, val displayName: String, val fraction: Float)
@@ -62,9 +64,15 @@ private sealed interface ItemRun {
  * is owed, MediaStore for the bytes, Telegram for the copy — so it belongs here rather than in the
  * worker that triggers it, or in a repository that would have to pretend to know about the others.
  *
- * Five rules it exists to hold:
+ * Six rules it exists to hold:
  * - One item at a time. TDLib uploads as part of sending, so concurrent sends mean concurrent file
  *   streams and memory spikes on exactly the devices this app targets. Reliability before throughput.
+ * - One pass at a time. The claim in [BackupQueueRepository.claimNext] is atomic per row, but a pass is
+ *   a sequence of claims, reconciles and read-backs: a second pass starting underneath the first
+ *   requeues what the first is sending and both read the same `preparing` row as theirs. Manual and
+ *   unattended work run as separate chains — separate work names are required so a hand-tapped backup
+ *   is not queued behind the unattended chain's constraints — so overlap is possible by design, and
+ *   the single flight lives here rather than in a scheduling accident.
  * - Every outcome writes a state, including the failures that happen before Telegram is involved. A row
  *   left in `PREPARING` because staging failed would disappear from the summary and be reported as
  *   nothing at all.
@@ -91,7 +99,21 @@ class RunBackupQueueUseCase(
      */
     private val ensureSession: suspend () -> Boolean,
 ) {
-    suspend fun run(onProgress: suspend (BackupProgress) -> Unit = {}): QueueRun {
+    /** The single flight promised above. One instance serves production; tests build their own. */
+    private val passMutex = Mutex()
+
+    /**
+     * One pass over the queue, and never two at once.
+     *
+     * The lock is held for the whole drain — reconcile, every claim, every send — because that is the
+     * span the claim transaction cannot cover. Waiting is not a delay the user sees: the second caller
+     * is another worker that would otherwise corrupt the first's work, and it gets the real answer a
+     * moment later when the queue says whether anything is left.
+     */
+    suspend fun run(onProgress: suspend (BackupProgress) -> Unit = {}): QueueRun =
+        passMutex.withLock { runPass(onProgress) }
+
+    private suspend fun runPass(onProgress: suspend (BackupProgress) -> Unit): QueueRun {
         if (!upload.isUsable) return QueueRun.TelegramUnavailable
 
         // Rows left mid-flight by a killed process are owed work again, not evidence of failure — and this

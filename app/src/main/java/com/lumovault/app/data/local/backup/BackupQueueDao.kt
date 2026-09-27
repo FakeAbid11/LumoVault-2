@@ -436,6 +436,9 @@ interface BackupQueueDao {
      * Newest first: [claimOldest] stamps `updated_at` as it takes the row, so the most recently
      * modified `preparing` row is the one this worker won. Reconciliation clears any leftovers before
      * a worker runs, so this is the tie-break that keeps a recovered row from being read as a new one.
+     * Rows stamped in the same second fall back to the row id, so ties answer the same way twice —
+     * `RunBackupQueueUseCase` keeps two passes from overlapping at all; this only stops the winner of
+     * a tie being a coin toss.
      *
      * A `LEFT JOIN` on purpose: a media row can be pruned by a later scan while its queue row is
      * pending, and the nullable columns are how the caller learns that the item it was told to back up
@@ -454,7 +457,7 @@ interface BackupQueueDao {
                m.width AS width, m.height AS height, m.duration_millis AS durationMillis
         FROM backup_queue b
         LEFT JOIN media m ON m.media_store_id = b.media_store_id
-        WHERE b.state = :state ORDER BY b.updated_at DESC LIMIT 1
+        WHERE b.state = :state ORDER BY b.updated_at DESC, b.media_store_id DESC LIMIT 1
         """,
     )
     suspend fun newestIn(state: String): ClaimedBackupRow?

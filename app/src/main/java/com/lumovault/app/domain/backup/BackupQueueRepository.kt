@@ -265,6 +265,11 @@ interface BackupQueueRepository {
      * incremented; once the queue's own cap is reached it becomes [UploadState.Failed] instead, so a
      * permanently refused file cannot loop forever. A non-retryable one fails immediately: waiting
      * three attempts to report "this file is no longer on the device" is not patience.
+     *
+     * The exception is [BackupFailureKind.RateLimited]. FLOOD_WAIT is a pause Telegram asked for, not
+     * a refusal of the file, so the attempt count is left untouched and the row simply requeues —
+     * spending attempts there would fail a healthy photo after four rate limits it never caused. The
+     * pause itself is WorkManager's backoff to apply; this method only has to not lie about attempts.
      */
     suspend fun release(request: BackupRequest, failure: BackupFailure)
 

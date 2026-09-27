@@ -259,8 +259,11 @@ class BackupQueueRepositoryImpl(
      * then identified by being *the newest one in `preparing`*, which is a second statement. Two passes
      * overlapping therefore each claim a different row and both read back the same newest one, and that is the
      * worst shape a queue can produce: one photo uploaded twice, and another stranded in `preparing` with
-     * nobody holding it. It stops being hypothetical the moment a manual "Back Up" and the unattended chain
-     * exist at the same time, which is why [BackupScheduler] gives them separate work names.
+     * nobody holding it. Manual and unattended work do run at the same time — separate work names are
+     * required so a hand-tapped backup is not chained behind the unattended pass's constraints, which is the
+     * opposite of a guarantee that they cannot overlap — so the overlap is stopped one level up, by the
+     * single flight in [RunBackupQueueUseCase], and the transaction here is what makes the claim itself
+     * safe once no two passes can interleave.
      */
     override suspend fun claimNext(chatId: Long): BackupRequest? {
         while (true) {
@@ -320,7 +323,12 @@ class BackupQueueRepositoryImpl(
     }
 
     override suspend fun release(request: BackupRequest, failure: BackupFailure) {
-        val attempts = request.attempts + 1
+        // A rate limit is Telegram's clock, not this file's refusal. FLOOD_WAIT says "come back later",
+        // and spending one of the four attempts on it would fail a perfectly good photo after four
+        // pauses it never caused — the count stays where it is, and the wait itself is WorkManager's
+        // backoff to apply on the next pass.
+        val spentAttempt = failure.kind != BackupFailureKind.RateLimited
+        val attempts = if (spentAttempt) request.attempts + 1 else request.attempts
         val willRetry = failure.retryable && attempts < attemptCap
         dao.settle(
             id = request.mediaStoreId,

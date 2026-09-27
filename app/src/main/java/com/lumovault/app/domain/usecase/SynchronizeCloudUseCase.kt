@@ -13,6 +13,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The cloud start-up flow: authenticate, find or create the storage channel, then index its history.
@@ -50,6 +52,17 @@ class SynchronizeCloudUseCase(
 ) {
     private val _state = MutableStateFlow<CloudInitState>(CloudInitState.Idle)
     val state: StateFlow<CloudInitState> = _state.asStateFlow()
+
+    /**
+     * One adoption at a time.
+     *
+     * The Cloud screen's scan and the queue's request for a channel to send into both land on
+     * [adoptChannel], and discovery on a just-started TDLib is slow — long enough for both to be told
+     * "no channel" at once and for the slower one to create a second. That orphaning is permanent:
+     * the association would then point at the empty new channel, and every later sync happily reads
+     * it. Nothing else here needs serialising; this is the one check-then-act in the class.
+     */
+    private val adoptionMutex = Mutex()
 
     /**
      * @param createIfMissing false when the caller has not been told it may create a channel — a
@@ -131,8 +144,14 @@ class SynchronizeCloudUseCase(
     /**
      * The saved channel if it is still this account's storage, else the one discovery finds — else the
      * one creation makes, and only when discovery has *concluded* that there is nothing to find.
+     *
+     * Single-flighted through [adoptionMutex]: check-then-act against Telegram and the index is only
+     * safe when the two halves are one caller's work.
      */
-    private suspend fun adoptChannel(createIfMissing: Boolean): CloudAssociation? {
+    private suspend fun adoptChannel(createIfMissing: Boolean): CloudAssociation? =
+        adoptionMutex.withLock { discoverOrAdopt(createIfMissing) }
+
+    private suspend fun discoverOrAdopt(createIfMissing: Boolean): CloudAssociation? {
         val userId = telegram.accountUserId()
 
         _state.value = CloudInitState.ValidatingChannel

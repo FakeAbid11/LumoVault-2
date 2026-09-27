@@ -14,9 +14,12 @@ import com.lumovault.app.domain.telegram.CloudHistoryPage
 import com.lumovault.app.domain.telegram.CloudInitState
 import com.lumovault.app.domain.telegram.LumoVaultStorageProtocol
 import com.lumovault.app.domain.telegram.TelegramCloudRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -66,12 +69,16 @@ class SynchronizeCloudUseCaseTest {
         var created = 0
         var discoveries = 0
 
+        /** When set, discovery holds here until completed — how a test keeps one adoption open. */
+        var discoveryGate: CompletableDeferred<Unit>? = null
+
         override val isUsable: Boolean get() = usable
         override suspend fun accountUserId(): Long = userId
 
         override suspend fun discoverStorageChannel(): ChannelDiscovery {
             discoveries += 1
             discoveryFailure?.let { throw it }
+            discoveryGate?.await()
             return discovery
         }
 
@@ -232,6 +239,35 @@ class SynchronizeCloudUseCaseTest {
 
         assertTrue("a deleted channel is recreated only after discovery found nothing", telegram.created == 1)
         assertEquals(11L, adopted?.ownerUserId)
+    }
+
+    @Test
+    fun twoCallersAtOnceAdoptOneChannelRatherThanEachCreatingTheirOwn() = runBlocking<Unit> {
+        val telegram = FakeTelegram(pages = listOf(emptyList()), discovery = ChannelDiscovery.Absent)
+        telegram.discoveryGate = CompletableDeferred()
+        val index = FakeIndex()
+        val subject = useCase(telegram, index)
+
+        val screen = launch { subject.synchronize() }
+        yield()
+        assertEquals("the first caller is inside discovery", 1, telegram.discoveries)
+
+        val worker = launch { subject.ensureChannel() }
+        yield()
+        assertEquals(
+            "the second caller must not run its own discovery: two 'absent' answers are two " +
+                "channels, and the second creation orphans every backup in the first — which no " +
+                "later sync repairs, because the association now points at the empty new one",
+            1,
+            telegram.discoveries,
+        )
+
+        requireNotNull(telegram.discoveryGate).complete(Unit)
+        screen.join()
+        worker.join()
+
+        assertEquals("exactly one channel exists", 1, telegram.created)
+        assertEquals(CHAT_ID, index.saved?.chatId)
     }
 
     @Test

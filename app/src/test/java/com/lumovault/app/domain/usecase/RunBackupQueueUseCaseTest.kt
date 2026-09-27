@@ -16,9 +16,13 @@ import com.lumovault.app.domain.backup.UploadRequest
 import com.lumovault.app.domain.backup.UploadState
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.repository.RemoteBackup
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -293,6 +297,39 @@ class RunBackupQueueUseCaseTest {
     }
 
     @Test
+    fun aSecondPassWaitsOutsideWhileTheFirstStillOwnsTheQueue() = runBlocking<Unit> {
+        queue.given(request(1L), request(2L))
+        upload.gate = CompletableDeferred()
+        upload.script(listOf(UploadEvent.Sent(CHANNEL, 9001L)))
+        upload.script(listOf(UploadEvent.Sent(CHANNEL, 9002L)))
+        val subject = useCase()
+
+        val first = launch { subject.run() }
+        yield()
+        assertEquals("the first pass is inside its send", 1, upload.started)
+
+        val second = launch { subject.run() }
+        yield()
+        assertEquals(
+            "a second pass reconciling underneath the first would requeue rows it is sending",
+            1,
+            queue.reconciles,
+        )
+        assertEquals("and it has not claimed an item out from under it", 1, upload.started)
+
+        requireNotNull(upload.gate).complete(Unit)
+        first.join()
+        second.join()
+
+        assertEquals(
+            "each item was claimed once between them, never twice",
+            2,
+            queue.claims.size,
+        )
+        assertEquals(listOf(9001L, 9002L), queue.backedUp.map { it.second })
+    }
+
+    @Test
     fun progressReachesTheCallerTogetherWithTheItemItBelongsTo() = runBlocking {
         queue.given(request(1L))
         upload.script(listOf(UploadEvent.Progress(0.5f), UploadEvent.Sent(CHANNEL, 9001L)))
@@ -491,6 +528,12 @@ private class FakeUpload : TelegramUploadRepository {
     var started = 0
     val requests = mutableListOf<UploadRequest>()
 
+    /**
+     * When set, every upload holds here until it is completed — the one way a test can keep a pass
+     * open long enough for a second one to try to start underneath it.
+     */
+    var gate: CompletableDeferred<Unit>? = null
+
     private val script = ArrayDeque<List<UploadEvent>>()
 
     override val isUsable: Boolean get() = usable
@@ -503,7 +546,12 @@ private class FakeUpload : TelegramUploadRepository {
         started += 1
         requests += request
         assertTrue("an upload was attempted with no scripted answer", script.isNotEmpty())
-        return flowOf(*script.removeFirst().toTypedArray())
+        val events = script.removeFirst()
+        val held = gate ?: return flowOf(*events.toTypedArray())
+        return flow {
+            held.await()
+            events.forEach { emit(it) }
+        }
     }
 }
 

@@ -213,13 +213,33 @@ class BackupQueueRepositoryTest {
     fun aRetryableFailureStopsBeingRetryableAtTheCap() = runBlocking {
         val claimed = requireNotNull(claimedRequest()).copy(attempts = 2)
 
-        repository.release(claimed, BackupFailure(BackupFailureKind.RateLimited))
+        repository.release(claimed, BackupFailure(BackupFailureKind.Network))
 
         assertEquals(
             "the third attempt is the last one the queue will spend",
             UploadState.Failed,
             dao.row(claimed.mediaStoreId).state.asState(),
         )
+    }
+
+    @Test
+    fun aRateLimitIsWaitedOutRatherThanSpentAsAnAttempt() = runBlocking {
+        val claimed = requireNotNull(claimedRequest()).copy(attempts = 2)
+
+        repository.release(claimed, BackupFailure(BackupFailureKind.RateLimited))
+
+        val row = dao.row(claimed.mediaStoreId)
+        assertEquals(
+            "FLOOD_WAIT is Telegram's clock, not this file's refusal",
+            2,
+            row.attempts,
+        )
+        assertEquals(
+            "so the item stays in line and the pause is WorkManager's backoff to apply",
+            UploadState.Queued,
+            row.state.asState(),
+        )
+        assertEquals(BackupFailureKind.RateLimited.name, row.failure)
     }
 
     @Test
