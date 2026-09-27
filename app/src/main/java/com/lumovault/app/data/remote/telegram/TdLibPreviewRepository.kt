@@ -11,27 +11,43 @@ import org.drinkless.tdlib.TdApi
  * The two-step shape is what TDLib requires: a remote id string is not a file handle, so
  * [TdApi.GetRemoteFile] first converts it into a [TdApi.File] with an integer id, and only that id is
  * ever passed to [TdApi.DownloadFile]. Callers hand over `previewRemoteFileId`, never `remoteFileId`,
- * and the file type asked for is [TdApi.FileTypeThumbnail] — the original is not reachable through
- * this class.
+ * so the original is not reachable through this class.
  *
  * Every failure returns null rather than throwing: an unavailable preview is a placeholder on screen,
  * not an error state, and a grid must not fail because one file could not be fetched.
  */
 class TdLibPreviewRepository(
     private val client: TelegramClient,
+    /**
+     * Brings up the session a thumbnail request needs, and says whether there is one.
+     *
+     * [TelegramClient.request] starts the client, but TDLib answers nothing until its parameters have
+     * been handed over, and the only thing that does that is the sign-in handshake. A Cloud screen opened
+     * straight from a cold start therefore used to ask for every thumbnail one step too early, get
+     * refused, and — because a cell asks once — show a placeholder over a picture that was a second away.
+     */
+    private val ensureSession: suspend () -> Boolean,
 ) : TelegramPreviewRepository {
     override val isUsable: Boolean
         get() = client.isUsable
 
     override suspend fun localPathFor(remoteFileId: String): String? {
         if (remoteFileId.isBlank() || !client.isUsable) return null
+        if (!ensureSession()) return null
 
         return try {
             // A remote id string is not a file handle: the request below turns it into a File with an
             // integer id, and only that id is ever passed on.
             val lookup = TdApi.GetRemoteFile()
             lookup.remoteFileId = remoteFileId
-            lookup.fileType = TdApi.FileTypeThumbnail()
+            // No asserted type. `getRemoteFile`'s `file_type` is documented in the pinned scheme as
+            // "File type; pass null if unknown", and this layer does not know one. Its sibling that fetches
+            // originals can name the type, because it is handed the media type alongside the id (see
+            // TdLibOriginalRepository); this one is handed a bare id — by design, so a grid cannot ask for
+            // an original — and the ids behind it are a photo's rendered size for pictures and a separate
+            // thumbnail file for videos and documents. One type string cannot be right for both, and the
+            // previous answer claimed a thumbnail for every photo in the library.
+            lookup.fileType = null
 
             val resolved = client.request(lookup).id.takeIf { it > 0 } ?: return null
 

@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -345,7 +346,7 @@ private fun CloudMediaCell(
     var previewPath by remember(item.messageId, item.previewRemoteFileId) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(item.messageId, item.previewRemoteFileId) {
-        previewPath = previewPathFor(item)
+        previewPath = awaitPreview(item, previewPathFor)
     }
 
     Box(
@@ -461,7 +462,7 @@ private fun CloudViewer(
     var previewAttempted by remember(item.messageId) { mutableStateOf(false) }
 
     LaunchedEffect(item) {
-        previewPath = previewPathFor(item)
+        previewPath = awaitPreview(item, previewPathFor)
         previewAttempted = true
     }
 
@@ -620,3 +621,37 @@ private const val MILLIS_PER_SECOND = 1000L
 
 /** Cells fetched ahead of the viewport edge, so scrolling does not hit a blank tail. */
 private const val LOAD_AHEAD = 24
+
+/**
+ * A bounded re-ask for a thumbnail that has not arrived.
+ *
+ * The first request can fail for reasons that cure themselves a moment later: TDLib is still completing
+ * its handshake when the grid first draws, or `downloadFile` has started and the bytes are on their way.
+ * Asking once and remembering the answer would then leave a placeholder sitting over a picture that
+ * exists, with nothing to bring it back but scrolling the row out and in again — which is how a cloud
+ * gallery reads as broken when nothing about the library is.
+ *
+ * The attempts are few and the wait short, because a cell that genuinely has no thumbnail should reach its
+ * honest placeholder rather than poll forever, and every visible cell is doing this at once.
+ */
+private suspend fun awaitPreview(
+    item: CloudMedia,
+    previewPathFor: suspend (CloudMedia) -> String?,
+): String? {
+    // An item with no stored thumbnail reference is not a retry candidate: nothing was ever there to
+    // fetch, and four asks would only delay the placeholder that says so.
+    if (!item.hasPreview) return null
+
+    var attempt = 0
+    while (true) {
+        val path = previewPathFor(item)
+        if (path != null || ++attempt >= PREVIEW_ATTEMPTS) return path
+        delay(PREVIEW_RETRY_MILLIS)
+    }
+}
+
+/** How many times a cell asks for a preview before it shows the placeholder. */
+private const val PREVIEW_ATTEMPTS = 4
+
+/** The pause between those asks. */
+private const val PREVIEW_RETRY_MILLIS = 400L

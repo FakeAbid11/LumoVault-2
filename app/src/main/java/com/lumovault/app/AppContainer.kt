@@ -266,9 +266,15 @@ class AppContainer(context: Context) {
     /**
      * Thumbnails only. Deliberately built on the same [telegramClient] as the rest of Telegram, since
      * TDLib allows one receive loop per process.
+     *
+     * It awaits the session for the same reason the queue pass does: the Cloud screen can draw its grid
+     * before the handshake has run, and a request sent before TDLib has its parameters is refused.
      */
     val telegramPreviewRepository: TelegramPreviewRepository by lazy {
-        TdLibPreviewRepository(client = telegramClient)
+        TdLibPreviewRepository(
+            client = telegramClient,
+            ensureSession = { telegramAuthRepository.awaitReady(SESSION_HANDSHAKE_MILLIS) },
+        )
     }
 
     /**
