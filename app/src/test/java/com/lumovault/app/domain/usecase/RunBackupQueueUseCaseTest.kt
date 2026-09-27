@@ -42,12 +42,13 @@ class RunBackupQueueUseCaseTest {
     private val cloud = FakeCloudIndexRepository()
     private val hasher = FakeMediaContentHasher()
 
-    private fun useCase(channel: Long = CHANNEL) = RunBackupQueueUseCase(
+    private fun useCase(channel: Long = CHANNEL, session: Boolean = true) = RunBackupQueueUseCase(
         queue = queue,
         upload = upload,
         stager = stager,
         recognition = recognizer(),
         resolveChannel = { channel },
+        ensureSession = { session },
     )
 
     private fun recognizer() = RecognizeBackupUseCase(
@@ -252,6 +253,26 @@ class RunBackupQueueUseCaseTest {
         assertEquals(QueueRun.NoChannel, useCase(channel = 0L).run())
         assertEquals(0, upload.started)
         assertEquals(emptyList<Long>(), queue.claims)
+    }
+
+    @Test
+    fun aProcessWithNoTelegramSessionClaimsNothingAndSpendsNoAttempts() = runBlocking {
+        queue.given(request(1L))
+
+        assertEquals(
+            "a worker woken with no screen ever opened has never handed TDLib its parameters, so the " +
+                "pass says it is signed out instead of burning one of the item's four attempts on a " +
+                "request that cannot be answered",
+            QueueRun.SignedOut,
+            useCase(session = false).run(),
+        )
+        assertEquals(0, upload.started)
+        assertEquals(emptyList<Long>(), queue.claims)
+        assertEquals(
+            "a pass that cannot send still puts back what an earlier process left mid-flight",
+            1,
+            queue.reconciles,
+        )
     }
 
     @Test

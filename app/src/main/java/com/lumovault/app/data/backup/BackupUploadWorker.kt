@@ -84,23 +84,13 @@ class BackupUploadWorker(
                 }
             }
 
-            when (outcome) {
-                // [deferred] is the retry signal: an item that Telegram or the network refused is back in
-                // the queue, and WorkManager's exponential backoff is what spaces the attempts out — this
-                // worker must not sit in a loop doing it faster and worse.
-                //
-                // A recognition pass that ran out of its time budget borrows the same signal rather than
-                // scheduling work of its own. The frontier strictly shrinks — every item it reaches either
-                // gets a hash or is recorded as unreadable, and both leave the candidate set — so asking to be
-                // run again terminates, which is what makes a second worker name unnecessary here.
-                is QueueRun.Done -> when {
-                    outcome.deferred || recognition.stoppedEarly -> Result.retry()
-                    else -> Result.success()
-                }
-
-                // Nothing to do about either from here: the user has to sign in, or the build has no
-                // Telegram. Retrying would re-run a pass that cannot make progress.
-                QueueRun.NoChannel, QueueRun.TelegramUnavailable -> Result.failure()
+            // What WorkManager is asked for next is decided entirely by [toPassDirective], which is a
+            // function over the pass's outcome rather than a branch in here — so the table, including the
+            // bound on retrying a refusal a person has to clear, is readable and testable without a worker.
+            when (outcome.toPassDirective(runAttemptCount, recognition.stoppedEarly)) {
+                PassDirective.TryAgain -> Result.retry()
+                PassDirective.Finished -> Result.success()
+                PassDirective.Abandoned -> Result.failure()
             }
         } finally {
             notifier.cancel()
@@ -111,3 +101,43 @@ class BackupUploadWorker(
         const val NOTIFICATION_ID = 4100
     }
 }
+
+/** What to ask WorkManager for next, which is the whole decision a pass makes when it ends. */
+internal enum class PassDirective { Finished, TryAgain, Abandoned }
+
+/**
+ * The pass's outcome turned into a scheduling decision, written apart from WorkManager so the table can
+ * be read — and tested — without a worker.
+ *
+ * [QueueRun.Done.deferred] is the retry signal: an item that Telegram or the network refused is back in
+ * the queue, and WorkManager's exponential backoff is what spaces the attempts out — this worker must not
+ * sit in a loop doing it faster and worse. A recognition pass that ran out of its time budget borrows the
+ * same signal rather than scheduling work of its own. The frontier strictly shrinks — every item it reaches
+ * either gets a hash or is recorded as unreadable, and both leave the candidate set — so asking to be run
+ * again terminates, which is what makes a second worker name unnecessary here.
+ *
+ * A pass that stopped because the account is signed out, or because no backup channel has been adopted yet,
+ * stopped for a reason a *person* has to clear. Ending the chain on the first of those would leave a phone
+ * whose owner signs in later with no work scheduled at all until the next periodic pass — six hours of
+ * nothing, with a queue full of photos. So each is retried and the backoff does the waiting, bounded so a
+ * decision the user never reverses cannot become a permanent wake-up: at this chain's curve — exponential
+ * from half a minute, set in [BackupScheduler] — the three attempts add up to a few minutes and then the
+ * chain ends, leaving the reason to be said out loud rather than re-asked forever.
+ *
+ * [QueueRun.TelegramUnavailable] is not in that family: it says this build has no TDLib or no API
+ * credentials, which neither a retry nor a user can change.
+ */
+internal fun QueueRun.toPassDirective(attempt: Int, recognitionStoppedEarly: Boolean): PassDirective = when (this) {
+    is QueueRun.Done -> when {
+        deferred || recognitionStoppedEarly -> PassDirective.TryAgain
+        else -> PassDirective.Finished
+    }
+
+    QueueRun.NoChannel, QueueRun.SignedOut ->
+        if (attempt < STOP_DIRECTIVE_ATTEMPT_LIMIT) PassDirective.TryAgain else PassDirective.Abandoned
+
+    QueueRun.TelegramUnavailable -> PassDirective.Abandoned
+}
+
+/** How many times a pass that needs a human may ask to be run again before it says so and stops. */
+internal const val STOP_DIRECTIVE_ATTEMPT_LIMIT = 3

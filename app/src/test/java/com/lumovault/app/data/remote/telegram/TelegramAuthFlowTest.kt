@@ -22,9 +22,11 @@ import org.junit.Test
  * back the state Telegram is supposed to reply with, so a repository that walked its own script instead
  * of following the answer fails loudly.
  *
- * [TelegramAuthRepository.connect] is exercised only on the branch it decides synchronously; the
- * update-collecting branch needs a test scheduler to be deterministic, which is a trade worth knowing
- * about rather than papering over with a sleep.
+ * [TelegramAuthRepository.connect] is exercised on its synchronous branches by the sign-in tests, and its
+ * launched handshake is waited on — with a ceiling, not a sleep — by the `awaitReady` tests, because that
+ * is the call an unattended pass makes and the promise it makes has to be tested where it is made. A test
+ * scheduler would make that wait exact; what it would not make is any difference to the assertion, so the
+ * ceiling stands.
  */
 class TelegramAuthFlowTest {
     private val databaseDirectory = File("tdlib-database")
@@ -82,6 +84,45 @@ class TelegramAuthFlowTest {
         // Bounded rather than looping forever, and it must not talk itself into a session.
         assertEquals(MAX_HANDSHAKE, client.sentOf<TdApi.SetTdlibParameters>().size)
         assertFalse(repository.state.value is TelegramAuthState.Authenticated)
+    }
+
+    @Test
+    fun `an unattended pass gets the session it is about to send with`() {
+        answerStates(TdApi.AuthorizationStateWaitTdlibParameters(), TdApi.AuthorizationStateReady())
+
+        // The handshake runs on the repository's own scope, so this is the one test here that waits on
+        // another coroutine; TDLib's stand-in answers synchronously, so the bound is only a ceiling.
+        assertTrue(
+            "a worker that has never shown a screen must still be able to send",
+            runBlocking { repository.awaitReady(2_000L) },
+        )
+        assertEquals(
+            "TDLib is handed its parameters by this call, not only by a screen doing sign-in",
+            1,
+            client.sentOf<TdApi.SetTdlibParameters>().size,
+        )
+    }
+
+    @Test
+    fun `a pass is told there is no session instead of being left waiting for one`() {
+        val unusable = repositoryFor(FakeTelegramClient(usable = false))
+
+        // connect() settles this synchronously as NotConfigured, and a settled non-session answer comes
+        // back false. The long timeout is deliberate: if the code ever slept on it, the test would hang
+        // rather than quietly pass.
+        assertFalse(runBlocking { unusable.awaitReady(30_000L) })
+    }
+
+    @Test
+    fun `a flow that needs a person is an answer, not something to wait out`() {
+        answerStates(TdApi.AuthorizationStateWaitPhoneNumber())
+        runBlocking { repository.requestCode(PHONE) }
+        assertEquals(TelegramAuthState.ReadyForPhoneNumber, repository.state.value)
+
+        assertFalse(
+            "an unattended pass may not sit on a step only the user can take",
+            runBlocking { repository.awaitReady(30_000L) },
+        )
     }
 
     @Test

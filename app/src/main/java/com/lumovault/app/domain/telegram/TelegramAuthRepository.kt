@@ -16,6 +16,19 @@ interface TelegramAuthRepository {
     /** Starts the client and resolves any stored session. Safe to call more than once. */
     fun connect()
 
+    /**
+     * Waits for a session, and says whether it got one.
+     *
+     * [connect] is what actually hands TDLib its parameters, and until it has, every request this client
+     * makes is refused — which is why the unattended paths (the upload worker, woken with no screen ever
+     * opened) have to ask through here rather than assume a screen did it earlier. Returns as soon as the
+     * flow holds an answer a background pass can act on ([TelegramAuthState.isSettled]): a session, or a
+     * step that needs a person with a phone. `false` covers both "still no session after
+     * [timeoutMillis]" and "this build has no Telegram", so the caller refuses visibly instead of
+     * spending the item's attempts on a request that cannot be answered.
+     */
+    suspend fun awaitReady(timeoutMillis: Long): Boolean
+
     /** [internationalNumber] must already be E.164 (see `PhoneNumbers`); this layer does not concatenate codes. */
     suspend fun requestCode(internationalNumber: String)
 

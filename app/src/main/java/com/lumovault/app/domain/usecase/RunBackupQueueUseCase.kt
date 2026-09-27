@@ -22,7 +22,10 @@ data class BackupProgress(val mediaStoreId: Long, val displayName: String, val f
  * What a pass over the queue ended with.
  *
  * [NoChannel] is not a failure of any item: it means nothing was attempted, because uploading into an
- * arbitrary chat to keep a queue moving is the one thing this engine must never do.
+ * arbitrary chat to keep a queue moving is the one thing this engine must never do. [SignedOut] is the
+ * same shape one step earlier — a session this client could use does not exist — and is kept apart from
+ * it because the two need different words on a screen: one asks the user to sign in, the other to let the
+ * app find the channel.
  *
  * [deferred] means a retryable item is still waiting. The pass stops rather than trying it again
  * immediately — retrying a network failure in a tight loop is not backoff, it is a way to turn one
@@ -74,12 +77,26 @@ class RunBackupQueueUseCase(
     private val stager: MediaSourceStager,
     private val recognition: RecognizeBackupUseCase,
     private val resolveChannel: suspend () -> Long,
+    /**
+     * Brings up the Telegram session, and says whether there is one.
+     *
+     * TDLib only accepts a request after its parameters have been handed over, and the screen that
+     * normally does that is the sign-in flow — which a worker woken by the periodic pass has never seen.
+     * Without this the pass would claim an item, be refused, and spend one of its four attempts on a
+     * request that could never be answered.
+     */
+    private val ensureSession: suspend () -> Boolean,
 ) {
     suspend fun run(onProgress: suspend (BackupProgress) -> Unit = {}): QueueRun {
         if (!upload.isUsable) return QueueRun.TelegramUnavailable
 
-        // Rows left mid-flight by a killed process are owed work again, not evidence of failure.
+        // Rows left mid-flight by a killed process are owed work again, not evidence of failure — and this
+        // is deliberately before the two refusals below, so a pass that cannot send still puts them back
+        // where the next one will find them instead of leaving them claimed by a worker that no longer
+        // exists.
         queue.reconcileInterrupted()
+
+        if (!ensureSession()) return QueueRun.SignedOut
 
         val chatId = resolveChannel()
         if (chatId == NO_CHANNEL) return QueueRun.NoChannel

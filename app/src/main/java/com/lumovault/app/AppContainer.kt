@@ -448,6 +448,10 @@ class AppContainer(context: Context) {
             stager = mediaStager,
             recognition = recognizeBackup,
             resolveChannel = { cloudIndexRepository.association()?.chatId ?: NO_CHANNEL },
+            // The pass opens its own session rather than relying on a screen having done it: WorkManager
+            // runs this in a process that has never shown the sign-in flow, and TDLib refuses every request
+            // until its parameters have been handed over once.
+            ensureSession = { telegramAuthRepository.awaitReady(SESSION_HANDSHAKE_MILLIS) },
         )
     }
 
@@ -554,5 +558,14 @@ class AppContainer(context: Context) {
     private companion object {
         /** TDLib reserves 0 for "no identifier", so it also means "no channel adopted yet". */
         const val NO_CHANNEL = 0L
+
+        /**
+         * How long a queue pass waits for TDLib's handshake before it calls the account unusable.
+         *
+         * Creating the client, sending its parameters and reading the authorization state is normally well
+         * under a second; the rest is a mobile network. Beyond that a pass has nothing to do but try again
+         * later, which [com.lumovault.app.data.backup.toPassDirective] is what asks for.
+         */
+        const val SESSION_HANDSHAKE_MILLIS = 15_000L
     }
 }

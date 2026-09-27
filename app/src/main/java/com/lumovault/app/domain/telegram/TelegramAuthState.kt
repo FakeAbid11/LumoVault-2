@@ -73,3 +73,21 @@ val TelegramAuthState.isInFlight: Boolean
         this is TelegramAuthState.VerifyingCode ||
         this is TelegramAuthState.Authenticating ||
         this is TelegramAuthState.Failed
+
+/**
+ * True once the flow holds an answer a caller can act on rather than a step still moving — including the
+ * answers that say *nobody is going to act*: [ReadyForPhoneNumber], [WaitingForCode], [WaitingForPassword]
+ * and [Failed] all mean a human with a phone is required, which is precisely what an unattended pass has
+ * to stop waiting for.
+ *
+ * This is deliberately not `!isInFlight`. [Failed] is in flight for the sign-in panel, because the retry
+ * belongs on the panel the user was already looking at, and settled for a background pass, because waiting
+ * on it would keep a queue claimed and moving never.
+ */
+val TelegramAuthState.isSettled: Boolean
+    get() = this is TelegramAuthState.Authenticated ||
+        this is TelegramAuthState.NotConfigured ||
+        this is TelegramAuthState.ReadyForPhoneNumber ||
+        this is TelegramAuthState.WaitingForCode ||
+        this is TelegramAuthState.WaitingForPassword ||
+        this is TelegramAuthState.Failed

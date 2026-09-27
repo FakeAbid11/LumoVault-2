@@ -3,13 +3,18 @@ package com.lumovault.app.data.remote.telegram
 import com.lumovault.app.domain.telegram.TelegramAuthFailure
 import com.lumovault.app.domain.telegram.TelegramAuthRepository
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import com.lumovault.app.domain.telegram.isAuthenticated
+import com.lumovault.app.domain.telegram.isSettled
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.TdApi
 
 /**
@@ -63,6 +68,28 @@ class TelegramAuthRepositoryImpl(
                 fail(error)
             }
         }
+    }
+
+    /**
+     * The unattended half of [connect]: start the handshake if it is not running, then stop waiting as
+     * soon as there is an answer.
+     *
+     * [connect] is the only thing in this class that hands TDLib its parameters, so a worker woken with no
+     * screen ever opened cannot send anything until this has been through it. A state already settled is
+     * trusted rather than waited out — [TelegramAuthState.ReadyForPhoneNumber] reached here means a person
+     * with a phone is required, and a pass that slept until its timeout would just be a queue that stops
+     * for fifteen seconds to learn what the flow already said.
+     */
+    override suspend fun awaitReady(timeoutMillis: Long): Boolean {
+        connect()
+        val current = _state.value
+        if (current.isSettled) return current.isAuthenticated
+        val settled = withTimeoutOrNull(timeoutMillis) {
+            // `dropWhile` because a StateFlow re-emits its current value on collection, and that value is
+            // the one already known not to be an answer.
+            _state.dropWhile { it == current }.first { it.isSettled }
+        }
+        return settled?.isAuthenticated == true
     }
 
     override suspend fun requestCode(internationalNumber: String) = guard(TelegramAuthState.SendingCode) {
