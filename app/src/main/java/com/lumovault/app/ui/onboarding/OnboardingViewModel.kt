@@ -69,12 +69,22 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         }
 
         viewModelScope.launch {
-            // Resolving ~200 regions' worth of metadata is real work: keep it off the main thread.
-            val countries = withContext(Dispatchers.Default) { container.countryRepository.countries }
+            // Resolving ~200 regions' worth of metadata is real work: keep it off the main thread. The device's
+            // own region is read in the same hop because it walks that same lazily-built list.
+            val (countries, deviceRegion) = withContext(Dispatchers.Default) {
+                container.countryRepository.countries to container.countryRepository.suggestedForDevice()
+            }
             _uiState.update { state ->
                 state.copy(
                     countries = countries,
-                    selectedCountry = state.selectedCountry ?: suggestedCountry(),
+                    // Matched against the list loaded four lines above, never against `_uiState.value`. This
+                    // block is a compare-and-set and its own write has not landed yet, so reading the state
+                    // here still sees the empty list the screen opened with — which meant the suggestion could
+                    // not resolve on any device, and a phone with a perfectly good region setting was greeted
+                    // by an unselected country and a `Continue` that could not be pressed until the user had
+                    // searched a list of 243.
+                    selectedCountry = state.selectedCountry
+                        ?: countries.firstOrNull { country -> country.iso2 == deviceRegion?.iso2 },
                 )
             }
         }
@@ -180,10 +190,5 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun completeOnboarding() {
         viewModelScope.launch { container.onboardingRepository.completeOnboarding() }
-    }
-
-    private fun suggestedCountry(): Country? {
-        val suggestion = container.countryRepository.suggestedForDevice() ?: return null
-        return _uiState.value.countries.firstOrNull { it.iso2 == suggestion.iso2 }
     }
 }
