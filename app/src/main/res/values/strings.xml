@@ -53,6 +53,9 @@
     <!-- Screen 3: Connect Telegram -->
     <string name="connect_title">Connect Telegram</string>
     <string name="connect_description">Connect your Telegram account to use it as your private cloud storage.</string>
+    <!-- Skipping is a choice about when, not whether: everything except the upload itself works without an account. -->
+    <string name="connect_skip">Skip for now</string>
+    <string name="connect_skip_note">Browsing, albums, favourites and the map all work without Telegram. Only backing up needs it, and photos chosen now queue on this phone until you connect.</string>
     <string name="connect_phone_label">Phone number</string>
     <string name="connect_action">Continue</string>
     <string name="connect_country_description">Choose your country</string>

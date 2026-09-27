@@ -110,7 +110,9 @@ fun OnboardingFlow(
                 onCountrySelected = viewModel::selectCountry,
                 onPhoneChange = viewModel::onPhoneChange,
                 onBack = { navController.popBackStack() },
-                onContinueWithoutTelegram = { navController.navigate(OnboardingStep.Permissions.route) },
+                // Skipping leaves the folders and the queue intact: what is chosen here is queued on the
+                // phone and drains the first time they connect.
+                onSkipTelegram = { navController.navigate(OnboardingStep.Permissions.route) },
             )
 
             LaunchedEffect(state.telegram) {

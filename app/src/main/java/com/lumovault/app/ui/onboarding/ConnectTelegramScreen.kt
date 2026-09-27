@@ -20,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,7 +73,11 @@ fun ConnectTelegramScreen(
     onCountrySelected: (Country) -> Unit,
     onPhoneChange: (String) -> Unit,
     onBack: () -> Unit,
-    onContinueWithoutTelegram: () -> Unit,
+    /**
+     * Leaves setup without an account. Used by the primary button when the *build* cannot authenticate —
+     * and offered as its own control, when it can, by [telegramSkipOffered].
+     */
+    onSkipTelegram: () -> Unit,
     /** True when hosted outside the setup flow — which drops the step counter, correctly. */
     standalone: Boolean = false,
     modifier: Modifier = Modifier,
@@ -118,7 +123,7 @@ fun ConnectTelegramScreen(
         primaryBusy = state.busy,
         onPrimary = {
             when (panel) {
-                TelegramPanel.Phone -> if (state.telegramUnavailable) onContinueWithoutTelegram() else onSubmitPhoneNumber()
+                TelegramPanel.Phone -> if (state.telegramUnavailable) onSkipTelegram() else onSubmitPhoneNumber()
                 TelegramPanel.Code -> onSubmitCode(codeDraft)
                 TelegramPanel.Password -> {
                     onSubmitPassword(passwordDraft)
@@ -148,7 +153,7 @@ fun ConnectTelegramScreen(
                 onCountryClick = { pickerOpen = true },
                 onPhoneChange = onPhoneChange,
                 onSubmit = {
-                    if (state.telegramUnavailable) onContinueWithoutTelegram() else onSubmitPhoneNumber()
+                    if (state.telegramUnavailable) onSkipTelegram() else onSubmitPhoneNumber()
                 },
                 submitEnabled = primaryEnabled,
             )
@@ -177,6 +182,26 @@ fun ConnectTelegramScreen(
                     passwordDraft = ""
                 },
                 submitEnabled = primaryEnabled,
+            )
+        }
+
+        // Under the primary button, not beside it: this is the choice not to do the thing the button above
+        // does, and a user who wants it should not have to find it first.
+        if (
+            telegramSkipOffered(
+                panel = panel,
+                standalone = standalone,
+                buildHasTelegram = !state.telegramUnavailable,
+                busy = state.busy,
+            )
+        ) {
+            OutlinedButton(onClick = onSkipTelegram, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.connect_skip))
+            }
+            Text(
+                text = stringResource(R.string.connect_skip_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 

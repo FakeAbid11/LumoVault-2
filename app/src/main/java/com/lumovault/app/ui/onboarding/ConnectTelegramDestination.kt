@@ -45,8 +45,9 @@ fun ConnectTelegramDestination(
         onCountrySelected = viewModel::selectCountry,
         onPhoneChange = viewModel::onPhoneChange,
         onBack = onNavigateUp,
-        // A build that cannot reach Telegram has nothing to reconnect; leaving is the whole answer.
-        onContinueWithoutTelegram = onNavigateUp,
+        // A build that cannot reach Telegram has nothing to reconnect; leaving is the whole answer. This
+        // route never offers the skip control itself — see `telegramSkipOffered`.
+        onSkipTelegram = onNavigateUp,
         standalone = true,
         modifier = modifier,
     )

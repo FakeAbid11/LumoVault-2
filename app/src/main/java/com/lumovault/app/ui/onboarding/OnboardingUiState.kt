@@ -10,7 +10,6 @@ import com.lumovault.app.domain.model.OnboardingSummary
 import com.lumovault.app.domain.telegram.AuthCodeChannel
 import com.lumovault.app.domain.telegram.TelegramAuthState
 import com.lumovault.app.domain.telegram.isInFlight
-import com.lumovault.app.domain.telegram.isAuthenticated
 import com.lumovault.app.util.PhoneNumbers
 import com.lumovault.app.util.Privacy
 
@@ -59,15 +58,7 @@ data class OnboardingUiState(
     val canRequestCode: Boolean
         get() = selectedCountry != null && PhoneNumbers.hasSubscriberNumber(selectedCountry.iso2, phoneInput)
 
-    val telegramConnected: Boolean get() = telegram.isAuthenticated
-
     val telegramUnavailable: Boolean get() = telegram is TelegramAuthState.NotConfigured
-
-    /**
-     * Authentication is required for the product, so the step cannot be passed silently — but when
-     * the build cannot authenticate at all, the user is not held hostage by it either.
-     */
-    val canContinueAfterTelegram: Boolean get() = telegramConnected || telegramUnavailable
 
     val busy: Boolean
         get() = telegram is TelegramAuthState.SendingCode ||
@@ -91,3 +82,21 @@ data class OnboardingUiState(
         backgroundBackup = backgroundBackup,
     )
 }
+
+/**
+ * Whether the sign-in step offers its own "Skip for now".
+ *
+ * Four conditions, each ruling out a case where the control would be a second, different answer to the
+ * same question. Only the phone panel: mid-code or mid-password the user has already chosen to connect, and
+ * abandoning a request Telegram has answered is how a resend ends up addressed to a number nobody typed.
+ * Only inside setup: the reconnect screen exists *because* Telegram is needed, and it has a back arrow.
+ * Only when the build can authenticate: without credentials the primary button already moves past the
+ * step, and two doors labelled differently for one action is how they start disagreeing. And never while a
+ * request is in flight, because the tap would race the answer.
+ */
+fun telegramSkipOffered(
+    panel: TelegramPanel,
+    standalone: Boolean,
+    buildHasTelegram: Boolean,
+    busy: Boolean,
+): Boolean = panel == TelegramPanel.Phone && !standalone && buildHasTelegram && !busy
