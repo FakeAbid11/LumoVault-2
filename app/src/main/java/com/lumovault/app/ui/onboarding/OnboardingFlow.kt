@@ -8,11 +8,6 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +30,10 @@ import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.OptionalStepDecision
 import com.lumovault.app.domain.telegram.TelegramAuthState
+import com.lumovault.app.ui.navigation.navEnterTransition
+import com.lumovault.app.ui.navigation.navExitTransition
+import com.lumovault.app.ui.navigation.navPopEnterTransition
+import com.lumovault.app.ui.navigation.navPopExitTransition
 import com.lumovault.app.util.openAppDetailsSettings
 
 /** The seven routes behind the six onboarding screens — folder picking is a sub-screen, not a step. */
@@ -109,24 +108,13 @@ fun OnboardingFlow(
         navController = navController,
         startDestination = OnboardingStep.Start,
         modifier = modifier,
-        // One axis, one weight: arriving screens arrive from the side you are moving toward and the
-        // outgoing screen simply fades — a full push-both-ways looks faster than it feels and fights
-        // the progress header, which says the step advanced. Back runs the same shape in reverse,
-        // with the incoming screen entering from the left. The animations are graph-wide because
-        // every step here is a sibling of the same dialog-like flow.
-        enterTransition = {
-            slideInHorizontally(tween(StepSlideMillis)) { width -> width / 5 } +
-                fadeIn(tween(StepFadeMillis))
-        },
-        exitTransition = { fadeOut(tween(StepFadeMillis)) },
-        popEnterTransition = {
-            slideInHorizontally(tween(StepSlideMillis)) { width -> -width / 6 } +
-                fadeIn(tween(StepFadeMillis))
-        },
-        popExitTransition = {
-            fadeOut(tween(StepFadeMillis)) +
-                slideOutHorizontally(tween(StepSlideMillis)) { width -> width / 5 }
-        },
+        // The app's motion, not this flow's — the main graph calls the same four functions, so a screen
+        // change looks like the same event whether it starts here or in the library. The shape itself
+        // lives in ui/navigation/NavMotion.kt, with the reasoning for its timings.
+        enterTransition = { navEnterTransition() },
+        exitTransition = { navExitTransition() },
+        popEnterTransition = { navPopEnterTransition() },
+        popExitTransition = { navPopExitTransition() },
     ) {
         composable(OnboardingStep.Welcome.route) {
             WelcomeScreen(onGetStarted = { navController.navigate(OnboardingStep.HowItWorks.route) })
@@ -238,14 +226,6 @@ fun OnboardingFlow(
         }
     }
 }
-
-/**
- * Step transitions run a touch slower than the system's default motion and a touch shorter in
- * distance: six screens in a row is a sequence, and a sequence should feel like pages turning,
- * not like the user is being shoved through a corridor.
- */
-private const val StepSlideMillis = 260
-private const val StepFadeMillis = 200
 
 /**
  * "Check Settings" opens the system page and stops there. Nothing is recorded from the act of

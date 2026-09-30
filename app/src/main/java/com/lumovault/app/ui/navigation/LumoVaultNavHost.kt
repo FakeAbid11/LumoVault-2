@@ -66,6 +66,14 @@ fun LumoVaultNavHost(
         navController = navController,
         startDestination = LumoVaultDestination.Start.route,
         modifier = modifier,
+        // The setup flow's motion, shared rather than imitated — see NavMotion.kt. The library used to
+        // switch with the platform's default fade-through while a setup step slid in from the side, which
+        // made the two halves of one app feel like they were built by two teams. Tab switches, album
+        // pushes and the viewer all run this one shape now.
+        enterTransition = { navEnterTransition() },
+        exitTransition = { navExitTransition() },
+        popEnterTransition = { navPopEnterTransition() },
+        popExitTransition = { navPopExitTransition() },
     ) {
         composable(LumoVaultDestination.Photos.route) {
             PhotosScreen(

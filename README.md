@@ -779,6 +779,50 @@ timeline really fits four columns on a specific device, whether the rail's pill 
 bezel, whether a 96 dp cell is too small for a library of screenshots heavy with text — all device questions,
 and none of them claimed.
 
+### The setup flow's language, made the app's
+
+A follow-up pass took the vocabulary the setup flow had built and made it the app's — one chip, one disc, one
+frame, one motion — in three pushes, each its own green build, and again with no ViewModel, repository, schema
+or route changed:
+
+- **One chip for every state.** `StatusPill` and its `PillTone` moved out of onboarding into `ui/components`,
+  and the screens that used to say states as raw words draw it now: diagnostics' Connected / Available /
+  Enabled / "not yet", the health card's waiting / failed / cloud-only counts, the cloud header's offline and
+  checking notices, and Free Up Space's five verdicts. Every tone is assigned from a fact the row already
+  holds — an absence nobody was asked about is an outline and never red, a preference the user switched off is
+  Skipped rather than Missing, and a declined deletion keeps the quiet fill because a dismissal is a choice,
+  not a refusal.
+- **One disc for every glyph that needs a ground.** `IconCircle` is shared by the setup cards, the empty
+  states' halos and the system album badges — three palettes that each claimed in a comment to be "the same
+  device" as the others until they were literally one component, in the container pair section 44 guarantees
+  clears contrast in both themes. An empty screen's framing got the same treatment: `PlaceholderScreen` took
+  the album grid's lone floating sentence, and its halo now sizes its glyph rather than wearing an icon
+  twice the intent.
+- **The settings half wears the setup flow's frame.** The five `backup/*` screens sit on the same
+  `onboardingBackdrop` gradient with their own bars transparent over it, the way `OnboardingScaffold` has
+  always done it — a bar painted `surface` across a tinted body is exactly the stripe that comment warns
+  about. The tabs keep the shell's opaque bar and the viewer keeps its chrome: the gradient is where the app
+  configures itself, not where it shows photographs.
+- **One motion, in `ui/navigation/NavMotion.kt`.** Both graphs call the same four transition functions — a
+  260 ms slide from the side you are moving toward and a 200 ms fade — so pushing an album and advancing a
+  setup step are visibly the same event. The durations do not live in two files waiting to disagree.
+
+Three stacking defects went with them: album detail printed its subject twice at 19 sp (the page heading now
+takes the named screen-heading role and ranks above the bar instead of echoing it), the standalone Telegram
+reconnect stacked the shell's opaque bar on top of its own back bar so only the lower title could be acted on
+(the shell leaves that route its chrome), and settings' section headings were the one place in the app that
+muted the shared heading tint.
+
+The exceptions are stated rather than hidden, as before: empty texts that sit under a live section heading
+which already offers the action stay quiet lines rather than borrowing `PlaceholderScreen` framing, because a
+message in the middle of a list is not a screen's body — and Free Up Space's candidate rows carry no chip,
+since every row in that list is the same verified state N times over, where a "verified" pill would either
+repeat one fact down four hundred rows or invent a variation the row does not hold.
+
+Same caveat as the pass above: unit tests and the compiler gate this work, and whether a gradient behind the
+diagnostics list reads as branded or as tinted at 70 % font scale is a device question, not one this machine
+can answer.
+
 ## Toolchain
 
 | Component | Version |

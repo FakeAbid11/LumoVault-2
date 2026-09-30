@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +56,7 @@ import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
 import com.lumovault.app.ui.components.PillTone
 import com.lumovault.app.ui.components.StatusPill
+import com.lumovault.app.ui.onboarding.onboardingBackdrop
 import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
 import com.lumovault.app.util.toByteText
 import com.lumovault.app.ui.theme.LumoVaultType
@@ -97,11 +101,17 @@ fun BackupHubScreen(
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val stop by viewModel.stopReason.collectAsStateWithLifecycle()
 
+    // The setup flow's frame, extended: the app's settings half sits on the same brand gradient, and its
+    // own bar draws nothing over it — a surface-coloured stripe across a tinted body is exactly what
+    // OnboardingScaffold's comment says not to do. The tabs keep the shell's opaque bar: the gradient is
+    // where the app configures itself, not where it shows photographs.
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize().background(onboardingBackdrop()),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.backup_hub_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -384,10 +394,12 @@ fun BackupHealthScreen(
     val health by viewModel.health.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize().background(onboardingBackdrop()),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.health_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -443,10 +455,12 @@ fun DiagnosticsScreen(
     val failures by viewModel.failedItems.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize().background(onboardingBackdrop()),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.diagnostics_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -690,10 +704,12 @@ fun FreeUpSpaceScreen(
     }
 
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize().background(onboardingBackdrop()),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.free_space_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))

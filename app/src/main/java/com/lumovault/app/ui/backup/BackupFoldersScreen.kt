@@ -2,6 +2,7 @@ package com.lumovault.app.ui.backup
 
 import android.app.Application
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -50,6 +53,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.lumovault.app.ui.onboarding.onboardingBackdrop
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -159,11 +163,14 @@ fun BackupFoldersScreen(
     var confirmStop by remember { mutableStateOf(false) }
     BackHandler(enabled = state.hasUnsavedChanges) { confirmDiscard = true }
 
+    // The settings frame, same as the hub: the gradient behind, the bar transparent over it.
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize().background(onboardingBackdrop()),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.backup_folders_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(onClick = {
                         if (state.hasUnsavedChanges) confirmDiscard = true else onNavigateUp()
