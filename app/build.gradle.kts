@@ -143,6 +143,12 @@ android {
             // Off-device there is no real Log, and AGP's default is to throw from every android.jar
             // method, which would turn a test of the error mapping into a test of the stub.
             isReturnDefaultValues = true
+            // Robolectric builds its shadow environment from the merged manifest and resources, read
+            // through the properties file this flag makes AGP emit (both it and the property above are
+            // the current DSL — checked against AGP's own UnitTestOptions source, not remembered).
+            // Without a manifest the framework has no application id, and a database file has no
+            // package directory to live under.
+            isIncludeAndroidResources = true
         }
     }
 
@@ -243,6 +249,14 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+
+    // Real SQLite for the two tests that need it: the migration chain opens a seeded version-1 file
+    // and AlbumDao's list query runs as written. Both are ordinary JVM tests on Robolectric's shadow
+    // framework, pinned to one SDK in each class so the android-all runtime jar is a version that
+    // exists for it. The alternatives were both worse: hand-written fakes can only agree with the
+    // Kotlin beside them, and `room-testing` needs an instrumented run plus the exported schema JSON
+    // that exists only in the runner's workspace.
+    testImplementation(libs.robolectric)
 }
 
 // Versioned schema so the Phase 3/6 tables land as real migrations instead of destructive upsets.

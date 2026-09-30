@@ -21,6 +21,13 @@ libphonenumber = "9.0.40"
 # devices, and a photo map missing half the library is the worse cost of saving one dependency.
 coil = "3.6.3"
 junit = "4.13.2"
+# Verified against Maven Central's maven-metadata.xml for org.robolectric:robolectric: 4.17 is both
+# `latest` and `release` (lastUpdated 2026-09-10). It provides the shadowed Android framework the two
+# tests that need real SQLite run on — the migration chain and AlbumDao's list query. `room-testing`
+# was the alternative and was ruled out: it needs an instrumented run plus the schema JSON that
+# `room.schemaLocation` writes only into the runner's workspace, so neither test could run where this
+# project runs anything.
+robolectric = "4.17"
 # Verified against Google Maven's `androidx/media3/group-index.xml`: 1.11.1 is the newest published release
 # (nothing exists at 1.12.x yet), and its own POM pins every sibling module to the same number, so one version
 # here is what keeps exoplayer, ui and common from disagreeing at runtime — a mixed Media3 set does not fail
@@ -73,6 +80,7 @@ coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "c
 coil-gif = { group = "io.coil-kt.coil3", name = "coil-gif", version.ref = "coil" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 # Three modules, and only three: `exoplayer` for the player, `common` for the `Player`/`MediaItem`/
 # `PlaybackException` types the app names directly, `ui` for `PlayerView`. No `media3-session` (no background
 # playback and no media notification, so nothing to publish a session to), no `media3-datasource-okhttp` or
