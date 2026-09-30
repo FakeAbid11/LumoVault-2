@@ -67,7 +67,9 @@ import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.ui.components.MediaGlyph
 import com.lumovault.app.ui.components.MediaPill
+import com.lumovault.app.ui.components.PillTone
 import com.lumovault.app.ui.components.PlaceholderScreen
+import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.screens.cloud.RestoreAction
 import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.CloudViewModel
@@ -317,18 +319,19 @@ private fun CloudHeader(state: CloudUiState.Library) {
         )
 
         // The two notices are mutually exclusive by construction: a stale library is not also being
-        // refreshed, and saying both would be one claim too many.
+        // refreshed, and saying both would be one claim too many. They wear chips now, like every other
+        // screen's answer to "what state am I in" — offline takes the outline rather than the error fill,
+        // because a phone with no signal is not broken and the library on screen is still correct, just not
+        // current; checking takes the quiet fill, because it is expected and over in a moment.
         when {
-            state.fromCache -> Text(
+            state.fromCache -> StatusPill(
                 text = stringResource(R.string.cloud_offline_notice),
-                style = LumoVaultType.sectionDetail,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                tone = PillTone.Missing,
             )
 
-            state.refreshing -> Text(
+            state.refreshing -> StatusPill(
                 text = stringResource(R.string.cloud_refreshing_notice),
-                style = LumoVaultType.sectionDetail,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                tone = PillTone.Neutral,
             )
         }
     }

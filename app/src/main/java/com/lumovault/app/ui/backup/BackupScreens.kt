@@ -51,6 +51,8 @@ import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
+import com.lumovault.app.ui.components.PillTone
+import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
 import com.lumovault.app.util.toByteText
 import com.lumovault.app.ui.theme.LumoVaultType
@@ -219,10 +221,12 @@ private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
  *
  * It used to run to eight lines — a title, three counts, two timestamps, a warning and a button — which made
  * the summary taller than the settings above it and turned the screen into a report about the queue rather
- * than a place to decide things. The counts are one line and the timestamps are one line: each figure is the
- * same string from the same resource, and a person scanning "3 waiting · 1 failed" is reading the same three
- * facts they read from three rows, in a third of the height. A zero count is still absent rather than shown,
- * because "0 failed" is not news and the line that carries it is.
+ * than a place to decide things. The counts are one row of chips and the timestamps are one line: each
+ * figure is the same string from the same resource, and a person scanning "3 waiting" next to "1 failed" is
+ * reading the same three facts they read from three rows, in a third of the height. A zero count is still
+ * absent rather than shown, because "0 failed" is not news and the line that carries it is — and each count
+ * now carries its tone as well as its number, because waiting, cloud-only and failed are three different
+ * kinds of news that one dot-separated sentence made look alike.
  */
 @Composable
 private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
@@ -245,20 +249,26 @@ private fun HealthSummary(health: BackupHealth, onOpenDetails: () -> Unit) {
             )
 
             val counts = listOfNotNull(
-                if (health.pending > 0) stringResource(R.string.health_waiting, health.pending.toString()) else null,
-                if (health.failed > 0) stringResource(R.string.health_failed, health.failed.toString()) else null,
+                if (health.pending > 0) {
+                    stringResource(R.string.health_waiting, health.pending.toString()) to PillTone.Neutral
+                } else {
+                    null
+                },
+                if (health.failed > 0) {
+                    stringResource(R.string.health_failed, health.failed.toString()) to PillTone.Unavailable
+                } else {
+                    null
+                },
                 if (health.cloudOnly > 0) {
-                    stringResource(R.string.health_cloud_only, health.cloudOnly.toString())
+                    stringResource(R.string.health_cloud_only, health.cloudOnly.toString()) to PillTone.Neutral
                 } else {
                     null
                 },
             )
             if (counts.isNotEmpty()) {
-                Text(
-                    text = counts.joinToString(separator = "  ·  "),
-                    style = LumoVaultType.sectionDetail,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(SpaceSm)) {
+                    counts.forEach { (text, tone) -> StatusPill(text = text, tone = tone) }
+                }
             }
 
             Text(
@@ -490,12 +500,17 @@ fun DiagnosticsScreen(
                 Row(
                     R.string.diag_last_backup,
                     current.health.lastBackupSeconds?.asText() ?: stringResource(R.string.health_never),
+                    // "Not yet" is a state wearing a value's clothes: the outline chip is the same mark the
+                    // checklist uses for a step that has nothing to show. A real timestamp stays plain text,
+                    // because a time is data about a state rather than the state itself.
+                    tone = if (current.health.lastBackupSeconds == null) PillTone.Missing else null,
                 )
             }
             item {
                 Row(
                     R.string.diag_last_scan,
                     current.health.lastScanSeconds?.asText() ?: stringResource(R.string.health_never),
+                    tone = if (current.health.lastScanSeconds == null) PillTone.Missing else null,
                 )
             }
             item {
@@ -509,6 +524,16 @@ fun DiagnosticsScreen(
                             TelegramWord.Unavailable -> R.string.diag_telegram_unavailable
                         },
                     ),
+                    // The same four answers the setup checklist gives, in its colours: connected is Done,
+                    // waiting on the user is quiet, not-configured is an absence (outline, never red —
+                    // nobody has been asked to sign in yet), and unavailable is the only one that means
+                    // something is actually wrong.
+                    tone = when (current.telegram) {
+                        TelegramWord.Connected -> PillTone.Done
+                        TelegramWord.WaitingForSignIn -> PillTone.Neutral
+                        TelegramWord.NotConfigured -> PillTone.Missing
+                        TelegramWord.Unavailable -> PillTone.Unavailable
+                    },
                 )
             }
             item {
@@ -517,6 +542,7 @@ fun DiagnosticsScreen(
                     stringResource(
                         if (current.channelAvailable) R.string.diag_channel_available else R.string.diag_channel_missing,
                     ),
+                    tone = if (current.channelAvailable) PillTone.Done else PillTone.Missing,
                 )
             }
             item {
@@ -525,6 +551,10 @@ fun DiagnosticsScreen(
                     stringResource(
                         if (current.preferences.automatic) R.string.state_enabled else R.string.state_disabled,
                     ),
+                    // A setting the user switched off is a choice, not a fault, and StopCard's own comment
+                    // says the same about preferences: Disabled wears the quiet fill, and only Missing's
+                    // outline marks something the app was never told or can no longer find.
+                    tone = if (current.preferences.automatic) PillTone.Done else PillTone.Skipped,
                 )
             }
             item {
@@ -547,18 +577,31 @@ fun DiagnosticsScreen(
     }
 }
 
+/**
+ * One line of the technical panel: the label, and the value in the form it should be read in.
+ *
+ * A value that *is* a state — Connected, Available, Enabled, "not yet" — earns a [StatusPill], so the words
+ * that say how things stand are the same words in the same colours as every other screen's. Figures,
+ * timestamps and constraints stay plain text: they are data about a state rather than the state itself, and
+ * a chip around a number only makes the row harder to scan.
+ */
 @Composable
-private fun Row(@androidx.annotation.StringRes label: Int, value: String) {
+private fun Row(@androidx.annotation.StringRes label: Int, value: String, tone: PillTone? = null) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = SpaceSm),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = stringResource(label),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        if (tone == null) {
+            Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        } else {
+            StatusPill(text = value, tone = tone)
+        }
     }
 }
 
@@ -582,19 +625,42 @@ fun FreeUpSpaceScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val consent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     var confirmShown by remember { mutableStateOf(false) }
-    val outcomeText = when (val outcome = state.outcome) {
+    // The verdict and the sentence that explains it are computed together, so the chip can never disagree
+    // with the paragraph beneath it. Declined keeps Skipped's own tone because it is the one outcome here
+    // that is a choice — the launcher's comment below says the same about Android's result codes, and an
+    // agreed dismissal must not wear the red of a refusal.
+    val outcomeDetail = when (val last = state.outcome) {
         DeletionOutcome.None, DeletionOutcome.Asked -> null
-        is DeletionOutcome.Removed ->
-            pluralStringResource(
+        is DeletionOutcome.Removed -> OutcomeDetail(
+            label = stringResource(R.string.status_done),
+            tone = PillTone.Done,
+            text = pluralStringResource(
                 R.plurals.free_space_done,
-                outcome.deleted,
-                outcome.deleted,
-                outcome.reclaimedBytes.toByteText(),
-            )
-        DeletionOutcome.NothingLeft -> stringResource(R.string.free_space_nothing_left)
-        DeletionOutcome.Declined -> stringResource(R.string.free_space_declined)
-        DeletionOutcome.Unavailable -> stringResource(R.string.free_space_unavailable)
-        DeletionOutcome.Failed -> stringResource(R.string.free_space_failed)
+                last.deleted,
+                last.deleted,
+                last.reclaimedBytes.toByteText(),
+            ),
+        )
+        DeletionOutcome.NothingLeft -> OutcomeDetail(
+            label = stringResource(R.string.status_skipped),
+            tone = PillTone.Neutral,
+            text = stringResource(R.string.free_space_nothing_left),
+        )
+        DeletionOutcome.Declined -> OutcomeDetail(
+            label = stringResource(R.string.status_skipped),
+            tone = PillTone.Skipped,
+            text = stringResource(R.string.free_space_declined),
+        )
+        DeletionOutcome.Unavailable -> OutcomeDetail(
+            label = stringResource(R.string.status_unavailable),
+            tone = PillTone.Unavailable,
+            text = stringResource(R.string.free_space_unavailable),
+        )
+        DeletionOutcome.Failed -> OutcomeDetail(
+            label = stringResource(R.string.diag_failed),
+            tone = PillTone.Unavailable,
+            text = stringResource(R.string.free_space_failed),
+        )
     }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -693,9 +759,9 @@ fun FreeUpSpaceScreen(
                 )
             }
 
-            if (outcomeText != null) {
+            if (outcomeDetail != null) {
                 item {
-                    OutcomeCard(text = outcomeText, onDismiss = viewModel::dismissOutcome)
+                    OutcomeCard(detail = outcomeDetail, onDismiss = viewModel::dismissOutcome)
                 }
             }
 
@@ -780,24 +846,37 @@ fun FreeUpSpaceScreen(
     }
 }
 
+/** One run's verdict: the word for it, how the app colours that word, and the sentence that says what happened. */
+private data class OutcomeDetail(val label: String, val tone: PillTone, val text: String)
+
+/**
+ * The outcome of a deletion run, chip first and sentence second.
+ *
+ * Every other screen in the app answers "how did it go" with a [StatusPill] before it writes a paragraph,
+ * and this one wrote only the paragraph — so the same five verdicts read as prose here and as chips
+ * everywhere else. The chip sits beside Dismiss because both are short, and the sentence gets its own line:
+ * the longest of them runs past a hundred characters, and a pill's row is not where a hundred characters go.
+ */
 @Composable
-private fun OutcomeCard(text: String, onDismiss: () -> Unit) {
+private fun OutcomeCard(detail: OutcomeDetail, onDismiss: () -> Unit) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(SpaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+            verticalArrangement = Arrangement.spacedBy(SpaceSm),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_dismiss)) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusPill(text = detail.label, tone = detail.tone)
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_dismiss)) }
+            }
+            Text(text = detail.text, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
