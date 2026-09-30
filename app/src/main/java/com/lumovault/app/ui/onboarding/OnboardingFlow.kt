@@ -8,7 +8,13 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +23,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -64,6 +73,22 @@ fun OnboardingFlow(
 
     var mediaRequested by rememberSaveable { mutableStateOf(false) }
 
+    /**
+     * Re-read the grants and battery state on every resume: all three can change while the app is
+     * backgrounded — the user grants media access from system settings, revokes it again, flips the
+     * unrestricted-battery toggle — and the statuses shown live on the cards would otherwise be the
+     * ones remembered from first entry, which is exactly the remembered-vs-live state PRD 38 forbids.
+     * The screen's own LaunchedEffect only covers its first appearance, not a return from Settings.
+     */
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshSystemStatuses()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val mediaLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
@@ -84,6 +109,24 @@ fun OnboardingFlow(
         navController = navController,
         startDestination = OnboardingStep.Start,
         modifier = modifier,
+        // One axis, one weight: arriving screens arrive from the side you are moving toward and the
+        // outgoing screen simply fades — a full push-both-ways looks faster than it feels and fights
+        // the progress header, which says the step advanced. Back runs the same shape in reverse,
+        // with the incoming screen entering from the left. The animations are graph-wide because
+        // every step here is a sibling of the same dialog-like flow.
+        enterTransition = {
+            slideInHorizontally(tween(StepSlideMillis)) { width -> width / 5 } +
+                fadeIn(tween(StepFadeMillis))
+        },
+        exitTransition = { fadeOut(tween(StepFadeMillis)) },
+        popEnterTransition = {
+            slideInHorizontally(tween(StepSlideMillis)) { width -> -width / 6 } +
+                fadeIn(tween(StepFadeMillis))
+        },
+        popExitTransition = {
+            fadeOut(tween(StepFadeMillis)) +
+                slideOutHorizontally(tween(StepSlideMillis)) { width -> width / 5 }
+        },
     ) {
         composable(OnboardingStep.Welcome.route) {
             WelcomeScreen(onGetStarted = { navController.navigate(OnboardingStep.HowItWorks.route) })
@@ -195,6 +238,14 @@ fun OnboardingFlow(
         }
     }
 }
+
+/**
+ * Step transitions run a touch slower than the system's default motion and a touch shorter in
+ * distance: six screens in a row is a sequence, and a sequence should feel like pages turning,
+ * not like the user is being shoved through a corridor.
+ */
+private const val StepSlideMillis = 260
+private const val StepFadeMillis = 200
 
 /**
  * "Check Settings" opens the system page and stops there. Nothing is recorded from the act of

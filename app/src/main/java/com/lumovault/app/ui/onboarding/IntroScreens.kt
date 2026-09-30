@@ -1,26 +1,41 @@
 package com.lumovault.app.ui.onboarding
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
+import com.lumovault.app.ui.theme.IconLeading
+import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -54,23 +69,33 @@ fun WelcomeScreen(
             verticalArrangement = Arrangement.spacedBy(SpaceLg),
             modifier = Modifier.fillMaxWidth(),
         ) {
+            // The app's own mark, not a stock glyph: a framed landscape in a gradient disc, tinted to the
+            // scheme's container text so the two blues of the original artwork stay legible on either theme.
             Box(
                 modifier = Modifier
                     .size(HeroMedallion)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                            ),
+                        ),
+                        CircleShape,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.PhotoLibrary,
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
                     contentDescription = null,
                     modifier = Modifier.size(HeroGlyph),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimaryContainer),
                 )
             }
 
             Text(
                 text = stringResource(R.string.welcome_tagline),
-                style = MaterialTheme.typography.titleLarge,
+                style = LumoVaultType.onboardingHero,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -81,6 +106,10 @@ fun WelcomeScreen(
 /**
  * Screen 2: phone → LumoVault → Telegram, in the order the user will experience it, with four
  * plain sentences. Deliberately not a Telegram tutorial (PRD section 34).
+ *
+ * The diagram is a stepper — disc, connector, disc — rather than labelled pills with arrows between
+ * them: an arrow glyph is a picture of a transition, while a connector line *is* the transition drawn
+ * once, and the discs give the middle node the app's own mark to stop at.
  */
 @Composable
 fun HowItWorksScreen(
@@ -97,61 +126,122 @@ fun HowItWorksScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = SpaceSm)) {
-            StepNode(label = stringResource(R.string.how_your_phone))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = SpaceSm),
+        ) {
+            DiagramNode(label = stringResource(R.string.how_your_phone)) {
+                IconCircle(
+                    imageVector = Icons.Filled.Smartphone,
+                    size = DiagramDisc,
+                )
+            }
             Connector()
-            StepNode(label = stringResource(R.string.app_name), emphasised = true)
+            DiagramNode(label = stringResource(R.string.app_name)) {
+                BrandDisc()
+            }
             Connector()
-            StepNode(label = stringResource(R.string.how_your_cloud))
+            DiagramNode(label = stringResource(R.string.how_your_cloud)) {
+                IconCircle(
+                    imageVector = Icons.Filled.Backup,
+                    size = DiagramDisc,
+                )
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(SpaceMd), modifier = Modifier.padding(top = SpaceSm)) {
-            Text(text = stringResource(R.string.how_point_local), style = MaterialTheme.typography.bodyLarge)
-            Text(text = stringResource(R.string.how_point_backup), style = MaterialTheme.typography.bodyLarge)
-            Text(text = stringResource(R.string.how_point_cloud), style = MaterialTheme.typography.bodyLarge)
-            Text(text = stringResource(R.string.how_point_originals), style = MaterialTheme.typography.bodyLarge)
+            PointRow(icon = Icons.Filled.Photo, text = stringResource(R.string.how_point_local))
+            PointRow(icon = Icons.Filled.CloudUpload, text = stringResource(R.string.how_point_backup))
+            PointRow(icon = Icons.Filled.Cloud, text = stringResource(R.string.how_point_cloud))
+            PointRow(icon = Icons.Filled.Download, text = stringResource(R.string.how_point_originals))
         }
     }
 }
 
+/** One node of the diagram: a disc with its name under it, centred as a unit. */
 @Composable
-private fun StepNode(label: String, emphasised: Boolean = false) {
-    val container = if (emphasised) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = if (emphasised) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Box(
-        modifier = Modifier
-            .background(container, CircleShape)
-            .padding(horizontal = StepBadgePadHorizontal, vertical = SpaceLg),
+private fun DiagramNode(label: String, glyph: @Composable () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(SpaceXs),
     ) {
-        Text(text = label, style = MaterialTheme.typography.titleMedium, color = content)
+        glyph()
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
+/** The middle node, in the same disc the welcome screen opens with — smaller, so it reads as the same mark. */
+@Composable
+private fun BrandDisc() {
+    Box(
+        modifier = Modifier
+            .size(DiagramDisc)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ),
+                ),
+                CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            modifier = Modifier.size(DiagramMark),
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimaryContainer),
+        )
+    }
+}
+
+/** The line between two nodes: one shape, at the outline's quietest weight. */
 @Composable
 private fun Connector() {
-    Icon(
-        imageVector = Icons.Filled.ArrowDownward,
-        contentDescription = null,
-        modifier = Modifier.padding(vertical = SpaceXs),
-        tint = MaterialTheme.colorScheme.outline,
+    Box(
+        modifier = Modifier
+            .width(ConnectorThickness)
+            .height(ConnectorHeight)
+            .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(ConnectorThickness)),
     )
 }
 
-/**
- * The welcome screen's own art: a medallion with the library glyph inside it. One screen draws it, so
- * one file owns its two measures rather than inventing a global rung nobody else would use.
- */
-private val HeroMedallion = 104.dp
-private val HeroGlyph = 52.dp
+/** One of the four sentences, with the accent icon that names its idea. */
+@Composable
+private fun PointRow(icon: ImageVector, text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(IconLeading),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 
-/** The step chip is a round container around a short label, so its inset is the label's own measure. */
-private val StepBadgePadHorizontal = 28.dp
+/** The welcome screen's own art: a mark in a gradient disc, big enough to be the screen's subject. */
+private val HeroMedallion = 128.dp
+private val HeroGlyph = 88.dp
+
+/** The stepper's discs — bigger than a row icon, smaller than the welcome mark. */
+private val DiagramDisc = 56.dp
+private val DiagramMark = 40.dp
+
+/** The connector spans the width of a rounded 2 dp line, with the corner rounding to match. */
+private val ConnectorThickness = 2.dp
+private val ConnectorHeight = 20.dp

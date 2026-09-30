@@ -107,4 +107,26 @@ internal object LumoVaultType {
         fontWeight = FontWeight.Medium,
         letterSpacing = 0.1.sp,
     )
+
+    /**
+     * A setup screen's own title.
+     *
+     * One size above [sectionHeader] because it heads a form rather than a list: `headlineSmall` (21 sp)
+     * sat close enough to the body copy that the six onboarding screens read as one flat block of text,
+     * which is the same failure the gallery roles above exist to avoid.
+     */
+    val onboardingTitle: TextStyle = TextStyle(
+        fontSize = 26.sp,
+        lineHeight = 32.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.1.sp,
+    )
+
+    /** The welcome tagline — the largest text the app draws, on the one screen that is a picture. */
+    val onboardingHero: TextStyle = TextStyle(
+        fontSize = 34.sp,
+        lineHeight = 40.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.2.sp,
+    )
 }

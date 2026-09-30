@@ -5,26 +5,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.BatteryStd
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.BackgroundBackupStatus
-import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -65,20 +64,19 @@ fun PermissionsSetupScreen(
         SetupCard(
             title = stringResource(R.string.setup_media_title),
             description = stringResource(R.string.setup_media_description),
+            icon = Icons.Filled.PhotoLibrary,
             status = state.mediaAccess.label(),
-            satisfied = state.mediaAccess.allowsScanning,
+            tone = if (state.mediaAccess.allowsScanning) PillTone.Done else PillTone.Missing,
             actions = {
                 if (mediaPermanentlyDenied && !state.mediaAccess.allowsScanning) {
                     CardAction(
                         label = stringResource(R.string.setup_media_open_settings),
                         onClick = onOpenMediaSettings,
-                        primary = true,
                     )
                 } else {
                     CardAction(
                         label = stringResource(R.string.setup_media_action),
                         onClick = onRequestMedia,
-                        primary = true,
                     )
                 }
             },
@@ -92,14 +90,18 @@ fun PermissionsSetupScreen(
             } else {
                 stringResource(R.string.setup_notifications_description)
             },
+            icon = Icons.Filled.NotificationsNone,
             status = state.notifications.label(),
-            satisfied = state.notifications.satisfied,
+            tone = when {
+                state.notifications.satisfied -> PillTone.Done
+                state.notifications == NotificationsStatus.Denied -> PillTone.Skipped
+                else -> PillTone.Missing
+            },
             actions = {
                 if (!state.notifications.satisfied) {
                     CardAction(
                         label = stringResource(R.string.setup_notifications_action),
                         onClick = onRequestNotifications,
-                        primary = true,
                     )
                     OutlinedButton(onClick = onSkipNotifications) {
                         Text(stringResource(R.string.setup_notifications_not_now))
@@ -111,15 +113,19 @@ fun PermissionsSetupScreen(
         SetupCard(
             title = stringResource(R.string.setup_background_title),
             description = stringResource(R.string.setup_background_description),
+            icon = Icons.Filled.BatteryStd,
             status = state.backgroundBackup.label(),
-            satisfied = state.backgroundBackup == BackgroundBackupStatus.Unrestricted,
+            tone = when (state.backgroundBackup) {
+                BackgroundBackupStatus.Unrestricted -> PillTone.Done
+                BackgroundBackupStatus.Restricted -> PillTone.Missing
+                BackgroundBackupStatus.Unknown -> PillTone.Unavailable
+            },
             actions = {
                 if (state.backgroundBackup != BackgroundBackupStatus.Unrestricted) {
                     if (canOpenBatterySettings) {
                         CardAction(
                             label = stringResource(R.string.setup_background_action),
                             onClick = onOpenBatterySettings,
-                            primary = true,
                         )
                     } else {
                         // No system page to open on this device: explained rather than a dead button.
@@ -142,8 +148,9 @@ fun PermissionsSetupScreen(
 private fun SetupCard(
     title: String,
     description: String,
+    icon: ImageVector,
     status: String,
-    satisfied: Boolean,
+    tone: PillTone,
     actions: @Composable () -> Unit,
 ) {
     Card(
@@ -159,22 +166,13 @@ private fun SetupCard(
                 horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(
-                    imageVector = if (satisfied) Icons.Filled.CheckCircle else Icons.Filled.RemoveCircleOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(IconLeading),
-                    tint = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                )
+                IconCircle(imageVector = icon)
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                StatusPill(text = status, tone = tone)
             }
 
             Text(
@@ -189,12 +187,8 @@ private fun SetupCard(
 }
 
 @Composable
-private fun CardAction(label: String, onClick: () -> Unit, primary: Boolean) {
-    if (primary) {
-        FilledTonalButton(onClick = onClick) { Text(label) }
-    } else {
-        OutlinedButton(onClick = onClick) { Text(label) }
-    }
+private fun CardAction(label: String, onClick: () -> Unit) {
+    FilledTonalButton(onClick = onClick) { Text(label) }
 }
 
 @Composable

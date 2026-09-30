@@ -1,9 +1,10 @@
 package com.lumovault.app.ui.onboarding
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,14 +21,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,7 +38,6 @@ import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceLg
-import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 
@@ -44,11 +45,15 @@ import com.lumovault.app.ui.theme.SpaceXs
  * The shared frame for all six onboarding screens: a header, scrollable body, and one pinned
  * primary action. Content scrolls so the button stays reachable on a small phone with the keyboard
  * open, and the column is width-capped so tablets don't get a stretched form.
+ *
+ * The whole frame sits on [onboardingBackdrop] — a brand tint fading into the background — which is why
+ * the scaffold and its top bar draw no colour of their own: a bar painted `surface` over the gradient
+ * would cut a flat stripe across every screen that has a back arrow.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScaffold(
-    /** Null outside the setup flow: a "step 3 of 7" bar above a lone reconnect screen is a lie about
+    /** Null outside the setup flow: a "step 3 of 6" bar above a lone reconnect screen is a lie about
      * where the user is. */
     step: Int?,
     totalSteps: Int,
@@ -66,125 +71,111 @@ fun OnboardingScaffold(
     primaryBusy: Boolean = false,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            if (onBack != null) {
-                TopAppBar(
-                    // Empty rather than a space-string: a title of " " is read aloud as a blank label.
-                    title = {},
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = SpaceXl),
-        ) {
-            StepProgress(step = step, totalSteps = totalSteps)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(onboardingBackdrop()),
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                if (onBack != null) {
+                    TopAppBar(
+                        // Empty rather than a space-string: a title of " " is read aloud as a blank label.
+                        title = {},
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                        ),
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        },
+                    )
+                }
+            },
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .widthIn(max = FormMaxWidth)
-                    .align(Alignment.CenterHorizontally)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.Start,
-                // Top-aligned on purpose: a vertically-centred arrangement inside a scroll column
-                // pushes the first line out of reach on short screens.
-                verticalArrangement = Arrangement.spacedBy(SpaceLg),
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = SpaceXl),
             ) {
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(SpaceXs),
-                ) {
-                    Text(
-                        // `headlineMedium` is 28 sp, and at that size the heading was the largest thing on a
-                        // screen whose actual subject is the form or the picture underneath it. Small enough to
-                        // be a heading, big enough to be the first thing read.
-                        text = title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Start,
+                if (step != null) {
+                    SegmentedProgress(
+                        step = step,
+                        totalSteps = totalSteps,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = SpaceLg),
                     )
-                    if (description != null) {
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .widthIn(max = FormMaxWidth)
+                        .align(Alignment.CenterHorizontally)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.Start,
+                    // Top-aligned on purpose: a vertically-centred arrangement inside a scroll column
+                    // pushes the first line out of reach on short screens.
+                    verticalArrangement = Arrangement.spacedBy(SpaceLg),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(SpaceXs),
+                    ) {
                         Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyLarge,
+                            // The flow's own 26 sp role rather than a Material default: it has to rank
+                            // above the form under it without out-shouting the picture on the steps
+                            // that have one. See LumoVaultType.onboardingTitle.
+                            text = title,
+                            style = LumoVaultType.onboardingTitle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Start,
+                        )
+                        if (description != null) {
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    content()
+                }
+
+                Spacer(Modifier.height(SpaceXl))
+
+                Button(
+                    onClick = onPrimary,
+                    enabled = primaryEnabled,
+                    // The inner `padding(vertical = 8.dp)` on the label is gone: a Material button is already 40 dp
+                    // tall, and padding its text made every step's primary action a 56 dp block sitting in the last
+                    // of the space the body had been given.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = FormMaxWidth)
+                        .align(Alignment.CenterHorizontally),
+                ) {
+                    if (primaryBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(MarkInline),
+                            strokeWidth = RingStroke,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    } else {
+                        Text(text = primaryLabel)
                     }
                 }
-                content()
+
+                Spacer(Modifier.height(SpaceLg))
             }
-
-            Spacer(Modifier.height(SpaceXl))
-
-            Button(
-                onClick = onPrimary,
-                enabled = primaryEnabled,
-                // The inner `padding(vertical = 8.dp)` on the label is gone: a Material button is already 40 dp
-                // tall, and padding its text made every step's primary action a 56 dp block sitting in the last
-                // of the space the body had been given.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = FormMaxWidth)
-                    .align(Alignment.CenterHorizontally),
-            ) {
-                if (primaryBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(MarkInline),
-                        strokeWidth = RingStroke,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(text = primaryLabel)
-                }
-            }
-
-            Spacer(Modifier.height(SpaceLg))
         }
     }
 }
 
-/**
- * One bar with the count beside it, rather than a bar and then a line of its own.
- *
- * Six steps of a flow should not cost six screen-heights of chrome: the fraction and the bar answer the same
- * question, and a row that answers it once leaves the answer and the room for the content both.
- */
-@Composable
-private fun StepProgress(step: Int?, totalSteps: Int) {
-    if (step == null) return
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = SpaceLg),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
-    ) {
-        LinearProgressIndicator(
-            progress = { step.toFloat() / totalSteps.toFloat() },
-            modifier = Modifier
-                .weight(1f)
-                .height(ProgressHeight),
-        )
-        Text(
-            text = stringResource(R.string.step_progress, step, totalSteps),
-            style = LumoVaultType.sectionDetail,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 private val FormMaxWidth = 560.dp
-private val ProgressHeight = 6.dp
