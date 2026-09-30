@@ -207,7 +207,9 @@ private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
     Text(
         text = stringResource(label),
         style = LumoVaultType.sectionHeader,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // onSurface, like every other section heading in the app: this tint was the one screen that
+        // muted it, and a heading that changes weight by room reads as a different kind of heading.
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(top = SpaceMd, bottom = SpaceXs),
     )
 }

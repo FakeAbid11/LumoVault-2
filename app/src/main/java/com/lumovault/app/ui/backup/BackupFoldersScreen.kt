@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
@@ -259,11 +260,14 @@ fun BackupFoldersScreen(
                     ) {
                         Checkbox(checked = checked, onCheckedChange = null)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = folder.displayName, style = MaterialTheme.typography.bodyLarge)
+                            // The same pair of roles the hub's rows and the album tiles use: a row's name
+                            // and its quiet detail line, rather than the raw Material sizes this screen
+                            // had picked for itself.
+                            Text(text = folder.displayName, style = LumoVaultType.itemTitle)
                             if (repeated && folder.parentLabel.isNotBlank()) {
                                 Text(
                                     text = folder.parentLabel,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = LumoVaultType.sectionDetail,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -274,7 +278,7 @@ fun BackupFoldersScreen(
                                 folder.mediaCount,
                                 folder.mediaCount,
                             ),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = LumoVaultType.sectionDetail,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

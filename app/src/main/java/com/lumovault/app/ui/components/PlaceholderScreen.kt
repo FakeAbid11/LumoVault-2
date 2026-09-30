@@ -1,20 +1,15 @@
 package com.lumovault.app.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,20 +29,23 @@ import com.lumovault.app.ui.theme.SpaceXl
 //
 // It used to wrap itself in a `Card`, which is the wrong instrument here: a card says "one item of content,
 // tappable, part of a set", and there is no item — the screen is empty, and the only thing worth drawing is
-// the reason and the way out. So it is a column on the background now, with the glyph in a tonal disc to give
-// the eye one anchor, and an optional action, because an empty state that explains itself without offering a
-// next step is a dead end with better typography.
+// the reason and the way out. So it is a column on the background now, with the glyph in [IconCircle] to give
+// the eye one anchor — the same disc the setup flow's cards and a system album's badge use, because an empty
+// state that looks like a different application's empty state is one — and an optional action, because an
+// empty state that explains itself without offering a next step is a dead end with better typography.
 //
 // Every empty, permission and failure state in the app goes through this one component so the same three
-// sentences look the same on the timeline, in the cloud and on the map.
+// sentences look the same on the timeline, in the cloud and on the map. A message that sits *inside* a live
+// screen — under a section heading that already offers the action, or between a list's controls — is not a
+// screen's body and does not borrow this framing; it stays the quiet line it is.
 
 /** A screen's whole body: why there is nothing here, and what to do about it. */
 @Composable
 fun PlaceholderScreen(
     title: String,
-    description: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    description: String? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
     Column(
@@ -57,19 +55,11 @@ fun PlaceholderScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(HaloSize)
-                .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(HaloIconSize),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
+        IconCircle(
+            imageVector = icon,
+            size = HaloSize,
+            glyph = HaloGlyphSize,
+        )
         Spacer(Modifier.height(SpaceXl))
         Text(
             text = title,
@@ -79,13 +69,15 @@ fun PlaceholderScreen(
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(SpaceSm))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        if (description != null) {
+            Spacer(Modifier.height(SpaceSm))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (action != null) {
             Spacer(Modifier.height(SpaceXl))
             action()
@@ -98,7 +90,8 @@ fun PlaceholderScreen(
 }
 
 private val HaloSize = 88.dp
-private val HaloIconSize = 40.dp
+// Half the disc at 88 dp would be a 44 dp poster; the halo anchors the screen, it is not the subject.
+private val HaloGlyphSize = 40.dp
 
 @Preview(name = "Dark")
 @Composable

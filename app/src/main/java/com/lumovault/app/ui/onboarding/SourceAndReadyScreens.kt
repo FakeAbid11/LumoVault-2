@@ -37,6 +37,8 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.ChecklistStatus
 import com.lumovault.app.domain.model.OnboardingSummary
+import com.lumovault.app.ui.components.PillTone
+import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd

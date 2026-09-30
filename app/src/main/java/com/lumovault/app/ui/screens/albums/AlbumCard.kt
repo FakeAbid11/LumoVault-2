@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
@@ -22,7 +20,6 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Screenshot
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.components.IconCircle
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -138,23 +136,16 @@ private fun AlbumFallback(icon: ImageVector?) {
  *
  * It was a 56 dp disc on a 150 dp tile — a poster rather than an icon, which made each of the eight system
  * collections a mostly-empty square with something floating in the middle of it. The coin is what keeps it
- * looking deliberate at 40 dp, and it is the same device the empty states use.
+ * looking deliberate at 40 dp, and it is literally the same component as the empty states' halo and the
+ * setup flow's permission cards now: [IconCircle], one palette, one shape, sized for its surface.
  */
 @Composable
 private fun ImageVector.Badge() {
-    Box(
-        modifier = Modifier
-            .size(BadgeSize)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = this@Badge,
-            contentDescription = null,
-            modifier = Modifier.size(BadgeIconSize),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-    }
+    IconCircle(
+        imageVector = this@Badge,
+        size = BadgeSize,
+        glyph = BadgeIconSize,
+    )
 }
 
 /**

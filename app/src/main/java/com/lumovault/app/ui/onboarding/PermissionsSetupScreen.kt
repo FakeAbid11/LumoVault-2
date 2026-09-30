@@ -24,6 +24,9 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.BackgroundBackupStatus
+import com.lumovault.app.ui.components.IconCircle
+import com.lumovault.app.ui.components.PillTone
+import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm

@@ -51,7 +51,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
@@ -62,11 +61,11 @@ import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
+import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
-import com.lumovault.app.ui.theme.SpaceXxl
 import com.lumovault.app.ui.theme.SpaceXxs
 
 /**
@@ -308,10 +307,13 @@ private fun AlbumHeader(
             .padding(horizontal = SpaceLg, vertical = SpaceSm),
         verticalArrangement = Arrangement.spacedBy(SpaceXxs),
     ) {
-        Text(text = title, style = MaterialTheme.typography.titleLarge)
+        // The bar above already says "Albums"; this is the screen's own subject, so it takes the named
+        // screen-heading role (21 sp) rather than the bar's own title style at the same size — two
+        // 19 sp titles stacked read as the same sentence printed twice, which is what it looked like.
+        Text(text = title, style = MaterialTheme.typography.headlineSmall)
         Text(
             text = pluralStringResource(R.plurals.album_items_count, itemCount, itemCount),
-            style = MaterialTheme.typography.bodyMedium,
+            style = LumoVaultType.sectionDetail,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (explainer != null) {
@@ -374,15 +376,13 @@ private fun MediaGrid(
     }
 
     if (items.isEmpty()) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = stringResource(R.string.albums_no_items),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(SpaceXxl),
-                textAlign = TextAlign.Center,
-            )
-        }
+        // The body of the screen, so it takes the same framing as every other screen's empty body —
+        // halo, heading, quiet line — instead of a lone sentence floating where the grid should be.
+        PlaceholderScreen(
+            title = stringResource(R.string.albums_no_items),
+            icon = Icons.Filled.PhotoLibrary,
+            modifier = modifier.fillMaxSize(),
+        )
         return
     }
 

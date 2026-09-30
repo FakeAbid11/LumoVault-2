@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lumovault.app.R
+import com.lumovault.app.ui.components.IconCircle
 import com.lumovault.app.ui.theme.IconLeading
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceLg

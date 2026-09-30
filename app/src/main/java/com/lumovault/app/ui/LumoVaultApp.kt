@@ -21,6 +21,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.R
+import com.lumovault.app.ui.navigation.AccountRoutes
 import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
@@ -52,8 +53,12 @@ fun LumoVaultApp(
     val isViewer = viewerRouteActive(route)
     // The backup and storage screens each draw their own bar, because each has a title that is not a tab's
     // name and a back arrow that is not a tab change. A screen that owns its chrome gets one bar, not two —
-    // and the one that would be added here is the one that cannot name them.
-    val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true
+    // and the one that would be added here is the one that cannot name them. The standalone Telegram
+    // reconnect is the same case wearing the setup flow's clothes: OnboardingScaffold draws a back bar on
+    // the gradient, and the shell's opaque bar stacked above it made two titles where the user could only
+    // act on the lower one. The tab bar stays either way — it is how you get back to the library.
+    val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true ||
+        route == AccountRoutes.CONNECT_TELEGRAM
 
     Scaffold(
         modifier = modifier,
