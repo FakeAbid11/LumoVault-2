@@ -67,9 +67,11 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.model.TimelineRail
 import com.lumovault.app.ui.components.CollectAppMessages
+import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.components.PillTone
 import com.lumovault.app.ui.components.StatusPill
+import com.lumovault.app.ui.components.WorkingScreen
 import com.lumovault.app.ui.screens.photos.DateRail
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.photos.BackupOverview
@@ -86,12 +88,9 @@ import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RailWidth
 import com.lumovault.app.ui.theme.RingStroke
-import com.lumovault.app.ui.theme.RingStrokeBold
-import com.lumovault.app.ui.theme.RingWaiting
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
-import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 
 /**
@@ -158,9 +157,10 @@ fun PhotosScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         when (val current = state) {
-            // The first permission read has not arrived yet; drawing nothing avoids a flash of
-            // "no photos" on a device that has thousands.
-            PhotosUiState.CheckingAccess -> Unit
+            // The first permission read has not arrived yet. The ring claims only that a question is
+            // pending — where silence left a blank frame, and where "no photos" would flash a lie on
+            // a device that has thousands.
+            PhotosUiState.CheckingAccess -> LoadingScreen()
 
             PhotosUiState.PermissionRequired -> PermissionRequired(
                 onRequestAccess = {
@@ -168,7 +168,17 @@ fun PhotosScreen(
                 },
             )
 
-            PhotosUiState.Scanning -> Scanning(found = scanProgress)
+            // How many rows have actually been indexed, not a percentage: a scan cannot know its
+            // total before it has finished, and inventing one would be a number the user watches
+            // stall. The count is passed as a fact this screen already holds.
+            PhotosUiState.Scanning -> WorkingScreen(
+                title = stringResource(R.string.photos_scanning_title),
+                detail = pluralStringResource(
+                    R.plurals.photos_scanning_progress,
+                    scanProgress,
+                    scanProgress,
+                ),
+            )
 
             PhotosUiState.Empty -> PlaceholderScreen(
                 title = stringResource(R.string.photos_empty_title),
@@ -554,32 +564,6 @@ private fun PermissionRequired(onRequestAccess: () -> Unit) {
             }
         },
     )
-}
-
-/**
- * Shows how many rows have actually been indexed rather than a percentage: the scan cannot know a
- * total before it has finished, and inventing one would be a number the user watches stall.
- */
-@Composable
-private fun Scanning(found: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = SpaceXl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(RingWaiting), strokeWidth = RingStrokeBold)
-        Text(
-            text = stringResource(R.string.photos_scanning_title),
-            style = LumoVaultType.sectionHeader,
-        )
-        Text(
-            text = pluralStringResource(R.plurals.photos_scanning_progress, found, found),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 /**

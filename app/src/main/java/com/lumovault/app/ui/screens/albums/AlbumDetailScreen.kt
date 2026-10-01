@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,7 +56,9 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.ui.components.CollectAppMessages
+import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaCell
+import com.lumovault.app.ui.components.NoticeBanner
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
@@ -157,19 +158,19 @@ fun AlbumDetailScreen(
         )
 
         if (deletionUnsupported) {
-            NoticeBanner(stringResource(R.string.trash_delete_unsupported))
+            NoticeBanner(
+                text = stringResource(R.string.trash_delete_unsupported),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = GridSpacing, vertical = SpaceXs),
+            )
         }
 
         val loadedItems = state.items
         if (loadedItems == null) {
             // Room has not answered yet. "No items" here would be a false claim on every album open,
             // and a failed load would be indistinguishable from an empty album.
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
+            LoadingScreen(modifier = Modifier.weight(1f))
         } else {
             MediaGrid(
                 items = loadedItems,
@@ -607,25 +608,6 @@ private fun AddMediaSheet(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.album_cancel)) } },
     )
 }
-
-@Composable
-private fun NoticeBanner(text: String) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = GridSpacing, vertical = SpaceXs),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(SpaceMd),
-        )
-    }
-}
-
 
 /** Rows fetched ahead of the viewport edge, so scrolling never reaches a blank tail. */
 private const val LOAD_AHEAD = 24

@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -65,11 +64,13 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.restore.RestoreJob
+import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaGlyph
 import com.lumovault.app.ui.components.MediaPill
 import com.lumovault.app.ui.components.PillTone
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.components.StatusPill
+import com.lumovault.app.ui.components.WorkingScreen
 import com.lumovault.app.ui.screens.cloud.RestoreAction
 import com.lumovault.app.ui.screens.cloud.CloudUiState
 import com.lumovault.app.ui.screens.cloud.CloudViewModel
@@ -89,12 +90,9 @@ import com.lumovault.app.ui.theme.MediaBadgeInset
 import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
 import com.lumovault.app.ui.theme.OnMedia
-import com.lumovault.app.ui.theme.RingStrokeBold
-import com.lumovault.app.ui.theme.RingWaiting
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
-import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.ui.theme.SpaceXxl
 
@@ -138,9 +136,11 @@ fun CloudScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         when (val current = state) {
-            // Nothing asked for yet; drawing neither a spinner nor an empty state avoids a flash of
-            // "your cloud is empty" over a library that is already indexed.
-            CloudUiState.Idle -> Unit
+            // The first sync was asked for the moment this screen's ViewModel came up, and has not
+            // answered yet. The ring claims only that a question is pending — where silence left a
+            // blank frame, and where an empty state would flash "your cloud is empty" over a
+            // library that is already indexed.
+            CloudUiState.Idle -> LoadingScreen()
 
             CloudUiState.NotAvailable -> PlaceholderScreen(
                 title = stringResource(R.string.cloud_not_available_title),
@@ -164,12 +164,12 @@ fun CloudScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            is CloudUiState.Preparing -> Working(
+            is CloudUiState.Preparing -> WorkingScreen(
                 title = stringResource(R.string.cloud_preparing_title),
                 detail = stringResource(current.step.labelRes()),
             )
 
-            is CloudUiState.Scanning -> Working(
+            is CloudUiState.Scanning -> WorkingScreen(
                 title = stringResource(R.string.cloud_scanning_title),
                 detail = pluralStringResource(R.plurals.cloud_items_found, current.found, current.found),
             )
@@ -594,27 +594,6 @@ private fun CloudViewer(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun Working(title: String, detail: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = SpaceXl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpaceMd, Alignment.CenterVertically),
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(RingWaiting), strokeWidth = RingStrokeBold)
-        Text(text = title, style = LumoVaultType.sectionHeader)
-        // The count underneath is the reassuring part: a sync that shows a number going up is working, and a
-        // spinner alone cannot tell a first run from a stall.
-        Text(
-            text = detail,
-            style = LumoVaultType.sectionDetail,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

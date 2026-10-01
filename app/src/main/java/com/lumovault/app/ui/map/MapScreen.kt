@@ -59,6 +59,7 @@ import com.lumovault.app.domain.map.MapPlacement
 import com.lumovault.app.domain.map.MapPin
 import com.lumovault.app.util.openAppDetailsSettings
 import com.lumovault.app.domain.model.MapPhoto
+import com.lumovault.app.ui.components.NoticeBanner
 import java.text.DateFormat
 import java.util.Date
 import kotlin.coroutines.resume
@@ -302,11 +303,11 @@ fun MapScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (!viewModel.tilesConfigured) {
-            MapNotice(
+            NoticeBanner(
                 text = stringResource(R.string.map_tiles_unconfigured),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = SpaceSm),
+                    .padding(horizontal = SpaceMd, top = SpaceSm),
             )
         }
 
@@ -363,7 +364,7 @@ fun MapScreen(
                 }
             }
         } else if (!state.hasPins && state.extractionWaiting > 0) {
-            MapNotice(
+            NoticeBanner(
                 text = pluralStringResource(
                     R.plurals.map_finding_locations,
                     state.extractionWaiting,
@@ -371,14 +372,14 @@ fun MapScreen(
                 ),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = SpaceSm),
+                    .padding(horizontal = SpaceMd, top = SpaceSm),
             )
         } else if (!state.hasPins && state.placedCount == 0) {
-            MapNotice(
+            NoticeBanner(
                 text = stringResource(R.string.map_no_positions),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = SpaceSm),
+                    .padding(horizontal = SpaceMd, top = SpaceSm),
             )
         }
 
@@ -657,21 +658,6 @@ private fun StripThumbnail(
             .pointerInput(photo.mediaStoreId) { detectTapGestures { onClick() } },
         contentScale = ContentScale.Crop,
     )
-}
-
-@Composable
-private fun MapNotice(text: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.padding(horizontal = SpaceMd),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = SpaceMd, vertical = SpaceSm),
-        )
-    }
 }
 
 /** Photos the preview card can show behind a cluster. */

@@ -1,15 +1,13 @@
 package com.lumovault.app.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.onboarding.OnboardingFlow
 import com.lumovault.app.ui.theme.LumoVaultTheme
 
@@ -40,8 +38,6 @@ fun LumoVaultRoot(viewModel: LumoVaultViewModel = viewModel()) {
 @Composable
 private fun StartupSurface() {
     Surface(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        LoadingScreen()
     }
 }
