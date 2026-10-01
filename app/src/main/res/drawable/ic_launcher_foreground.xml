@@ -8,17 +8,17 @@
     <path
         android:name="frame"
         android:fillColor="#00000000"
-        android:strokeColor="#4C8DFF"
+        android:strokeColor="#4C7BFF"
         android:strokeWidth="4"
         android:pathData="M38,36 L70,36 A6,6 0 0 1 76,42 L76,70 A6,6 0 0 1 70,76 L38,76 A6,6 0 0 1 32,70 L32,42 A6,6 0 0 1 38,36 Z" />
 
     <path
         android:name="landscape"
-        android:fillColor="#4C8DFF"
+        android:fillColor="#4C7BFF"
         android:pathData="M37,71 L49,53 L57,63 L63,56 L71,71 Z" />
 
     <path
         android:name="sun"
-        android:fillColor="#9EC1FF"
+        android:fillColor="#9EB7FF"
         android:pathData="M60,46 a4.5,4.5 0 1,1 9,0 a4.5,4.5 0 1,1 -9,0" />
 </vector>

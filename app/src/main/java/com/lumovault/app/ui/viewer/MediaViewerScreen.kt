@@ -85,6 +85,7 @@ import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.ui.theme.SpaceXxs
+import com.lumovault.app.ui.theme.SyncingAccent
 
 /**
  * The full-screen viewer: one item, the list it came from, and what can be done to it.
@@ -533,8 +534,10 @@ private fun ViewerActionBar(
                     contentDescription = stringResource(ViewerFormatting.backupLabel(status)),
                     // An explicit tint bypasses the content alpha a disabled control gets by itself,
                     // so the dimming the "wait" state needs is spelled out: `Busy` disables the button
-                    // and the icon must look disabled with it.
+                    // and the icon must look disabled with it. Uploading leads because `Busy` is the
+                    // only action that carries that status, and it is the transfer's own mark: brandSky.
                     tint = when {
+                        status == ViewerBackupStatus.Uploading -> SyncingAccent.copy(alpha = DisabledContentAlpha)
                         !enabled -> OnMedia.copy(alpha = DisabledContentAlpha)
                         status == ViewerBackupStatus.BackedUp -> BackedUpAccent
                         else -> OnMedia

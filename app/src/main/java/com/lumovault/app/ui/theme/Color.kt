@@ -2,29 +2,51 @@ package com.lumovault.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+/*
+ * The brand palette, named for the design spec (app_colors.dart). brandIndigo is the seed the whole
+ * Material scheme is built from: every hue-bearing role below carries the seed's hue (224.3 degrees,
+ * rotated from the blues the scheme shipped with), while each role's tone stays where it was — the
+ * tones are what `ThemePaletteTest` encodes as ramp ordering and WCAG floors, and a re-hue must not
+ * quietly renegotiate those. brandSky is the spec's own literal and keeps the hue the spec drew it
+ * at (a lighter, slightly cyan step off the seed); only the scheme's roles are rotated. The error
+ * family, the scrims and the thumbnail accents are out of the scheme by design and are never rotated.
+ */
+internal val BrandIndigo = Color(0xFF2B5CE6)
+
+/** The spec's lighter sky-blue: the step between the seed and white, available to UI that needs
+ * the brand without the seed's weight. */
+internal val BrandSky = Color(0xFF4FA8FF)
+
+/** The spec's `syncing` role, equal to [BrandSky] by the spec's own note. In-flight upload and
+ * transfer marks only — a queue ring, a restore bar, a viewer's load spinner — never generic busy
+ * work, and never a mark drawn over a photograph: at 0x8C over a white sky it lands near 1.9:1,
+ * below the floor `ThemePaletteTest` holds white glyphs to, which is why badges stay white. */
+internal val SyncingAccent = BrandSky
+
 // Dark scheme: black + dark blue surfaces, blue accents (PRD section 44).
 internal val DarkBackground = Color(0xFF05070D)
-internal val DarkSurface = Color(0xFF0C1220)
-internal val DarkSurfaceVariant = Color(0xFF16203A)
-internal val DarkOnSurface = Color(0xFFE6EDF8)
-internal val DarkOnSurfaceVariant = Color(0xFFA9B7CE)
-internal val DarkPrimary = Color(0xFF4C8DFF)
-internal val DarkOnPrimary = Color(0xFF001429)
-internal val DarkPrimaryContainer = Color(0xFF1B3A67)
-internal val DarkOnPrimaryContainer = Color(0xFFCFE0FF)
-internal val DarkOutline = Color(0xFF6E7F9E)
+internal val DarkSurface = Color(0xFF0C1120)
+internal val DarkSurfaceVariant = Color(0xFF161F3A)
+internal val DarkOnSurface = Color(0xFFE6EBF8)
+internal val DarkOnSurfaceVariant = Color(0xFFA9B3CE)
+internal val DarkPrimary = Color(0xFF4C7BFF)
+internal val DarkOnPrimary = Color(0xFF000B29)
+internal val DarkPrimaryContainer = Color(0xFF1B2F67)
+internal val DarkOnPrimaryContainer = Color(0xFFCFDCFF)
+internal val DarkOutline = Color(0xFF6E7B9E)
 
-// Light scheme: white + light blue surfaces, the same blue accent family.
+// Light scheme: white + light blue surfaces, the same blue accent family. The primary is the seed
+// itself: the brand colour should be what a light-scheme button wears.
 internal val LightBackground = Color(0xFFFFFFFF)
-internal val LightSurface = Color(0xFFF4F8FF)
-internal val LightSurfaceVariant = Color(0xFFDCE9FA)
-internal val LightOnSurface = Color(0xFF0C1420)
-internal val LightOnSurfaceVariant = Color(0xFF43526B)
-internal val LightPrimary = Color(0xFF0F5FD8)
+internal val LightSurface = Color(0xFFF4F7FF)
+internal val LightSurfaceVariant = Color(0xFFDCE4FA)
+internal val LightOnSurface = Color(0xFF0C1120)
+internal val LightOnSurfaceVariant = Color(0xFF434D6B)
+internal val LightPrimary = BrandIndigo
 internal val LightOnPrimary = Color(0xFFFFFFFF)
-internal val LightPrimaryContainer = Color(0xFFD3E3FF)
-internal val LightOnPrimaryContainer = Color(0xFF00296B)
-internal val LightOutline = Color(0xFF66748C)
+internal val LightPrimaryContainer = Color(0xFFD3DFFF)
+internal val LightOnPrimaryContainer = Color(0xFF001C6B)
+internal val LightOutline = Color(0xFF66708C)
 
 /*
  * The raised-surface ramp, in both schemes.
@@ -42,24 +64,24 @@ internal val LightOutline = Color(0xFF66748C)
  * and a dialog respectively need.
  */
 internal val DarkSurfaceContainerLowest = Color(0xFF010307)
-internal val DarkSurfaceDim = Color(0xFF060A12)
+internal val DarkSurfaceDim = Color(0xFF060912)
 internal val DarkSurfaceContainerLow = Color(0xFF0B1120)
-internal val DarkSurfaceContainer = Color(0xFF101828)
-internal val DarkSurfaceContainerHigh = Color(0xFF16203A)
-internal val DarkSurfaceContainerHighest = Color(0xFF1D2B4A)
-internal val DarkSurfaceBright = Color(0xFF24334F)
+internal val DarkSurfaceContainer = Color(0xFF101628)
+internal val DarkSurfaceContainerHigh = Color(0xFF161F3A)
+internal val DarkSurfaceContainerHighest = Color(0xFF1D294A)
+internal val DarkSurfaceBright = Color(0xFF242F4F)
 
 /** Hairlines and dividers: quieter than [DarkOutline], which is the icon colour and has to stay at 3:1. */
-internal val DarkOutlineVariant = Color(0xFF3E4C68)
+internal val DarkOutlineVariant = Color(0xFF3E4968)
 
 internal val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
-internal val LightSurfaceBright = Color(0xFFFBFDFF)
-internal val LightSurfaceContainerLow = Color(0xFFF8FBFF)
-internal val LightSurfaceContainer = Color(0xFFEFF5FD)
-internal val LightSurfaceContainerHigh = Color(0xFFE6EEF9)
-internal val LightSurfaceContainerHighest = Color(0xFFDCE9FA)
-internal val LightSurfaceDim = Color(0xFFD3E0F1)
-internal val LightOutlineVariant = Color(0xFFC3CFE0)
+internal val LightSurfaceBright = Color(0xFFFBFCFF)
+internal val LightSurfaceContainerLow = Color(0xFFF8FAFF)
+internal val LightSurfaceContainer = Color(0xFFEFF3FD)
+internal val LightSurfaceContainerHigh = Color(0xFFE6EBF9)
+internal val LightSurfaceContainerHighest = Color(0xFFDCE4FA)
+internal val LightSurfaceDim = Color(0xFFD3DBF1)
+internal val LightOutlineVariant = Color(0xFFC3CBE0)
 
 // Drawn on top of a photograph, so these cannot come from the colour scheme: a surface colour chosen for a
 // dark or light app background is the wrong value for a badge over whatever the user's picture happens to be.
@@ -113,10 +135,10 @@ internal val DarkOnErrorContainer = Color(0xFFF9DEDC)
  * scheme, was almost white over the user's own photographs. These match the badge family the rest of
  * the media surfaces use: a dark blue-tinted chip with the scheme's own text colour on it.
  */
-internal val DarkInverseSurface = Color(0xFF2A3140)
-internal val DarkOnInverseSurface = Color(0xFFE6EDF8)
-internal val LightInverseSurface = Color(0xFF253A57)
-internal val LightOnInverseSurface = Color(0xFFEDF2FB)
+internal val DarkInverseSurface = Color(0xFF2A3040)
+internal val DarkOnInverseSurface = Color(0xFFE6EBF8)
+internal val LightInverseSurface = Color(0xFF253257)
+internal val LightOnInverseSurface = Color(0xFFEDF1FB)
 
 /*
  * The secondary roles, which were never defined at all.
@@ -134,14 +156,14 @@ internal val LightOnInverseSurface = Color(0xFFEDF2FB)
  * existing `onSurface` as its label colour — the pairing is then inherited from a text colour the palette test
  * already proves legible on every surface, instead of being a new value nobody checked.
  */
-internal val DarkSecondary = Color(0xFFB7C3D6)
-internal val DarkOnSecondary = Color(0xFF233046)
-internal val DarkSecondaryContainer = Color(0xFF3B4A66)
+internal val DarkSecondary = Color(0xFFB7BFD6)
+internal val DarkOnSecondary = Color(0xFF232C46)
+internal val DarkSecondaryContainer = Color(0xFF3B4666)
 internal val DarkOnSecondaryContainer = DarkOnSurface
 
-internal val LightSecondary = Color(0xFF4A6289)
+internal val LightSecondary = Color(0xFF4A5B89)
 internal val LightOnSecondary = Color(0xFFFFFFFF)
-internal val LightSecondaryContainer = Color(0xFFB0C6E2)
+internal val LightSecondaryContainer = Color(0xFFB0BDE2)
 internal val LightOnSecondaryContainer = LightOnSurface
 
 /**

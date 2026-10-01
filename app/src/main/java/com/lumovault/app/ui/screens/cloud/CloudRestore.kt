@@ -23,6 +23,7 @@ import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RingStroke
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
+import com.lumovault.app.ui.theme.SyncingAccent
 import com.lumovault.app.util.toByteText
 
 /**
@@ -81,7 +82,11 @@ internal fun RestoreAction(
                     horizontalArrangement = Arrangement.spacedBy(SpaceMd),
                 ) {
                     if (live != null) {
-                        CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(MarkInline),
+                            color = SyncingAccent,
+                            strokeWidth = RingStroke,
+                        )
                     }
                     Text(
                         text = stringResource(label),
@@ -99,7 +104,11 @@ internal fun RestoreAction(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(MarkInline),
+                    color = SyncingAccent,
+                    strokeWidth = RingStroke,
+                )
                 Text(
                     text = job.progressText(),
                     style = MaterialTheme.typography.bodyMedium,

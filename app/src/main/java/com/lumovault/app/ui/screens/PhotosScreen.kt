@@ -92,6 +92,7 @@ import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
+import com.lumovault.app.ui.theme.SyncingAccent
 
 /**
  * The local library. It reads one value — [PhotosUiState] — and draws that, so a combination the
@@ -337,7 +338,11 @@ private fun BackupBar(
                         modifier = Modifier.weight(1f),
                     )
                     if (summary.inFlight > 0) {
-                        CircularProgressIndicator(modifier = Modifier.size(MarkInline), strokeWidth = RingStroke)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(MarkInline),
+                            color = SyncingAccent,
+                            strokeWidth = RingStroke,
+                        )
                     }
                     TextButton(onClick = onCancel) {
                         Text(stringResource(R.string.backup_cancel))

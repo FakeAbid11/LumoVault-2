@@ -34,6 +34,7 @@ import coil3.size.Size
 import com.lumovault.app.R
 import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.SpaceXxl
+import com.lumovault.app.ui.theme.SyncingAccent
 
 /**
  * One image, at the size it was taken, under the user's fingers.
@@ -171,7 +172,7 @@ fun ZoomableImage(
             contentScale = ContentScale.Fit,
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = SyncingAccent)
                 }
             },
             error = {

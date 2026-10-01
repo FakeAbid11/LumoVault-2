@@ -51,6 +51,7 @@ import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXl
 import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.ui.theme.SpaceXxs
+import com.lumovault.app.ui.theme.SyncingAccent
 import com.lumovault.app.util.formatDuration
 import kotlinx.coroutines.delay
 
@@ -249,7 +250,7 @@ fun VideoStage(
             if (machine.loading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(RingWaiting),
-                    color = OnMedia,
+                    color = SyncingAccent,
                 )
             }
         }
