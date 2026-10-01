@@ -108,13 +108,15 @@ fun OnboardingFlow(
         navController = navController,
         startDestination = OnboardingStep.Start,
         modifier = modifier,
-        // The app's motion, not this flow's — the main graph calls the same four functions, so a screen
-        // change looks like the same event whether it starts here or in the library. The shape itself
-        // lives in ui/navigation/NavMotion.kt, with the reasoning for its timings.
+        // The app's motion, not this flow's — the main graph calls the same functions, so every route
+        // here takes the pushed-screen shape and a step change looks like the same event wherever it
+        // starts. The rules live in ui/navigation/NavMotion.kt, with the reasoning for their timings.
         enterTransition = { navEnterTransition() },
         exitTransition = { navExitTransition() },
         popEnterTransition = { navPopEnterTransition() },
         popExitTransition = { navPopExitTransition() },
+        predictivePopEnterTransition = { navPopEnterTransition() },
+        predictivePopExitTransition = { navPopExitTransition() },
     ) {
         composable(OnboardingStep.Welcome.route) {
             WelcomeScreen(onGetStarted = { navController.navigate(OnboardingStep.HowItWorks.route) })

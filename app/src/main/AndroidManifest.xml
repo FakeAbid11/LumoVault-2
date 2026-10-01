@@ -53,10 +53,15 @@
     <!--
         Backup rules are meaningful now that TDLib writes a session to app-private storage: the
         session must never leave the device, while the harmless settings row may.
+
+        The back flag opts into the system's gesture dispatch, which is what lets an edge swipe
+        drive NavHost's predictive transitions frame by frame instead of committing instantly.
+        Below Android 13 the flag is ignored and back behaves as it always has.
     -->
     <application
         android:name=".LumoVaultApplication"
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
