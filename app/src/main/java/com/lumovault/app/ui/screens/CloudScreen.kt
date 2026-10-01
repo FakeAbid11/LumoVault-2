@@ -528,6 +528,9 @@ private fun CloudViewer(
     // it has not even returned.
     var previewAttempted by remember(item.messageId) { mutableStateOf(false) }
 
+    // Resolved here because the semantics lambda below is not a composable context.
+    val closeLabel = stringResource(R.string.viewer_close)
+
     LaunchedEffect(item) {
         previewPath = awaitPreview(item, previewPathFor)
         previewAttempted = true
@@ -545,7 +548,7 @@ private fun CloudViewer(
             modifier = Modifier
                 .matchParentSize()
                 .background(FullScreenScrim)
-                .semantics { contentDescription = stringResource(R.string.viewer_close) }
+                .semantics { contentDescription = closeLabel }
                 .clickable(role = Role.Button, onClick = onDismiss),
         )
         Surface(
