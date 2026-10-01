@@ -82,6 +82,18 @@ interface MediaDao {
     suspend fun pruneBefore(scanId: Long): Int
 
     /**
+     * The highest scan id any surviving row carries, or 0 on an empty index.
+     *
+     * The scan id is a clock reading and the prune is `last_seen_scan_id < :scanId`, so a scan's id has to
+     * exceed every tag the previous scan left or the prune matches nothing. A clock that moves backwards (a
+     * user changing the date) would mint a smaller id than the existing tags, no row would be `< scanId`, and
+     * every file that left the device would stay in the index as a ghost. Read the current maximum and never
+     * issue an id at or below it, and the tag stays monotonic across a clock change.
+     */
+    @Query("SELECT COALESCE(MAX(last_seen_scan_id), 0) FROM media")
+    suspend fun maxScanId(): Long
+
+    /**
      * Removes specific items from the index, for the one case where the file itself is known to be gone:
      * Android confirmed a deletion LumoVault asked for.
      *

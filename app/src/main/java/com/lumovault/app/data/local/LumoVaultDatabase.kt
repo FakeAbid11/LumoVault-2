@@ -72,7 +72,7 @@ abstract class LumoVaultDatabase : RoomDatabase() {
 
     /**
      * Query-only: Free Up Space reads five tables and owns none, so it adds no entity and no
-     * schema step. The database version stays at 9 for that reason.
+     * schema step of its own.
      */
     abstract fun freeUpSpaceDao(): FreeUpSpaceDao
 

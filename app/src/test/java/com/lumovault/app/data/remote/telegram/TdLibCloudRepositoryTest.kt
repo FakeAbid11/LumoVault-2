@@ -402,6 +402,80 @@ class TdLibCloudRepositoryTest {
         )
     }
 
+    /**
+     * A failure that is not "gone" must not read as "gone".
+     *
+     * `NotFound` is the verdict whose reaction is to drop the saved association and rediscover — which for
+     * a momentary network refusal throws away a channel that is still perfectly valid. The distinction is
+     * the same one discovery already draws between an answer and an absence: only a *successful* read that
+     * says the chat is missing may report [CloudChannelVerdict.NotFound]; anything the request layer could
+     * not answer has to come back as a failure the caller can retry.
+     */
+    @Test
+    fun `a supergroup lookup that failed is a failure, not an absent channel`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.GetChat ->
+                    chat(9L, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 9)
+                function is TdApi.GetSupergroup ->
+                    throw TelegramRequestException(code = 500, reason = "Internal Server Error")
+                else -> TdApi.Ok()
+            }
+        }
+
+        val failure = runBlocking {
+            runCatching { repository.validateChannel(9L) }.exceptionOrNull()
+        } as CloudFailureException
+        assertEquals(CloudFailure.Kind.RequestFailed, failure.failure.kind)
+    }
+
+    /**
+     * A marker probe that could not be answered is not a channel without a marker.
+     *
+     * [CloudChannelVerdict.MarkerMissing] is the one verdict that must never be adopted over — the right
+     * name, but not ours. Reporting a transient refusal as `MarkerMissing` therefore conflates "do not
+     * adopt this" with "could not tell", and the two demand opposite reactions from the caller.
+     */
+    @Test
+    fun `a marker probe that failed is a failure, not a missing marker`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.GetChat ->
+                    chat(9L, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 9)
+                function is TdApi.GetSupergroup -> supergroupOwnedBy(TdApi.ChatMemberStatusCreator())
+                function is TdApi.GetSupergroupFullInfo ->
+                    throw TelegramRequestException(code = 500, reason = "Internal Server Error")
+                else -> TdApi.Ok()
+            }
+        }
+
+        val failure = runBlocking {
+            runCatching { repository.validateChannel(9L) }.exceptionOrNull()
+        } as CloudFailureException
+        assertEquals(CloudFailure.Kind.RequestFailed, failure.failure.kind)
+    }
+
+    /** A verdict is a claim about a channel, and a claim needs an answer: the empty description is one. */
+    @Test
+    fun `a channel whose description and history carry no marker is MarkerMissing`() {
+        client.answer = { function ->
+            when {
+                function is TdApi.GetChat ->
+                    chat(9L, LumoVaultStorageProtocol.CHANNEL_TITLE, supergroupId = 9)
+                function is TdApi.GetSupergroup -> supergroupOwnedBy(TdApi.ChatMemberStatusCreator())
+                function is TdApi.GetSupergroupFullInfo ->
+                    TdApi.SupergroupFullInfo().apply { description = "a plain channel" }
+                function is TdApi.GetChatHistory -> TdApi.Messages().apply { messages = emptyArray() }
+                else -> TdApi.Ok()
+            }
+        }
+
+        assertEquals(
+            CloudChannelVerdict.MarkerMissing,
+            runBlocking { repository.validateChannel(9L) },
+        )
+    }
+
     @Test
     fun `the marker is written to the description and as the first message`() {
         val createdId = 77L

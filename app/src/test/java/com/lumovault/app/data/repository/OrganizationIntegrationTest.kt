@@ -1,6 +1,7 @@
 package com.lumovault.app.data.repository
 
 import com.lumovault.app.data.local.backup.FakeBackupQueueDao
+import com.lumovault.app.data.local.metadata.FakeMediaMetadataDao
 import com.lumovault.app.data.local.organization.FakeAlbumDao
 import com.lumovault.app.data.local.organization.FakeMediaDao
 import com.lumovault.app.data.local.organization.FakeMediaOrganizationDao
@@ -33,6 +34,7 @@ class OrganizationIntegrationTest {
     private val organization = FakeMediaOrganizationDao(store)
     private val albums = FakeAlbumDao(store)
     private val systemAlbums = FakeSystemAlbumDao(store)
+    private val metadata = FakeMediaMetadataDao(store)
     private val queue = FakeBackupQueueDao()
 
     private val albumRepository: AlbumRepository =
@@ -43,6 +45,7 @@ class OrganizationIntegrationTest {
         systemAlbums = systemAlbums,
         media = media,
         albums = albums,
+        metadata = metadata,
         nowSeconds = { NOW },
         inTransaction = { block -> block() },
     )

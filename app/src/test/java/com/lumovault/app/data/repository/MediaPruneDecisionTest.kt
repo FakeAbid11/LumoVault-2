@@ -156,6 +156,31 @@ class MediaPruneDecisionTest {
     }
 
     @Test
+    fun aClockThatMovedBackwardsStillPrunesWhatLeftTheDevice() = runBlocking {
+        // Every row already carries a tag far in the future — as though a scan once ran with a clock that was
+        // later corrected. A scan id taken from the wall clock alone would now be *smaller* than these tags,
+        // no row would satisfy `last_seen_scan_id < scanId`, and the file that left the device would sit in the
+        // index as a ghost the user can still see and the app will still offer to back up.
+        val futureTag = System.currentTimeMillis() + 10_000_000_000L
+        indexLibraryOf(1L, 2L, 3L)
+        (1L..3L).forEach { id -> store.media[id] = store.media.getValue(id).copy(lastSeenScanId = futureTag) }
+
+        val result = repository(
+            answering { scanId ->
+                assertTrue(
+                    "the new scan id has to exceed every tag already in the index, or nothing can be pruned",
+                    scanId > futureTag,
+                )
+                MediaIndexScan.Found(listOf(1L, 2L).map { id -> store.media.getValue(id).copy(lastSeenScanId = scanId) })
+            },
+        ).sync()
+
+        assertTrue(result.reconciled)
+        assertEquals(1, result.removed)
+        assertFalse("the ghost is pruned even though the clock went backwards", store.media.containsKey(3L))
+    }
+
+    @Test
     fun onlyAnInconclusiveScanRefusesToRemoveRows() {
         // The two cases that look identical as a list and are not identical at the prune.
         assertTrue(MediaIndexScan.Found(listOf<MediaEntity>()).prunesIndex())

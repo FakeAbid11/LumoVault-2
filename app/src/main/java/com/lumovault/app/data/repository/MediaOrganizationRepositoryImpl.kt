@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
+import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.organization.AlbumDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.data.local.organization.LocalFolderRow
@@ -35,9 +36,10 @@ class MediaOrganizationRepositoryImpl(
     private val systemAlbums: SystemAlbumDao,
     private val media: MediaDao,
     private val albums: AlbumDao,
+    private val metadata: MediaMetadataDao,
     private val nowSeconds: () -> Long,
     /**
-     * Runs [forgetDeletedLocally]'s three writes as one statement group. Supplied rather than reached for
+     * Runs [forgetDeletedLocally]'s four writes as one statement group. Supplied rather than reached for
      * because the alternative was a database handle in a class whose decisions are testable without one;
      * the container wires it to `RoomDatabase.withTransaction`.
      */
@@ -134,7 +136,10 @@ class MediaOrganizationRepositoryImpl(
      * in the user's channel — PRD section 72 treats "local + cloud becomes cloud only" as the intended
      * outcome, and the Phase 6 record is what still resolves that photo to its message. The media row
      * does go, because the thing it described is gone; the organisation goes with it, because there is
-     * nothing left to favourite, archive or restore.
+     * nothing left to favourite, archive or restore. The EXIF row goes too: it belongs to the file, not
+     * to a media row, so a position read out of a photograph nobody still has is worth nothing — the
+     * per-scan `cleanupOrphans` sweep would eventually catch it, but only after a full scan, and the
+     * metadata for a file the app itself deleted is stale the moment the confirmation lands.
      */
     override suspend fun forgetDeletedLocally(mediaStoreIds: Collection<Long>) {
         if (mediaStoreIds.isEmpty()) return
@@ -142,9 +147,10 @@ class MediaOrganizationRepositoryImpl(
             // Chunked *inside* the transaction, not before it: "empty the Trash" hands this every trashed
             // id at once, and SQLite's ceiling on bind parameters is a property of the statement rather than
             // of how the list was built. Keeping one transaction means a library of any size still clears a
-            // row, its organisation and its memberships together.
+            // row, its organisation, its metadata and its memberships together.
             mediaStoreIds.chunked(MAX_IDS_PER_QUERY).forEach { chunk ->
                 organization.clearFor(chunk)
+                metadata.clearFor(chunk)
                 albums.removeFromEveryAlbum(chunk)
                 media.deleteByIds(chunk)
             }

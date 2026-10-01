@@ -192,7 +192,7 @@ internal fun TelegramRequestException.toBackupFailure(): BackupFailure {
     val kind = when {
         // [TdLibClient]'s own marker, not a TDLib token: nothing came back, which is a network
         // condition rather than a rejection.
-        reason == TIMED_OUT -> BackupFailureKind.Network
+        reason == TDLIB_TIMED_OUT -> BackupFailureKind.Network
 
         token.startsWith("FLOOD_WAIT") || token.contains("SLOWMODE") -> BackupFailureKind.RateLimited
 
@@ -217,9 +217,6 @@ internal fun TelegramRequestException.toBackupFailure(): BackupFailure {
     }
     return BackupFailure(kind)
 }
-
-/** Mirrors [TdLibClient]'s private timeout marker, which is a token rather than a TDLib answer. */
-private const val TIMED_OUT = "TDLIB_TIMED_OUT"
 
 /** TDLib's media durations are whole seconds; MediaStore's are milliseconds. */
 private val UploadRequest.durationSeconds: Int

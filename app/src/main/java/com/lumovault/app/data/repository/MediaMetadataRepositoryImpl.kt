@@ -40,12 +40,23 @@ class MediaMetadataRepositoryImpl(
         ).map { rows -> rows.map(MapPhotoRow::toMapPhoto) }
 
     override suspend fun mapPhotos(mediaStoreIds: Collection<Long>, limit: Int): List<MapPhoto> {
-        // Bounded before the query, not after: `IN (:ids)` binds a parameter per id, and SQLite's limit is
-        // in the low hundreds — a city cluster can name a thousand photos, so the slice is what keeps this
-        // a query rather than a crash.
+        // Chunked rather than truncated. `IN (:ids)` binds a parameter per id and SQLite stops in the low
+        // hundreds, but the previous `.take(MAX_IDS_PER_QUERY)` threw the rest away *before* the query, so a
+        // cluster bigger than one chunk silently lost whichever photos happened to sort past the cut. Asking
+        // each chunk for its own top `limit` and merging is the ceiling-safe form, and it is exact: the
+        // global top-`limit` is always contained in the union of the per-chunk top-`limit`s.
         if (mediaStoreIds.isEmpty()) return emptyList()
-        val ids = mediaStoreIds.take(MAX_IDS_PER_QUERY)
-        return mediaMetadata.photosWithIds(ids, limit).map(MapPhotoRow::toMapPhoto)
+        val merged = mediaStoreIds.chunked(MAX_IDS_PER_QUERY).flatMap { chunk ->
+            mediaMetadata.photosWithIds(chunk, limit).map(MapPhotoRow::toMapPhoto)
+        }
+        // The DAO's own ordering, re-applied across the merge: each chunk came back sorted, but the chunks
+        // have to be woven back into one sequence or the merged list would be grouped by chunk.
+        return merged
+            .sortedWith(
+                compareByDescending<MapPhoto> { it.dateTakenSeconds ?: it.dateAddedSeconds }
+                    .thenByDescending { it.mediaStoreId },
+            )
+            .take(limit)
     }
 
     override fun observeLocatedCount(): Flow<Int> = mediaMetadata.observeLocatedCount()
@@ -83,9 +94,6 @@ class MediaMetadataRepositoryImpl(
 
     override suspend fun pendingExtractionCount(): Int = mediaMetadata.pendingExtractionCount()
 
-    override suspend fun forgetDeleted(mediaStoreIds: Collection<Long>): Int =
-        if (mediaStoreIds.isEmpty()) 0 else mediaMetadata.clearFor(mediaStoreIds)
-
     override suspend fun discardUnlocatedReads(): Int = mediaMetadata.discardUnlocatedReads()
 
     private fun MediaMetadataEntity.toMetadata(): MediaMetadata = MediaMetadata(
@@ -101,10 +109,6 @@ class MediaMetadataRepositoryImpl(
         isoSpeed = isoSpeed,
         shutterSeconds = shutterSeconds,
     )
-
-    private companion object {
-        /** Comfortably under SQLite's parameter ceiling, and far more than a preview strip can draw. */
-    }
 }
 
 private fun LocatedBoundsRow.toLocatedBounds(): LocatedBounds = LocatedBounds(

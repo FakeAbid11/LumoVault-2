@@ -57,6 +57,8 @@ class FakeMediaDao(private val store: OrganizationStore) : MediaDao {
         return stale.size
     }
 
+    override suspend fun maxScanId(): Long = store.media.values.maxOfOrNull { it.lastSeenScanId } ?: 0L
+
     override suspend fun deleteByIds(ids: Collection<Long>): Int {
         val matching = ids.filter { store.media.containsKey(it) }
         matching.forEach { store.media.remove(it) }

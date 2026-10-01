@@ -175,6 +175,10 @@ class AppContainer(context: Context) {
             systemAlbums = systemAlbumDao,
             media = database.mediaDao(),
             albums = albumDao,
+            // A confirmed local deletion takes the file's EXIF row with it — the same sweep that clears
+            // the media row, its organisation and its memberships. Without this the map kept a position
+            // for a photograph the user had just deleted until a later full scan's orphan sweep ran.
+            metadata = mediaMetadataDao,
             nowSeconds = ::unixNow,
             inTransaction = { block -> database.withTransaction(block) },
         )

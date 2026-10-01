@@ -1,6 +1,8 @@
 package com.lumovault.app.data.repository
 
 import com.lumovault.app.data.local.backup.FakeBackupQueueDao
+import com.lumovault.app.data.local.metadata.FakeMediaMetadataDao
+import com.lumovault.app.data.local.metadata.MediaMetadataEntity
 import com.lumovault.app.data.local.organization.AlbumEntity
 import com.lumovault.app.data.local.organization.FakeAlbumDao
 import com.lumovault.app.data.local.organization.FakeMediaDao
@@ -34,6 +36,7 @@ class MediaOrganizationRepositoryTest {
     private val organization = FakeMediaOrganizationDao(store)
     private val albums = FakeAlbumDao(store)
     private val systemAlbums = FakeSystemAlbumDao(store)
+    private val metadata = FakeMediaMetadataDao(store)
     private val queue = FakeBackupQueueDao()
 
     private var clock = NOW
@@ -42,6 +45,7 @@ class MediaOrganizationRepositoryTest {
         systemAlbums = systemAlbums,
         media = media,
         albums = albums,
+        metadata = metadata,
         nowSeconds = { clock },
         inTransaction = { block -> block() },
         recentlyAddedWindowSeconds = RECENT_WINDOW,
@@ -204,6 +208,9 @@ class MediaOrganizationRepositoryTest {
         albums.addMembers(albumId, listOf(1L, 2L), 1L)
         repository.setFavorite(listOf(1L), true)
         repository.moveToTrash(listOf(1L))
+        // A position read out of photo 1 and photo 2: the deletion must take 1's with it and leave 2's.
+        store.metadata[1L] = MediaMetadataEntity(mediaStoreId = 1L, latitude = 52.5, longitude = 13.4, extractedAt = 1L)
+        store.metadata[2L] = MediaMetadataEntity(mediaStoreId = 2L, latitude = 52.6, longitude = 13.5, extractedAt = 1L)
         queue.withMedia(1L)
         queue.insertMissing(listOf(1L), UploadState.Queued.storageKey, 7L)
         queue.recordIdentity(
@@ -219,6 +226,12 @@ class MediaOrganizationRepositoryTest {
 
         assertNull("the index row is gone", store.media[1L])
         assertNull("so is its organisation", store.organizationOf(1L))
+        assertNull("and its EXIF row, which belonged to the file and not to a row that outlived it", store.metadata[1L])
+        assertEquals(
+            "the other photo's position is untouched",
+            listOf(2L),
+            store.metadata.keys.toList(),
+        )
         assertEquals(
             "its membership is gone, and the other item's is not",
             listOf(2L),

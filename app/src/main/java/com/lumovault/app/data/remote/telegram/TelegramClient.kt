@@ -53,3 +53,14 @@ class TelegramRequestException(
     val code: Int,
     val reason: String,
 ) : Exception("TDLib request failed (code $code): $reason")
+
+/**
+ * The [TelegramRequestException.reason] a request carries when no answer arrived at all.
+ *
+ * Not a TDLib token: [TelegramRequestException] guarantees its `reason` is Telegram's machine text, so a
+ * marker of the client's own has to be distinguishable from one — this is it. It lives here, beside the
+ * exception it is set on, because three files compare against it ([TdLibClient] raises it and the upload
+ * and original mappers read it) and three private copies had to agree by convention rather than by the
+ * compiler.
+ */
+internal const val TDLIB_TIMED_OUT = "TDLIB_TIMED_OUT"

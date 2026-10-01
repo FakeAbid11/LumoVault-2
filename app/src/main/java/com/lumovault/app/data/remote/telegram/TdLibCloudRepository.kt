@@ -65,10 +65,23 @@ class TdLibCloudRepository(
             val candidates = askForCandidates()
             if (!candidates.answered) telegramFailed = true
 
-            val valid = candidates.chatIds.filter { chatId ->
-                val verdict = validateChannel(chatId)
-                if (verdict is CloudChannelVerdict.Valid) Log.i(TAG, "CLOUD_CHANNEL_CANDIDATE_FOUND chat_id=$chatId")
-                verdict is CloudChannelVerdict.Valid
+            val valid = mutableListOf<Long>()
+            for (chatId in candidates.chatIds) {
+                val verdict = try {
+                    validateChannel(chatId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: CloudFailureException) {
+                    // A candidate whose ownership or marker could not be read is not a *rejected* candidate,
+                    // and it is certainly not evidence of absence. Recording it as a failed round is what
+                    // keeps discovery retryable and stops creation, which is the whole point of [InProgress].
+                    telegramFailed = true
+                    continue
+                }
+                if (verdict is CloudChannelVerdict.Valid) {
+                    Log.i(TAG, "CLOUD_CHANNEL_CANDIDATE_FOUND chat_id=$chatId")
+                    valid += chatId
+                }
             }
 
             if (valid.isNotEmpty()) {
@@ -213,7 +226,11 @@ class TdLibCloudRepository(
 
         val supergroupId = TdCloudMapper.supergroupIdOf(chat) ?: return CloudChannelVerdict.NotAChannel
 
-        val supergroup = requestOrNull(getSupergroup(supergroupId)) ?: return CloudChannelVerdict.NotFound
+        // Ownership is the check that makes adoption safe, so a failed read of the supergroup must not be
+        // reported as absence. `requestOrNull` used to swallow the error into `null`, which this line read
+        // as `NotFound` — the verdict the caller reacts to by dropping the saved association, which is the
+        // wrong answer to a momentary network failure. Only a successful read may decide anything here.
+        val supergroup = request(getSupergroup(supergroupId))
         if (!TdCloudMapper.isOwnedByMe(supergroup)) return CloudChannelVerdict.NotOwned
 
         val version = markerVersion(chatId, supergroupId)
@@ -275,24 +292,21 @@ class TdLibCloudRepository(
      * a given id, so a page requested from [EARLIEST_PROBE_ID] returns the earliest messages a
      * channel can have. The description is checked first because it costs one request and does not
      * depend on message ids being dense.
+     *
+     * A failure of either read propagates: `MarkerMissing` is a *verdict* — the channel is not ours and
+     * must never be adopted over — so it may only come from an answer that actually arrived and carried
+     * no marker. A transient refusal reported as `MarkerMissing` would be indistinguishable from the one
+     * case that must block adoption, and the two need opposite reactions.
      */
     private suspend fun markerVersion(chatId: Long, supergroupId: Long): Int? {
-        val fullInfo = requestOrNull(supergroupFullInfo(supergroupId))
-        if (fullInfo != null) {
-            TdCloudMapper.markerVersionInDescription(TdCloudMapper.descriptionOf(fullInfo))?.let { return it }
-        }
+        val fullInfo = request(supergroupFullInfo(supergroupId))
+        TdCloudMapper.markerVersionInDescription(TdCloudMapper.descriptionOf(fullInfo))?.let { return it }
         return probeHistory(chatId)
     }
 
-    private suspend fun probeHistory(chatId: Long): Int? = try {
-        val response = client.request(chatHistory(chatId, EARLIEST_PROBE_ID, MAX_PAGE))
-        TdCloudMapper.markerVersionIn(response.messages.asList())
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (error: TelegramRequestException) {
-        null
-    } catch (error: Exception) {
-        throw CloudFailureException(CloudFailure(CloudFailure.Kind.RequestFailed), error)
+    private suspend fun probeHistory(chatId: Long): Int? {
+        val response = request(chatHistory(chatId, EARLIEST_PROBE_ID, MAX_PAGE))
+        return TdCloudMapper.markerVersionIn(response.messages.asList())
     }
 
     /**
@@ -357,15 +371,6 @@ class TdLibCloudRepository(
         request.replyMarkup = null
         request.inputMessageContent = content
         return request
-    }
-
-    /** A failed informational request means an absent field, not a failed validation. */
-    private suspend fun <T : TdApi.Object> requestOrNull(function: TdApi.Function<T>): T? = try {
-        client.request(function)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (error: Exception) {
-        null
     }
 
     private suspend fun <T : TdApi.Object> request(function: TdApi.Function<T>): T = try {

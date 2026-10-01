@@ -25,9 +25,10 @@ interface MediaMetadataDao {
     /**
      * Replaces this item's metadata wholesale.
      *
-     * `@Upsert` is `INSERT OR REPLACE`, which is correct here and nowhere else in this schema: this row is
-     * written only by the extraction pass, so a rewrite *is* the update. Nothing the user owns lives in
-     * these columns.
+     * `@Upsert` is `INSERT OR REPLACE`, and here that is not a compromise: this row is written only by the
+     * extraction pass, so a rewrite *is* the update, and nothing the user owns lives in these columns. (It is
+     * also — unlike a table holding a user decision — safe to rebuild, because there is no second writer whose
+     * columns a replace could drop.)
      */
     @Upsert
     suspend fun record(row: MediaMetadataEntity)
@@ -103,9 +104,10 @@ interface MediaMetadataDao {
     /**
      * The same rows without a rectangle, for a cluster the user tapped.
      *
-     * [ids] is bounded by the caller, and has to be: `IN (:ids)` binds one parameter per id, and SQLite
-     * refuses a statement over its limit — a cluster of a thousand photos in a city is not hypothetical,
-     * which is why the repository takes a fixed slice rather than handing this the whole bucket.
+     * [ids] must be bounded by the caller: `IN (:ids)` binds one parameter per id, and SQLite refuses a
+     * statement over its limit — a cluster of a thousand photos in a city is not hypothetical. The
+     * repository *chunks* the collection against [MAX_IDS_PER_QUERY] and merges the answers rather than
+     * truncating it, so no id is dropped and only this query's per-chunk `limit` applies.
      */
     @Query(
         """

@@ -78,7 +78,7 @@ class TdLibClient(
         }
 
         val answered = withTimeoutOrNull(timeoutMillis) { response.await() }
-            ?: throw TelegramRequestException(code = 0, reason = TIMED_OUT)
+            ?: throw TelegramRequestException(code = 0, reason = TDLIB_TIMED_OUT)
 
         if (answered is TdApi.Error) {
             throw TelegramRequestException(code = answered.code, reason = answered.message)
@@ -94,9 +94,6 @@ class TdLibClient(
 
     private companion object {
         const val TAG = "LumoVaultTelegram"
-
-        /** Not a TDLib token: no response arrived at all, so nothing can be mapped from it. */
-        const val TIMED_OUT = "TDLIB_TIMED_OUT"
 
         /**
          * Whether this APK carries `libtdjni.so`.

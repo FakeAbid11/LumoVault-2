@@ -147,9 +147,11 @@ interface MediaRestoreDao {
     /**
      * Rows a killed process left mid-flight, moved to [RestoreState.Failed] under one reason.
      *
-     * Their `temp_path` is deliberately untouched by the statement, so the caller can still see which
-     * files to delete; the sweep of the directory itself happens in the repository that owns the path, not
-     * in SQL.
+     * The statement touches only `state`, `failure` and `updated_at`. Everything that identifies the row and
+     * the transfer it was making — `chat_id`, `message_id`, `tdlib_file_id`, `downloaded_bytes` — is left
+     * exactly as it was, so the caller can still say which message failed and where the partial download
+     * stopped. Any cleanup of that partial file is the repository's, not SQL's, because the path it lives at
+     * is TDLib's, not a column here.
      */
     @Query(
         """

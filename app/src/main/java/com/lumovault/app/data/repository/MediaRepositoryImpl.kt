@@ -80,7 +80,11 @@ internal class MediaRepositoryImpl(
         dao.observeFolders().map { paths -> paths.map(String::displayFolder).sorted() }
 
     override suspend fun sync(): SyncResult = syncLock.withLock {
-        val scanId = System.currentTimeMillis()
+        // Strictly greater than anything already tagged. `System.currentTimeMillis()` alone is not enough: the
+        // prune is `last_seen_scan_id < :scanId`, and a clock that moved backwards would mint an id smaller
+        // than the previous scan's tags — no row would compare less, and every file that left the device would
+        // survive in the index as a ghost. Taking the maximum keeps the tag monotonic across a clock change.
+        val scanId = maxOf(System.currentTimeMillis(), dao.maxScanId() + 1)
         val scan = source.scan(scanId)
 
         // Decided before anything is written, and it is the only guard the destructive half of this function

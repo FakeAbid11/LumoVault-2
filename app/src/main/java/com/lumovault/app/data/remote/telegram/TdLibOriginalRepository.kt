@@ -240,7 +240,7 @@ class TdLibOriginalRepository(
 internal fun TelegramRequestException.toRestoreFailure(): RestoreFailure {
     val token = reason.uppercase()
     val kind = when {
-        reason == TIMED_OUT -> RestoreFailureKind.Network
+        reason == TDLIB_TIMED_OUT -> RestoreFailureKind.Network
 
         token.startsWith("FLOOD_WAIT") || token.contains("SLOWMODE") -> RestoreFailureKind.RateLimited
 
@@ -264,6 +264,3 @@ internal fun TelegramRequestException.toRestoreFailure(): RestoreFailure {
     }
     return RestoreFailure(kind)
 }
-
-/** Mirrors [TdLibClient]'s private timeout marker, which is a token rather than a TDLib answer. */
-private const val TIMED_OUT = "TDLIB_TIMED_OUT"

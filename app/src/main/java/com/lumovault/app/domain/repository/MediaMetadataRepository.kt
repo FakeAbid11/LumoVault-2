@@ -71,7 +71,4 @@ interface MediaMetadataRepository {
      * been logged.
      */
     suspend fun discardUnlocatedReads(): Int
-
-    /** Forgets metadata for files the device confirmed as deleted. */
-    suspend fun forgetDeleted(mediaStoreIds: Collection<Long>): Int
 }

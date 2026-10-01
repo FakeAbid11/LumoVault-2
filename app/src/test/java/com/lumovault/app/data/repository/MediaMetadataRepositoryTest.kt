@@ -131,6 +131,14 @@ class MediaMetadataRepositoryTest {
             200,
             photos.size,
         )
+        // The ids are chunked, queried and merged, not truncated before the query — so the newest photos
+        // (which live in the last chunk) must be exactly what a "newest first" limit returns. The old
+        // `.take(MAX_IDS_PER_QUERY)` would have returned the first chunk's slice instead.
+        assertEquals(
+            "the merge is ordered across chunks, so the newest 200 are the ones that survive",
+            (1_200L downTo 1_001L).toList(),
+            photos.map { it.mediaStoreId },
+        )
     }
 
     @Test
@@ -162,17 +170,6 @@ class MediaMetadataRepositoryTest {
             listOf(2L),
             repository.extractionCandidates(10).map { it.mediaStoreId },
         )
-    }
-
-    @Test
-    fun forgettingADeletedFileTakesItsPositionWithIt() = runBlocking {
-        store.index(FakeMediaRow(1L), FakeMediaRow(2L))
-        position(1L, 52.5, 13.4)
-        position(2L, 52.6, 13.5)
-
-        assertEquals(1, repository.forgetDeleted(listOf(1L)))
-        assertEquals(listOf(2L), repository.observeMapPhotos(berlin, limit = 10).first().map { it.mediaStoreId })
-        assertEquals("an empty selection asks for nothing", 0, repository.forgetDeleted(emptyList()))
     }
 
     @Test
