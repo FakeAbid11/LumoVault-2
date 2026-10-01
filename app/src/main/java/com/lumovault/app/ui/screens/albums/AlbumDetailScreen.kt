@@ -425,6 +425,7 @@ private fun MediaGrid(
         itemsIndexed(items, key = { _, media -> media.id }) { _, media ->
             MediaCell(
                 media = media,
+                modifier = Modifier.animateItem(),
                 favorite = media.id in favoriteIds,
                 selected = media.id in selection,
                 onClick = { onCellClick(media.id) },
@@ -578,7 +579,7 @@ private fun AddMediaSheet(
                 ) {
                     items(items, key = { media -> media.id }) { media ->
                         val added = media.id in alreadyMemberOf
-                        Box {
+                        Box(modifier = Modifier.animateItem()) {
                             MediaCell(
                                 media = media,
                                 selected = media.id in chosen || added,

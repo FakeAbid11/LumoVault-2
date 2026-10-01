@@ -6,6 +6,10 @@ import android.view.View
 import android.view.Window
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +74,7 @@ import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.lumovault.app.ui.theme.BackedUpAccent
+import com.lumovault.app.ui.theme.ChromeFadeMillis
 import com.lumovault.app.ui.theme.ChromeScrim
 import com.lumovault.app.ui.theme.FavoriteAccent
 import com.lumovault.app.ui.theme.LumoVaultType
@@ -246,46 +251,58 @@ private fun ViewerPager(
             )
         }
 
-        if (chromeVisible) {
+        // The band arrives and leaves on a fade rather than a swap, and the container is one AnimatedVisibility
+        // rather than three: a control strip that snaps makes the screen feel twitchy under the finger, and all
+        // three parts are one decision the user made with a tap. The inner box is because the animation's content
+        // is outside the screen box's scope — `align` still needs a Box to hang from — and because an ordinary
+        // box passes a tap straight through to the pager, exactly as the old `if` did.
+        AnimatedVisibility(
+            visible = chromeVisible,
+            enter = fadeIn(tween(ChromeFadeMillis)),
+            exit = fadeOut(tween(ChromeFadeMillis)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
             val shown = currentItem
-            // A band, not a bar: the controls are white and a bright photograph is full of white, but the
-            // picture is still the screen, so only the top of it is darkened — and only for as long as the
-            // chrome is up.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .systemBarsPadding()
-                    .height(ChromeScrimHeight)
-                    .background(
-                        Brush.verticalGradient(listOf(ChromeScrim, Color.Transparent)),
-                    ),
-            )
-            ViewerTopBar(
-                item = shown,
-                position = pagerState.settledPage + 1,
-                total = items.size,
-                onNavigateUp = onNavigateUp,
-                onArchive = viewModel::archiveCurrent,
-                onTrash = { confirmingTrash = true },
-                onAddToAlbum = albums.takeIf { it.isNotEmpty() }?.let { { choosingAlbum = true } },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .systemBarsPadding(),
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                // A band, not a bar: the controls are white and a bright photograph is full of white, but the
+                // picture is still the screen, so only the top of it is darkened — and only for as long as the
+                // chrome is up.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .systemBarsPadding()
+                        .height(ChromeScrimHeight)
+                        .background(
+                            Brush.verticalGradient(listOf(ChromeScrim, Color.Transparent)),
+                        ),
+                )
+                ViewerTopBar(
+                    item = shown,
+                    position = pagerState.settledPage + 1,
+                    total = items.size,
+                    onNavigateUp = onNavigateUp,
+                    onArchive = viewModel::archiveCurrent,
+                    onTrash = { confirmingTrash = true },
+                    onAddToAlbum = albums.takeIf { it.isNotEmpty() }?.let { { choosingAlbum = true } },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .systemBarsPadding(),
+                )
 
-            ViewerActionBar(
-                media = shown,
-                action = ViewerPresentation.backupAction(backupState),
-                isFavorite = favorite,
-                onBackUp = viewModel::backUpCurrent,
-                onRetry = viewModel::retryCurrent,
-                onFavorite = { viewModel.setFavorite(!favorite) },
-                onInfo = { showingDetails = true },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .systemBarsPadding(),
-            )
+                ViewerActionBar(
+                    media = shown,
+                    action = ViewerPresentation.backupAction(backupState),
+                    isFavorite = favorite,
+                    onBackUp = viewModel::backUpCurrent,
+                    onRetry = viewModel::retryCurrent,
+                    onFavorite = { viewModel.setFavorite(!favorite) },
+                    onInfo = { showingDetails = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .systemBarsPadding(),
+                )
+            }
         }
     }
 

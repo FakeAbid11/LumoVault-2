@@ -444,17 +444,18 @@ private fun Timeline(
             ) {
                 if (state.limitedAccess) {
                     item(key = "limited-access", span = { GridItemSpan(maxLineSpan) }) {
-                        LimitedAccessNotice()
+                        LimitedAccessNotice(modifier = Modifier.animateItem())
                     }
                 }
 
                 state.days.forEach { day ->
                     item(key = "day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
-                        DayHeader(epochDay = day.epochDay)
+                        DayHeader(epochDay = day.epochDay, modifier = Modifier.animateItem())
                     }
                     items(items = day.items, key = { media -> media.id }) { media ->
                         MediaCell(
                             media = media,
+                            modifier = Modifier.animateItem(),
                             status = backup.statusOf(media.id),
                             favorite = media.id in favoriteIds,
                             selected = media.id in selected,
@@ -486,10 +487,10 @@ private fun Timeline(
  * and the fix is a system screen, not something LumoVault can decide for them.
  */
 @Composable
-private fun LimitedAccessNotice() {
+private fun LimitedAccessNotice(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = GridSpacing, end = RailWidth, top = SpaceSm, bottom = SpaceSm)
             .background(
@@ -521,7 +522,7 @@ private fun LimitedAccessNotice() {
 }
 
 @Composable
-private fun DayHeader(epochDay: Long) {
+private fun DayHeader(epochDay: Long, modifier: Modifier = Modifier) {
     val day = LocalDate.ofEpochDay(epochDay)
     val distance = dayDistance(day, LocalDate.now())
     val text = when (distance) {
@@ -538,7 +539,7 @@ private fun DayHeader(epochDay: Long) {
         text = text,
         style = LumoVaultType.sectionHeader,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = GridSpacing, end = RailWidth, top = SpaceLg, bottom = SpaceSm),
     )

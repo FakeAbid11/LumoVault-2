@@ -2,6 +2,10 @@ package com.lumovault.app.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -90,6 +94,7 @@ import com.lumovault.app.ui.theme.MediaBadgeInset
 import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
 import com.lumovault.app.ui.theme.OnMedia
+import com.lumovault.app.ui.theme.OverlayFadeMillis
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -230,19 +235,32 @@ fun CloudScreen(
         viewModel.focusing(null)
     }
 
-    selected?.let { item ->
-        CloudViewer(
-            item = item,
-            onDevice = (state as? CloudUiState.Library)?.localMatches?.contains(item.messageId) == true,
-            previewPathFor = viewModel::previewPath,
-            job = restoreJob?.takeIf { it.messageId == item.messageId },
-            onDownload = { viewModel.restore(item) },
-            onCancel = { viewModel.cancelRestore(item) },
-            onDismiss = {
-                selected = null
-                viewModel.focusing(null)
-            },
-        )
+    // The overlay exits over the picture it was showing, not over the grid behind it: `selected` is null the
+    // moment dismissal begins, so a remembered copy of the last selection keeps that frame on screen for the
+    // length of the fade. The copy is written during composition rather than in an effect, because an effect
+    // runs after the exit's first frame — the overlay would show the grid for one frame before it caught up.
+    var overlayItem by remember { mutableStateOf(selected) }
+    if (selected != null) overlayItem = selected
+
+    AnimatedVisibility(
+        visible = selected != null,
+        enter = fadeIn(tween(OverlayFadeMillis)),
+        exit = fadeOut(tween(OverlayFadeMillis)),
+    ) {
+        overlayItem?.let { item ->
+            CloudViewer(
+                item = item,
+                onDevice = (state as? CloudUiState.Library)?.localMatches?.contains(item.messageId) == true,
+                previewPathFor = viewModel::previewPath,
+                job = restoreJob?.takeIf { it.messageId == item.messageId },
+                onDownload = { viewModel.restore(item) },
+                onCancel = { viewModel.cancelRestore(item) },
+                onDismiss = {
+                    selected = null
+                    viewModel.focusing(null)
+                },
+            )
+        }
     }
 }
 
@@ -273,16 +291,23 @@ private fun CloudTimeline(
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "cloud-header", span = { GridItemSpan(maxLineSpan) }) {
-            CloudHeader(state = state)
+            CloudHeader(
+                state = state,
+                modifier = Modifier.animateItem(),
+            )
         }
 
         state.days.forEach { day ->
             item(key = "cloud-day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
-                CloudDayHeader(epochDay = day.epochDay)
+                CloudDayHeader(
+                    epochDay = day.epochDay,
+                    modifier = Modifier.animateItem(),
+                )
             }
             items(items = day.items, key = { item -> "cloud-${item.messageId}" }) { item ->
                 CloudMediaCell(
                     item = item,
+                    modifier = Modifier.animateItem(),
                     onDevice = item.messageId in state.localMatches,
                     onClick = { onSelect(item) },
                     previewPathFor = previewPathFor,
@@ -295,7 +320,7 @@ private fun CloudTimeline(
 
 /** Header line, built only from counts the index actually holds. */
 @Composable
-private fun CloudHeader(state: CloudUiState.Library) {
+private fun CloudHeader(state: CloudUiState.Library, modifier: Modifier = Modifier) {
     // Plurals are resolved through Resources rather than pluralStringResource inside the lambda: a
     // @Composable call is only allowed in composable scope, and joinToString's transform is an ordinary
     // function type. The wording and the resource names are unchanged.
@@ -305,7 +330,7 @@ private fun CloudHeader(state: CloudUiState.Library) {
         .ifBlank { resources.getQuantityString(R.plurals.cloud_items_found, state.totalCount, state.totalCount) }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = GridSpacing, vertical = SpaceSm),
         verticalArrangement = Arrangement.spacedBy(SpaceXs),
@@ -338,7 +363,7 @@ private fun CloudHeader(state: CloudUiState.Library) {
 }
 
 @Composable
-private fun CloudDayHeader(epochDay: Long) {
+private fun CloudDayHeader(epochDay: Long, modifier: Modifier = Modifier) {
     val day = LocalDate.ofEpochDay(epochDay)
     val distance = dayDistance(day, LocalDate.now())
     val text = when (distance) {
@@ -354,7 +379,7 @@ private fun CloudDayHeader(epochDay: Long) {
         text = text,
         style = LumoVaultType.sectionHeader,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = GridSpacing, end = GridSpacing, top = SpaceLg, bottom = SpaceSm),
     )
@@ -376,6 +401,7 @@ private fun CloudDayHeader(epochDay: Long) {
 @Composable
 private fun CloudMediaCell(
     item: CloudMedia,
+    modifier: Modifier = Modifier,
     onDevice: Boolean,
     onClick: () -> Unit,
     previewPathFor: suspend (CloudMedia) -> String?,
@@ -388,7 +414,7 @@ private fun CloudMediaCell(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(MediaThumbCorner))
             .clickable(onClick = onClick),

@@ -76,13 +76,17 @@ fun AlbumsScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             item(key = "system-header", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(R.string.albums_section_system)
+                SectionHeader(
+                    label = R.string.albums_section_system,
+                    modifier = Modifier.animateItem(),
+                )
             }
 
             SystemAlbum.entries.forEach { album ->
                 item(key = "system-${album.name}") {
                     AlbumCard(
                         title = stringResource(album.titleRes),
+                        modifier = Modifier.animateItem(),
                         subtitle = pluralStringResource(R.plurals.album_items_count, state.counts.of(album), state.counts.of(album)),
                         icon = album.icon,
                         onClick = { onOpenAlbum(AlbumTarget.System(album)) },
@@ -92,7 +96,10 @@ fun AlbumsScreen(
 
             if (state.localFolders.isNotEmpty()) {
                 item(key = "folders-header", span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader(R.string.albums_section_folders)
+                    SectionHeader(
+                        label = R.string.albums_section_folders,
+                        modifier = Modifier.animateItem(),
+                    )
                 }
 
                 val repeatedNames = state.localFolders.groupingBy { it.displayName }.eachCount()
@@ -106,6 +113,7 @@ fun AlbumsScreen(
                         )
                         AlbumCard(
                             title = folder.displayName,
+                            modifier = Modifier.animateItem(),
                             // The parent is only worth a place on the card when two folders share a name;
                             // otherwise it is a path, and a path is not what the album is called.
                             subtitle = if (repeatedNames.getValue(folder.displayName) > 1 &&
@@ -129,7 +137,7 @@ fun AlbumsScreen(
                 // control used once in a blue moon. It sits beside the heading of the section it adds to now,
                 // which is where a user looks for it.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.animateItem().fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     SectionHeader(
@@ -150,7 +158,7 @@ fun AlbumsScreen(
             if (state.userAlbums.isEmpty()) {
                 item(key = "user-empty", span = { GridItemSpan(maxLineSpan) }) {
                     Column(
-                        modifier = Modifier
+                        modifier = Modifier.animateItem()
                             .fillMaxWidth()
                             .padding(bottom = SpaceSm),
                         verticalArrangement = Arrangement.spacedBy(SpaceXs),
@@ -173,6 +181,7 @@ fun AlbumsScreen(
                 item(key = "album-${album.id}") {
                     AlbumCard(
                         title = album.name,
+                        modifier = Modifier.animateItem(),
                         subtitle = pluralStringResource(R.plurals.album_items_count, album.itemCount, album.itemCount),
                         coverUri = album.coverUri,
                         onClick = { onOpenAlbum(AlbumTarget.User(album.id)) },
