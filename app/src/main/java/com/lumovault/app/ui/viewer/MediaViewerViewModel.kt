@@ -5,19 +5,25 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.R
 import com.lumovault.app.domain.backup.UploadState
 import com.lumovault.app.domain.metadata.MetadataCandidate
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaMetadata
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.organization.Album
+import com.lumovault.app.ui.components.AppMessage
 import com.lumovault.app.ui.navigation.ViewerTarget
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -55,6 +61,21 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
 
     /** Once per item per process, so "this file has no EXIF" is not discovered again on every visit. */
     private val metadataReadAttempted = mutableSetOf<Long>()
+
+    /**
+     * One-shot feedback for actions taken from this screen, as the strings to show.
+     *
+     * Failures only: the viewer shows one item, so a write that lands is visible in the heart, the
+     * badges and the picture leaving — there is no count here the grid cannot already tell. What the
+     * grid could *not* tell was a write that threw, which used to be one log line: the heart did not
+     * move and nothing said why. [MESSAGE_BUFFER] lines wait for a collector still showing the
+     * previous one; past that the oldest is dropped rather than stalling the write.
+     */
+    private val _messages = MutableSharedFlow<AppMessage>(
+        extraBufferCapacity = MESSAGE_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val messages: SharedFlow<AppMessage> = _messages.asSharedFlow()
 
     /**
      * The source's window, or null while Room has not answered about it yet.
@@ -133,7 +154,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
                 val uri = media.contentUri
                 container.mediaMetadataRepository.observe(id).map { found ->
                     if (found == null && metadataReadAttempted.add(id)) {
-                        launchWrite("metadata read") {
+                        launchWrite("metadata read", failureMessage = null) {
                             container.extractMediaMetadata.readOne(MetadataCandidate(id, uri))
                         }
                     }
@@ -230,7 +251,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
      */
     fun backUpCurrent() {
         val id = currentItem.value?.id ?: return
-        launchWrite("backup enqueue") {
+        launchWrite("backup enqueue", failureMessage = R.string.feedback_queue_failed) {
             container.backupQueueRepository.enqueue(listOf(id))
             container.backupScheduler.start()
         }
@@ -239,7 +260,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     /** A failed item re-queued through the queue's own rules rather than restarted from here. */
     fun retryCurrent() {
         val id = currentItem.value?.id ?: return
-        launchWrite("backup retry enqueue") {
+        launchWrite("backup retry enqueue", failureMessage = R.string.feedback_queue_failed) {
             container.backupQueueRepository.enqueue(listOf(id))
             container.backupScheduler.start()
         }
@@ -248,7 +269,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     /** Favourites the shown item. Nothing on this path can enqueue an upload: the two tables never meet. */
     fun setFavorite(favorite: Boolean) {
         val id = currentItem.value?.id ?: return
-        launchWrite("favorite write") {
+        launchWrite("favorite write", failureMessage = R.string.feedback_favorite_failed) {
             container.mediaOrganizationRepository.setFavorite(listOf(id), favorite)
         }
     }
@@ -262,7 +283,11 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     fun archiveCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
-        launchWrite("archive write", onFailure = { retiring = false }) {
+        launchWrite(
+            "archive write",
+            failureMessage = R.string.feedback_archive_failed,
+            onFailure = { retiring = false },
+        ) {
             container.mediaOrganizationRepository.setArchived(listOf(id), true)
         }
     }
@@ -271,7 +296,11 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     fun moveToTrashCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
-        launchWrite("trash write", onFailure = { retiring = false }) {
+        launchWrite(
+            "trash write",
+            failureMessage = R.string.feedback_trash_failed,
+            onFailure = { retiring = false },
+        ) {
             container.mediaOrganizationRepository.moveToTrash(listOf(id))
         }
     }
@@ -298,12 +327,16 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
      *
      * Cancellation is rethrown — the scope is shutting down, which is not a failure of the write — and
      * everything else is one log line of the class name, because a SQLite or MediaStore message can quote
-     * a path. The states these writes produce are observed from the database, so on failure the screen
-     * simply keeps drawing what is still true. [onFailure] exists for the flags this class sets *before*
-     * asking: `retiring` would otherwise wait forever for a row that never leaves the query.
+     * a path, plus [failureMessage] as a line the screen shows: a heart that did not change and said
+     * nothing looks like a tap that did nothing. The states these writes produce are observed from the
+     * database, so on failure the screen simply keeps drawing what is still true. [onFailure] exists for
+     * the flags this class sets *before* asking: `retiring` would otherwise wait forever for a row that
+     * never leaves the query. A read-only probe passes [failureMessage] null — the EXIF read happens on
+     * its own, not from anything the user pressed, so there is no action to report a failure against.
      */
     private fun launchWrite(
         description: String,
+        failureMessage: Int? = R.string.feedback_action_failed,
         onFailure: () -> Unit = {},
         block: suspend () -> Unit,
     ) {
@@ -315,6 +348,7 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
             } catch (error: Exception) {
                 Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
                 onFailure()
+                failureMessage?.let { _messages.tryEmit(AppMessage(it)) }
             }
         }
     }
@@ -338,6 +372,9 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
         const val TAG = "LumoVaultViewer"
         const val WINDOW_START = 300
         const val WINDOW_STEP = 300
+
+        /** How many feedback lines wait for a screen that is still showing the previous one. */
+        const val MESSAGE_BUFFER = 8
 
         /** How deep one tap is allowed to materialise a window; beyond it, paging is the answer. */
         const val WINDOW_PROBE_CEILING = 38_400

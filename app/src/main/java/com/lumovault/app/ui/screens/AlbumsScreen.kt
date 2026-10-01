@@ -59,6 +59,12 @@ fun AlbumsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var creating by rememberSaveable { mutableStateOf(false) }
+    // The prompt stays open until the write answers — closing it first is what used to swallow a
+    // refusal, leaving a dialog gone and an album never made. Held in `remember` rather than
+    // saveable: process death mid-write should come back as a re-enabled button to press again,
+    // not as a pending state nothing will ever finish.
+    var createPending by remember { mutableStateOf(false) }
+    var createFailed by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -180,10 +186,28 @@ fun AlbumsScreen(
         AlbumNameDialog(
             title = R.string.album_create_title,
             confirm = R.string.album_create_action,
-            onDismiss = { creating = false },
-            onConfirm = { name ->
+            pending = createPending,
+            error = if (createFailed) R.string.album_create_failed else null,
+            onDismiss = {
                 creating = false
-                viewModel.create(name) { id -> onOpenAlbum(AlbumTarget.User(id)) }
+                createPending = false
+                createFailed = false
+            },
+            onConfirm = { name ->
+                createPending = true
+                createFailed = false
+                viewModel.create(
+                    name,
+                    onCreated = { id ->
+                        creating = false
+                        createPending = false
+                        onOpenAlbum(AlbumTarget.User(id))
+                    },
+                    onRefused = {
+                        createPending = false
+                        createFailed = true
+                    },
+                )
             },
         )
     }

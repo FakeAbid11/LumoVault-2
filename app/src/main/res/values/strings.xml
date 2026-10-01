@@ -24,6 +24,7 @@
     <string name="photos_error_body">Something went wrong while reading your device media.</string>
     <string name="photos_limited_access_notice">Only the photos you selected are shown.</string>
     <string name="photos_limited_access_action">Choose more</string>
+    <string name="photos_refresh_failed">Refresh failed. Showing the photos from your last scan.</string>
     <string name="day_today">Today</string>
     <string name="day_yesterday">Yesterday</string>
     <string name="media_kind_photo">Photo</string>
@@ -371,6 +372,8 @@
     <string name="album_rename_title">Rename album</string>
     <string name="album_create_action">Create</string>
     <string name="album_rename_action">Rename</string>
+    <string name="album_create_failed">Couldn\'t create the album. Try again.</string>
+    <string name="album_rename_failed">Couldn\'t rename the album. Try again.</string>
     <string name="album_cancel">Cancel</string>
     <string name="album_delete_title">Delete album?</string>
     <string name="album_delete_body">The album goes away. Your photos, your favourites and your backups are untouched.</string>
@@ -412,6 +415,35 @@
     <plurals name="album_items_count">
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
+    </plurals>
+
+    <!-- Action feedback: one line after the user acts. Failures always say so — a write that did not
+         land used to be one log line nobody reads. Successes only for bulk actions from the selection
+         bar, where the grid refilling cannot show how many items moved or where they went. -->
+    <string name="feedback_action_failed">Couldn\'t complete that action. Try again.</string>
+    <string name="feedback_favorite_failed">Couldn\'t update favourites. Try again.</string>
+    <string name="feedback_archive_failed">Couldn\'t archive. Try again.</string>
+    <string name="feedback_trash_failed">Couldn\'t move to Trash. Try again.</string>
+    <string name="feedback_queue_failed">Couldn\'t queue for backup. Try again.</string>
+    <plurals name="feedback_favorited_count">
+        <item quantity="one">Marked %1$d item as favourite</item>
+        <item quantity="other">Marked %1$d items as favourite</item>
+    </plurals>
+    <plurals name="feedback_unfavorited_count">
+        <item quantity="one">Removed %1$d item from favourites</item>
+        <item quantity="other">Removed %1$d items from favourites</item>
+    </plurals>
+    <plurals name="feedback_archived_count">
+        <item quantity="one">Archived %1$d item</item>
+        <item quantity="other">Archived %1$d items</item>
+    </plurals>
+    <plurals name="feedback_trashed_count">
+        <item quantity="one">Moved %1$d item to Trash</item>
+        <item quantity="other">Moved %1$d items to Trash</item>
+    </plurals>
+    <plurals name="feedback_queued_count">
+        <item quantity="one">Queued %1$d item for backup</item>
+        <item quantity="other">Queued %1$d items for backup</item>
     </plurals>
 
 

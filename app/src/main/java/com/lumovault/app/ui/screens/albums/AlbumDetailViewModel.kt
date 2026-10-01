@@ -7,17 +7,23 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.R
 import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.Album
+import com.lumovault.app.ui.components.AppMessage
 import com.lumovault.app.ui.navigation.AlbumTarget
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -67,6 +73,20 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     private val target = MutableStateFlow<AlbumTarget?>(null)
     private val loadedLimit = MutableStateFlow(WINDOW_START)
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
+
+    /**
+     * One-shot feedback for writes from this screen, as the strings to show.
+     *
+     * [MESSAGE_BUFFER] lines wait for a screen still showing the previous one; past that the oldest
+     * is dropped rather than stalling the write that reported it. A line is only ever emitted here
+     * for a failure the screen has no other way to show — the rename refusal reports under the
+     * field instead, and the delete-forever answer is already a banner, so nothing is said twice.
+     */
+    private val _messages = MutableSharedFlow<AppMessage>(
+        extraBufferCapacity = MESSAGE_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val messages: SharedFlow<AppMessage> = _messages.asSharedFlow()
 
     private val items: StateFlow<List<Media>?> = combine(target, loadedLimit) { value, limit -> value to limit }
         .flatMapLatest { (value, limit) -> contentsOf(value, limit) }
@@ -139,15 +159,17 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         selection.value = emptySet()
     }
 
-    fun setFavorite(favorite: Boolean) = withSelected { ids ->
+    fun setFavorite(favorite: Boolean) = withSelected(R.string.feedback_favorite_failed) { ids ->
         container.mediaOrganizationRepository.setFavorite(ids, favorite)
     }
 
-    fun setArchived(archived: Boolean) = withSelected { ids ->
+    fun setArchived(archived: Boolean) = withSelected(R.string.feedback_archive_failed) { ids ->
         container.mediaOrganizationRepository.setArchived(ids, archived)
     }
 
-    fun moveToTrash() = withSelected { ids -> container.mediaOrganizationRepository.moveToTrash(ids) }
+    fun moveToTrash() = withSelected(R.string.feedback_trash_failed) { ids ->
+        container.mediaOrganizationRepository.moveToTrash(ids)
+    }
 
     fun restoreFromTrash() = withSelected { ids ->
         container.mediaOrganizationRepository.restoreFromTrash(ids)
@@ -175,9 +197,27 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         launchWrite("add media") { container.albumRepository.addMedia(albumId, ids) }
     }
 
-    fun rename(name: String) {
-        val albumId = (target.value as? AlbumTarget.User)?.albumId ?: return
-        launchWrite("rename album") { container.albumRepository.rename(albumId, name) }
+    /**
+     * Renames the album, and reports the answer instead of assuming it.
+     *
+     * The repository answers a refusal with `false` — a name that was only whitespace — and a write
+     * that throws ends the same way, so [onRefused] fires for either and the prompt stays open with
+     * what was typed. Only [onRenamed], after the write has landed, lets the screen close it: this
+     * dialog used to dismiss before calling here, so a refusal or a failure was invisible and the
+     * old name silently remained. The failure is not also announced as a line at the bottom — the
+     * dialog is on screen saying it under the field, and two copies of the same news are noise.
+     */
+    fun rename(name: String, onRenamed: () -> Unit, onRefused: () -> Unit) {
+        val albumId = (target.value as? AlbumTarget.User)?.albumId
+        if (albumId == null) {
+            // Only a user album can be renamed; saying refused is the honest answer for anything else
+            // rather than leaving the prompt waiting for a write that was never asked for.
+            onRefused()
+            return
+        }
+        launchWrite("rename album", failureMessage = null, onFailure = onRefused) {
+            if (container.albumRepository.rename(albumId, name)) onRenamed() else onRefused()
+        }
     }
 
     /**
@@ -332,19 +372,34 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
      * Clearing before the write would tell the action bar its rows were handled while Room was still
      * deciding; clearing in the success path only means a refusal leaves every id selected, which is
      * still true. Cancellation is rethrown, everything else is one class-name log line — a SQLite
-     * message can quote a path.
+     * message can quote a path — plus [failureMessage] for the screen, because a selection action
+     * that failed and said nothing looks like one that did nothing at all.
      */
-    private fun withSelected(action: suspend (Collection<Long>) -> Unit) {
+    private fun withSelected(
+        failureMessage: Int = R.string.feedback_action_failed,
+        action: suspend (Collection<Long>) -> Unit,
+    ) {
         val ids = selection.value
         if (ids.isEmpty()) return
-        launchWrite("selection action") {
+        launchWrite("selection action", failureMessage = failureMessage) {
             action(ids)
             selection.value = emptySet()
         }
     }
 
-    /** Companion to [withSelected] for the actions that name their own write in the log. */
-    private fun launchWrite(description: String, block: suspend () -> Unit) {
+    /**
+     * Companion to [withSelected] for the actions that name their own write in the log.
+     *
+     * [failureMessage] null means the caller shows the failure itself — [rename] puts it under the
+     * field of a prompt that is still open — and [onFailure] runs in the catch alongside it, for
+     * flags the screen sets before asking.
+     */
+    private fun launchWrite(
+        description: String,
+        failureMessage: Int? = R.string.feedback_action_failed,
+        onFailure: () -> Unit = {},
+        block: suspend () -> Unit,
+    ) {
         viewModelScope.launch {
             try {
                 block()
@@ -352,6 +407,8 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
                 throw cancelled
             } catch (error: Exception) {
                 Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+                onFailure()
+                failureMessage?.let { _messages.tryEmit(AppMessage(it)) }
             }
         }
     }
@@ -360,6 +417,9 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         private const val TAG = "LumoVaultAlbumDetail"
         private const val WINDOW_START = 300
         private const val WINDOW_STEP = 300
+
+        /** How many feedback lines wait for a screen that is still showing the previous one. */
+        private const val MESSAGE_BUFFER = 8
 
         /** How many library items the add sheet offers at once; the same bound as the timeline's first page. */
         private const val SHEET_WINDOW = 300

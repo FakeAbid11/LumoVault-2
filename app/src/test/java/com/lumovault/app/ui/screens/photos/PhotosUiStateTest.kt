@@ -82,6 +82,22 @@ class PhotosUiStateTest {
         ) as PhotosUiState.Content
 
         assertTrue(state.isRefreshing)
+        assertFalse(state.refreshFailed)
+        assertEquals(2, state.indexedCount)
+    }
+
+    @Test
+    fun `a failed rescan keeps the rows and flags the failure for the notice`() {
+        val state = derive(
+            access = MediaAccessStatus.Granted,
+            items = listOf(media(1), media(2)),
+            failed = true,
+        ) as PhotosUiState.Content
+
+        // The rows are still there, so this is not the Failure screen — but a rescan that threw is
+        // a fact the grid has to say out loud, or the library just quietly stops being current.
+        assertTrue(state.refreshFailed)
+        assertFalse(state.isRefreshing)
         assertEquals(2, state.indexedCount)
     }
 

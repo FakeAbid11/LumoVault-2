@@ -4,13 +4,19 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.groupByDay
+import com.lumovault.app.ui.components.AppMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -108,6 +114,21 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     private val _scanProgress = MutableStateFlow(0)
     val scanProgress: StateFlow<Int> = _scanProgress
 
+    /**
+     * One-shot feedback for actions taken from this screen, as the strings to show.
+     *
+     * [MESSAGE_BUFFER] lines wait for a screen that is still showing the previous one; past that
+     * the oldest is dropped, because a burst of failures is better reported newest-first than by
+     * stalling the write that reported it. Emitted only from [launchWrite], so a line always
+     * follows the action it is about, and only collected while this screen composes — a line
+     * waiting without a collector is dropped rather than shown at the user some screens later.
+     */
+    private val _messages = MutableSharedFlow<AppMessage>(
+        extraBufferCapacity = MESSAGE_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val messages: SharedFlow<AppMessage> = _messages.asSharedFlow()
+
     init {
         refreshAccess()
         viewModelScope.launch { syncIfNeeded() }
@@ -183,7 +204,11 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
         val ids = selection.value
         if (ids.isEmpty()) return
 
-        launchWrite("backup enqueue") {
+        launchWrite(
+            "backup enqueue",
+            failureMessage = R.string.feedback_queue_failed,
+            successMessage = AppMessage(R.plurals.feedback_queued_count, ids.size),
+        ) {
             container.backupQueueRepository.enqueue(ids)
             selection.value = emptySet()
             container.backupScheduler.start()
@@ -200,7 +225,14 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun setFavoriteSelected(favorite: Boolean) {
         val ids = selection.value
         if (ids.isEmpty()) return
-        launchWrite("favorite write") { container.mediaOrganizationRepository.setFavorite(ids, favorite) }
+        launchWrite(
+            "favorite write",
+            failureMessage = R.string.feedback_favorite_failed,
+            successMessage = AppMessage(
+                if (favorite) R.plurals.feedback_favorited_count else R.plurals.feedback_unfavorited_count,
+                ids.size,
+            ),
+        ) { container.mediaOrganizationRepository.setFavorite(ids, favorite) }
     }
 
     /**
@@ -212,7 +244,11 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun archiveSelected() {
         val ids = selection.value
         if (ids.isEmpty()) return
-        launchWrite("archive write") {
+        launchWrite(
+            "archive write",
+            failureMessage = R.string.feedback_archive_failed,
+            successMessage = AppMessage(R.plurals.feedback_archived_count, ids.size),
+        ) {
             container.mediaOrganizationRepository.setArchived(ids, true)
             selection.value = emptySet()
         }
@@ -222,7 +258,11 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun moveToTrashSelected() {
         val ids = selection.value
         if (ids.isEmpty()) return
-        launchWrite("trash write") {
+        launchWrite(
+            "trash write",
+            failureMessage = R.string.feedback_trash_failed,
+            successMessage = AppMessage(R.plurals.feedback_trashed_count, ids.size),
+        ) {
             container.mediaOrganizationRepository.moveToTrash(ids)
             selection.value = emptySet()
         }
@@ -230,11 +270,13 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Withdraws everything still waiting. An upload already in flight is left to finish. */
     fun cancelPending() {
-        launchWrite("cancel pending") { container.runBackupQueue.cancelPending() }
+        launchWrite("cancel pending", failureMessage = R.string.feedback_action_failed) {
+            container.runBackupQueue.cancelPending()
+        }
     }
 
     fun retryFailed() {
-        launchWrite("retry failed") {
+        launchWrite("retry failed", failureMessage = R.string.feedback_action_failed) {
             if (container.runBackupQueue.retryFailed() > 0) container.backupScheduler.start()
         }
     }
@@ -243,18 +285,28 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
      * Runs a write the grid has already committed to, and stays honest when it throws.
      *
      * Cancellation is rethrown; everything else is one class-name log line, because a SQLite message can
-     * quote a path. What the screen draws comes from the database, so a failed write leaves every shown
-     * state as it still is — including the selection, which is only cleared *after* the write lands, so
-     * an action bar never stops naming rows it did not act on.
+     * quote a path, and — when the action named one — a line the screen shows the user, because a write
+     * that failed and said nothing is indistinguishable from one that worked slowly. What the screen
+     * draws comes from the database, so a failed write leaves every shown state as it still is — including
+     * the selection, which is only cleared *after* the write lands, so an action bar never stops naming
+     * rows it did not act on. [successMessage] is emitted only after the block has fully completed, so a
+     * count can never claim items the write did not finish with.
      */
-    private fun launchWrite(description: String, block: suspend () -> Unit) {
+    private fun launchWrite(
+        description: String,
+        failureMessage: Int? = null,
+        successMessage: AppMessage? = null,
+        block: suspend () -> Unit,
+    ) {
         viewModelScope.launch {
             try {
                 block()
+                successMessage?.let { _messages.tryEmit(it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 android.util.Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+                failureMessage?.let { _messages.tryEmit(AppMessage(it)) }
             }
         }
     }
@@ -291,6 +343,9 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
 
     private companion object {
         const val TAG = "LumoVaultMedia"
+
+        /** How many feedback lines wait for a screen that is still showing the previous one. */
+        const val MESSAGE_BUFFER = 8
 
         /**
          * The timeline is loaded in a widening window rather than all at once: a library can hold

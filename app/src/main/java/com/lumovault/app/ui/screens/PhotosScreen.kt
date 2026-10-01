@@ -66,7 +66,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.backup.BackupQueueSummary
 import com.lumovault.app.domain.model.TimelineRail
+import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.MediaCell
+import com.lumovault.app.ui.components.PillTone
+import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.screens.photos.DateRail
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.photos.BackupOverview
@@ -109,6 +112,10 @@ fun PhotosScreen(
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Failures of the bar's writes and the counts of its bulk successes, shown by the shell's one
+    // snackbar. Collected before any state can route around it, so a line is never lost to a branch.
+    CollectAppMessages(viewModel.messages)
 
     // Trashing a selection and withdrawing the queue are both bulk acts with no undo from the bar, so
     // both confirm — the viewer already confirms the same trash action for one item.
@@ -392,56 +399,74 @@ private fun Timeline(
             }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = GridCellMinSize),
-            state = gridState,
-            // The rail's width is reserved beside the grid rather than drawn over it: a scrubber that covers
-            // the rightmost column of photos has taken the thing it is there to help the user reach.
-            contentPadding = PaddingValues(
-                start = GridSpacing,
-                top = GridSpacing,
-                end = GridSpacing + RailWidth,
-                bottom = bottomInset,
-            ),
-            horizontalArrangement = Arrangement.spacedBy(GridSpacing),
-            verticalArrangement = Arrangement.spacedBy(GridSpacing),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (state.limitedAccess) {
-                item(key = "limited-access", span = { GridItemSpan(maxLineSpan) }) {
-                    LimitedAccessNotice()
-                }
-            }
-
-            state.days.forEach { day ->
-                item(key = "day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
-                    DayHeader(epochDay = day.epochDay)
-                }
-                items(items = day.items, key = { media -> media.id }) { media ->
-                    MediaCell(
-                        media = media,
-                        status = backup.statusOf(media.id),
-                        favorite = media.id in favoriteIds,
-                        selected = media.id in selected,
-                        onClick = { onCellClick(media.id) },
-                        onLongClick = { onCellLongClick(media.id) },
-                    )
-                }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Said above the grid rather than as a grid item: the rail indexes count grid rows, and a
+        // notice that is not one must not shift every month's pointer. The outline tone keeps it
+        // quiet — the rows below are still true, they are just from the last scan that finished.
+        if (state.refreshFailed) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = GridSpacing, end = GridSpacing + RailWidth, top = SpaceSm),
+            ) {
+                StatusPill(
+                    text = stringResource(R.string.photos_refresh_failed),
+                    tone = PillTone.Missing,
+                )
             }
         }
 
-        DateRail(
-            months = railMonths,
-            activeMonth = activeMonth,
-            onScrub = { index ->
-                // A jump, not an animation. A drag delivers a position per frame, and an animation per frame
-                // is a queue of flights the finger keeps interrupting — which reads as lag, then as a stuck
-                // rail. `scrollToItem` lands where the finger is and is done.
-                scrollScope.launch { gridState.scrollToItem(index) }
-            },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = GridCellMinSize),
+                state = gridState,
+                // The rail's width is reserved beside the grid rather than drawn over it: a scrubber that covers
+                // the rightmost column of photos has taken the thing it is there to help the user reach.
+                contentPadding = PaddingValues(
+                    start = GridSpacing,
+                    top = GridSpacing,
+                    end = GridSpacing + RailWidth,
+                    bottom = bottomInset,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+                verticalArrangement = Arrangement.spacedBy(GridSpacing),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (state.limitedAccess) {
+                    item(key = "limited-access", span = { GridItemSpan(maxLineSpan) }) {
+                        LimitedAccessNotice()
+                    }
+                }
+
+                state.days.forEach { day ->
+                    item(key = "day-${day.epochDay}", span = { GridItemSpan(maxLineSpan) }) {
+                        DayHeader(epochDay = day.epochDay)
+                    }
+                    items(items = day.items, key = { media -> media.id }) { media ->
+                        MediaCell(
+                            media = media,
+                            status = backup.statusOf(media.id),
+                            favorite = media.id in favoriteIds,
+                            selected = media.id in selected,
+                            onClick = { onCellClick(media.id) },
+                            onLongClick = { onCellLongClick(media.id) },
+                        )
+                    }
+                }
+            }
+
+            DateRail(
+                months = railMonths,
+                activeMonth = activeMonth,
+                onScrub = { index ->
+                    // A jump, not an animation. A drag delivers a position per frame, and an animation per frame
+                    // is a queue of flights the finger keeps interrupting — which reads as lag, then as a stuck
+                    // rail. `scrollToItem` lands where the finger is and is done.
+                    scrollScope.launch { gridState.scrollToItem(index) }
+                },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
     }
 }
 

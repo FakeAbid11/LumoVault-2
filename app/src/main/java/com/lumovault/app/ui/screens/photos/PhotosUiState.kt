@@ -27,6 +27,9 @@ sealed interface PhotosUiState {
     /**
      * The library is on screen. [isRefreshing] keeps the existing rows visible while a rescan runs,
      * which is what the PRD asks for: an already-indexed library must not be replaced by a spinner.
+     * [refreshFailed] is the other half of that promise — a rescan that threw leaves the rows on
+     * screen and stale, and without flagging it the failure was invisible: a spinner that never
+     * appeared and a grid that quietly stopped being current.
      */
     data class Content(
         val days: List<MediaDay>,
@@ -34,6 +37,7 @@ sealed interface PhotosUiState {
         val totalCount: Int,
         val isRefreshing: Boolean,
         val limitedAccess: Boolean,
+        val refreshFailed: Boolean,
     ) : PhotosUiState {
         val hasMoreToLoad: Boolean get() = indexedCount < totalCount
     }
@@ -61,8 +65,9 @@ internal fun derivePhotosState(
 
     !access.allowsScanning -> PhotosUiState.PermissionRequired
 
-    // A failed scan with nothing indexed is an error; with rows already present it is a stale
-    // library, which Content already reports through isRefreshing.
+    // A failed scan with nothing indexed is an error; with rows already present the library is
+    // still there to show, and Content flags the failed refresh so the grid can say the rows are
+    // from the last scan rather than leaving that for the user to notice.
     scanFailed && totalCount == 0 -> PhotosUiState.Failure(PhotosUiState.Failure.Reason.ScanFailed)
 
     isScanning && totalCount == 0 -> PhotosUiState.Scanning
@@ -75,5 +80,9 @@ internal fun derivePhotosState(
         totalCount = totalCount,
         isRefreshing = isScanning,
         limitedAccess = access == MediaAccessStatus.PartiallyGranted,
+        // Only while idle: a scan in flight has already reset the flag when it starts, and the
+        // brief overlap of "failed" and "still winding down" must not show a stale notice under
+        // the spinner that is already retrying.
+        refreshFailed = scanFailed && !isScanning,
     )
 }

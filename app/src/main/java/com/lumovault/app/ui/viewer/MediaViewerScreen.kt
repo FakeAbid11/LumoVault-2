@@ -63,6 +63,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaMetadata
+import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.ViewerTarget
 import java.text.DateFormat
@@ -105,6 +106,11 @@ fun MediaViewerScreen(
     ImmersiveViewer()
 
     LaunchedEffect(mediaStoreId, target) { viewModel.open(mediaStoreId, target) }
+
+    // Failed writes from this screen — the heart that would not move, the trash that would not take —
+    // shown by the shell's one snackbar over the black frame, collected before any branch routes
+    // around it.
+    CollectAppMessages(viewModel.messages)
 
     val listing by viewModel.listing.collectAsStateWithLifecycle()
 

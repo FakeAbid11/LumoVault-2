@@ -62,19 +62,23 @@ class AlbumsViewModel(application: Application) : AndroidViewModel(application) 
      *
      * A blank name never gets here — the dialog keeps its own button disabled until there is text — so a
      * null from the repository is the *other* refusal: a name that was only whitespace, which the field
-     * accepted and the repository trimmed away. Nothing is created in that case, and the screen stays put
-     * rather than opening an album the user cannot find again. A write that throws ends the same way the
-     * refusal does: no album, so no navigation, and the dialog still showing what was typed.
+     * accepted and the repository trimmed away. Nothing is created in that case, and the screen keeps the
+     * prompt rather than opening an album the user cannot find again. A write that throws ends the same
+     * way the refusal does, and [onRefused] is how the screen hears about either: the dialog stays open
+     * with what was typed and says why under the field, because closing it would leave the user with no
+     * way to know whether their album exists.
      */
-    fun create(name: String, onCreated: (Long) -> Unit) {
+    fun create(name: String, onCreated: (Long) -> Unit, onRefused: () -> Unit) {
         viewModelScope.launch {
             try {
-                container.albumRepository.create(name)?.let(onCreated)
+                val albumId = container.albumRepository.create(name)
+                if (albumId == null) onRefused() else onCreated(albumId)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 // Class name only: an IO message can quote a path.
                 android.util.Log.w(TAG, "album create failed: ${error.javaClass.simpleName}")
+                onRefused()
             }
         }
     }

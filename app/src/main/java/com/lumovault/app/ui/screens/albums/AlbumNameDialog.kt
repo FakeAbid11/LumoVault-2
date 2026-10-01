@@ -19,7 +19,11 @@ import com.lumovault.app.domain.organization.AlbumRepository
  *
  * Confirm stays disabled while the field is blank rather than explaining afterwards why nothing happened:
  * the repository will refuse a blank name anyway, so a dialog that let the user press it would be
- * showing a button that is known not to work.
+ * showing a button that is known not to work. [pending] disables it for the same reason while the write
+ * is in flight — the prompt now stays open until the write answers, and a second tap during that window
+ * would create or rename twice. [error] is the refusal or the failed write, shown under the field in the
+ * error colour: the typed name is still here to correct, so the news goes where the correction happens
+ * instead of in a line at the bottom of the screen that the dialog is covering anyway.
  */
 @Composable
 fun AlbumNameDialog(
@@ -29,6 +33,8 @@ fun AlbumNameDialog(
     onConfirm: (String) -> Unit,
     initial: String = "",
     maxLength: Int = AlbumRepository.MAX_NAME_LENGTH,
+    pending: Boolean = false,
+    @StringRes error: Int? = null,
 ) {
     // Saveable: the activity recreates on rotation, and the typed name — with the prompt still open —
     // is work the user is mid-way through, not a detail to lose with the pixels.
@@ -46,11 +52,18 @@ fun AlbumNameDialog(
                 onValueChange = { input -> value = input.take(maxLength) },
                 label = { Text(stringResource(R.string.album_name_label)) },
                 singleLine = true,
-                isError = value.isBlank(),
+                isError = value.isBlank() || error != null,
+                // Only drawn when there is something to say; M3 colours it from isError, so no
+                // colour is chosen here that could disagree with the field above it.
+                supportingText = if (error != null) {
+                    { Text(stringResource(error)) }
+                } else {
+                    null
+                },
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
+            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank() && !pending) {
                 Text(stringResource(confirm))
             }
         },

@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.AlbumTarget
@@ -96,7 +97,16 @@ fun AlbumDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val libraryItems by viewModel.libraryItems.collectAsStateWithLifecycle()
 
+    // Failures of this screen's writes, shown by the shell's one snackbar. Collected before the
+    // unresolved-album return below, so the collector is never started and stopped by a branch.
+    CollectAppMessages(viewModel.messages)
+
     var renaming by rememberSaveable { mutableStateOf(false) }
+    // The prompt stays open until the rename lands; see the create prompt in AlbumsScreen for why
+    // these are `remember` rather than saveable — a write killed mid-flight must come back as a
+    // button to press again, not as a pending state nothing will finish.
+    var renamePending by remember { mutableStateOf(false) }
+    var renameFailed by remember { mutableStateOf(false) }
     var confirming by remember { mutableStateOf<Confirmation?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var deletionUnsupported by rememberSaveable { mutableStateOf(false) }
@@ -210,10 +220,27 @@ fun AlbumDetailScreen(
             title = R.string.album_rename_title,
             confirm = R.string.album_rename_action,
             initial = state.userAlbum?.name.orEmpty(),
-            onDismiss = { renaming = false },
-            onConfirm = { name ->
+            pending = renamePending,
+            error = if (renameFailed) R.string.album_rename_failed else null,
+            onDismiss = {
                 renaming = false
-                viewModel.rename(name)
+                renamePending = false
+                renameFailed = false
+            },
+            onConfirm = { name ->
+                renamePending = true
+                renameFailed = false
+                viewModel.rename(
+                    name,
+                    onRenamed = {
+                        renaming = false
+                        renamePending = false
+                    },
+                    onRefused = {
+                        renamePending = false
+                        renameFailed = true
+                    },
+                )
             },
         )
     }

@@ -11,16 +11,21 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lumovault.app.R
+import com.lumovault.app.ui.components.LocalSnackbarHostState
 import com.lumovault.app.ui.navigation.AccountRoutes
 import com.lumovault.app.ui.navigation.AlbumRoutes
 import com.lumovault.app.ui.navigation.BackupRoutes
@@ -60,49 +65,57 @@ fun LumoVaultApp(
     val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true ||
         route == AccountRoutes.CONNECT_TELEGRAM
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            if (!isViewer && !ownsItsBar) {
-                TopBar(
-                    destination = currentDestination,
-                    onCycleThemeMode = onCycleThemeMode,
-                    onNavigateUp = { if (isNested) navController.navigateUp() },
-                    showNavigateUp = isNested,
-                    onOpenBackup = {
-                        navController.navigate(BackupRoutes.HUB) {
-                            // The gear stays in the bar on every tab, so a double tap on the way past the
-                            // backup screen would otherwise leave two of them, and back would retrace one.
-                            launchSingleTop = true
-                        }
-                    },
-                )
-            }
-        },
-        bottomBar = {
-            if (isViewer) Unit else NavigationBar {
-                LumoVaultDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = destination == currentDestination,
-                        onClick = { navController.navigateToTab(destination) },
-                        icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = null,
-                            )
+    // The app's one snackbar. It lives here rather than in each screen because every destination is
+    // drawn inside this scaffold — including the backup screens and the viewer — and one host means
+    // one place messages queue instead of a host per screen competing for the same corner.
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
+        Scaffold(
+            modifier = modifier,
+            topBar = {
+                if (!isViewer && !ownsItsBar) {
+                    TopBar(
+                        destination = currentDestination,
+                        onCycleThemeMode = onCycleThemeMode,
+                        onNavigateUp = { if (isNested) navController.navigateUp() },
+                        showNavigateUp = isNested,
+                        onOpenBackup = {
+                            navController.navigate(BackupRoutes.HUB) {
+                                // The gear stays in the bar on every tab, so a double tap on the way past the
+                                // backup screen would otherwise leave two of them, and back would retrace one.
+                                launchSingleTop = true
+                            }
                         },
-                        label = { Text(destination.label()) },
                     )
                 }
-            }
-        },
-    ) { innerPadding ->
-        LumoVaultNavHost(
-            navController = navController,
-            // The viewer's own chrome pads for the system bars it is drawn behind; every other screen lets
-            // the scaffold do it, which is what keeps a status bar from landing on top of a title.
-            modifier = if (isViewer) modifier else modifier.padding(innerPadding),
-        )
+            },
+            bottomBar = {
+                if (isViewer) Unit else NavigationBar {
+                    LumoVaultDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = destination == currentDestination,
+                            onClick = { navController.navigateToTab(destination) },
+                            icon = {
+                                Icon(
+                                    imageVector = destination.icon,
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { Text(destination.label()) },
+                        )
+                    }
+                }
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        ) { innerPadding ->
+            LumoVaultNavHost(
+                navController = navController,
+                // The viewer's own chrome pads for the system bars it is drawn behind; every other screen lets
+                // the scaffold do it, which is what keeps a status bar from landing on top of a title.
+                modifier = if (isViewer) modifier else modifier.padding(innerPadding),
+            )
+        }
     }
 }
 
