@@ -110,6 +110,15 @@ no interface gained a member. What each batch changed is in
 [Five UI/UX batches, and what each one changed](#five-uiux-batches-and-what-each-one-changed), and none of
 the five has run on a phone.
 
+**Navigation motion — one policy, three shapes:** complete and CI-verified,
+[36829952541](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36829952541), 597 unit tests, 0 failed
+(61 classes), debug APK published. Tabs fade through instead of sliding sideways, the viewer scales open
+and closed like a photograph being picked up, pushed screens keep their slide with a short outgoing
+parallax under Material's emphasized easings, and the system's predictive back gesture scrubs those same
+pop transitions frame by frame — `enableOnBackInvokedCallback` opted in, ignored below Android 13. Every
+navigation API was read from the 2.10.2 sources jar before it was written, and `NavMotionTest` pins the
+route classification the four lambdas read. The feel itself is not device-verified.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
@@ -827,7 +836,9 @@ or route changed:
   configures itself, not where it shows photographs.
 - **One motion, in `ui/navigation/NavMotion.kt`.** Both graphs call the same four transition functions — a
   260 ms slide from the side you are moving toward and a 200 ms fade — so pushing an album and advancing a
-  setup step are visibly the same event. The durations do not live in two files waiting to disagree.
+  setup step are visibly the same event. The durations do not live in two files waiting to disagree. The
+  navigation-motion section below kept the file and the durations and let the functions choose their shape
+  per move instead of sliding every one of them.
 
 Three stacking defects went with them: album detail printed its subject twice at 19 sp (the page heading now
 takes the named screen-heading role and ranks above the bar instead of echoing it), the standalone Telegram
@@ -917,6 +928,40 @@ and every batch passed the same static pass — brace and paren balance, every `
 `strings.xml` and every newly-unread string removed, package/import agreement, and a full diff review —
 because the development machine cannot compile. The snackbar's wording on a screen, the motion's feel,
 TalkBack's reading of the new roles and the settings layouts are the developer's to confirm.
+
+## Navigation motion: one policy, three shapes
+
+The polish pass above unified every screen change into one slide — the fix for a library that faded while
+setup slid. This pass kept the sharing and questioned the uniformity: a tab switch is a change of place, a
+photograph opening is a lift, and only a pushed screen is travel. `NavMotion.kt` still holds the whole
+policy and both graphs still call the same four functions; the functions now read the pair of entries each
+transition already carries and choose a shape from the pair.
+
+Forward moves read the arriving entry. A tab fades through — a short out, a delayed in — because tapping
+the bottom bar should not look like falling sideways through the app. The viewer scales up from 96 % with
+its fade and back down toward it when it closes: a photograph picked up and set back down. A pushed screen
+— an album, a settings category, a setup step — slides from the side it is moving toward, 260 ms with its
+200 ms fade as before, except that the screen it replaces now travels a short parallax distance instead of
+only fading, which is what gives a push depth without a full push-both-ways. Back moves read the departing
+entry instead: depth mirrors itself, while arriving back at a tab or closing the viewer has no sideways
+motion at all, because that screen never went anywhere. The easings are Material's emphasized pair —
+decelerating in, accelerating out — rather than the tween default.
+
+**Predictive back is the same motion with a different driver.** The manifest opts into the system's
+gesture dispatch, and both `NavHost`s point their predictive parameters at the same pop functions: an edge
+swipe scrubs them frame by frame, a completed back press plays them, so there is one motion to get right.
+The APIs were read rather than remembered — the navigation-compose 2.10.2 sources jar confirmed that both
+non-deprecated `NavHost` overloads carry the predictive parameters, that the gesture arrives through
+`NavHostEventHandler`'s `NavigationEvent` bridge, and that the default shape we would have gotten by
+omission is a Material scale-out, not ours. Below Android 13 the flag is ignored and back behaves exactly
+as it always has.
+
+`NavMotionTest` pins the classification the lambdas judge from route strings alone: the four tab routes
+fade, `viewer/` scales, an album *under* the Albums tab still slides, settings/backup/reconnect/setup are
+pushes, and an unknown route takes the app's general shape — five tests in a new class, reported by
+[36829952541](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36829952541) alongside the rest. And
+the same caveat as everything else in this section: whether the fade-through's 100/50/200 timing and the
+viewer's 96 % read as calm on a real screen is a device question, not one this machine can answer.
 
 ## Toolchain
 
