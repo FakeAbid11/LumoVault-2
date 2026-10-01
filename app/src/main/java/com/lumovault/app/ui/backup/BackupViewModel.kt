@@ -155,8 +155,29 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
-/** How the session reads, in the four words a diagnostics row has room for. */
-enum class TelegramWord { Connected, WaitingForSignIn, NotConfigured, Unavailable }
+/**
+ * How the session reads, in the four words a diagnostics row has room for.
+ *
+ * The word and its label belong together: the diagnostics panel and the settings account screen describe
+ * the same live state, and two `when`s deciding it separately is how they would start disagreeing about
+ * whether the user is signed in.
+ */
+enum class TelegramWord(@StringRes val labelRes: Int) {
+    Connected(R.string.diag_telegram_connected),
+    WaitingForSignIn(R.string.diag_telegram_waiting),
+    NotConfigured(R.string.diag_telegram_not_configured),
+    Unavailable(R.string.diag_telegram_unavailable),
+    ;
+
+    companion object {
+        fun of(state: TelegramAuthState): TelegramWord = when (state) {
+            is TelegramAuthState.Authenticated -> Connected
+            is TelegramAuthState.NotConfigured, is TelegramAuthState.Unknown -> NotConfigured
+            is TelegramAuthState.Failed -> Unavailable
+            else -> WaitingForSignIn
+        }
+    }
+}
 
 /**
  * Why a queue with work in it is not moving.
@@ -294,12 +315,7 @@ private fun diagnosticsFlow(container: com.lumovault.app.AppContainer): Flow<Bac
         BackupDiagnostics(
             health = health,
             preferences = preferences,
-            telegram = when (auth) {
-                is TelegramAuthState.Authenticated -> TelegramWord.Connected
-                is TelegramAuthState.NotConfigured, is TelegramAuthState.Unknown -> TelegramWord.NotConfigured
-                is TelegramAuthState.Failed -> TelegramWord.Unavailable
-                else -> TelegramWord.WaitingForSignIn
-            },
+            telegram = TelegramWord.of(auth),
             channelAvailable = container.cloudIndexRepository.association() != null,
             // This transform runs wherever the flow is collected — the hub's viewModelScope, i.e. Main —
             // and these two are not Room-scheduled queries: reading the version opens the database file

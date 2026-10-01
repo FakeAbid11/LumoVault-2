@@ -20,6 +20,12 @@ import com.lumovault.app.ui.map.MapScreen
 import com.lumovault.app.ui.onboarding.ConnectTelegramDestination
 import com.lumovault.app.ui.screens.PhotosScreen
 import com.lumovault.app.ui.screens.albums.AlbumDetailScreen
+import com.lumovault.app.ui.settings.AboutSettingsScreen
+import com.lumovault.app.ui.settings.AccountSettingsScreen
+import com.lumovault.app.ui.settings.AppearanceSettingsScreen
+import com.lumovault.app.ui.settings.CloudSettingsScreen
+import com.lumovault.app.ui.settings.NotificationsSettingsScreen
+import com.lumovault.app.ui.settings.SettingsHubScreen
 import com.lumovault.app.ui.viewer.MediaViewerScreen
 
 /**
@@ -55,6 +61,24 @@ object BackupRoutes {
  */
 object AccountRoutes {
     const val CONNECT_TELEGRAM = "connect-telegram"
+}
+
+/**
+ * PRD section 43's graph: the hub behind the gear, and the five categories that had no screen.
+ *
+ * The same shape as Phase 9's routes — one prefix so the shell can tell a settings screen from a tab —
+ * and for the same reason: settings hangs off the top bar because it is something you do to the library
+ * rather than a fifth place to look at it. Every entry, hub included, lives under the prefix, so one
+ * `startsWith` is all the shell and the tab map ever need.
+ */
+object SettingsRoutes {
+    const val PREFIX = "settings/"
+    const val HUB = PREFIX + "hub"
+    const val ACCOUNT = PREFIX + "account"
+    const val CLOUD = PREFIX + "cloud"
+    const val APPEARANCE = PREFIX + "appearance"
+    const val NOTIFICATIONS = PREFIX + "notifications"
+    const val ABOUT = PREFIX + "about"
 }
 
 @Composable
@@ -156,6 +180,42 @@ fun LumoVaultNavHost(
 
         composable(AccountRoutes.CONNECT_TELEGRAM) {
             ConnectTelegramDestination(onNavigateUp = navController::navigateUp)
+        }
+
+        composable(SettingsRoutes.HUB) {
+            SettingsHubScreen(
+                onNavigateUp = navController::navigateUp,
+                onOpenAccount = { navController.navigate(SettingsRoutes.ACCOUNT) },
+                // Backup and Storage are rows onto screens that already exist — the hub behind the old
+                // gear, and free-up-space — rather than a second copy of either.
+                onOpenBackup = { navController.navigate(BackupRoutes.HUB) },
+                onOpenCloud = { navController.navigate(SettingsRoutes.CLOUD) },
+                onOpenStorage = { navController.navigate(BackupRoutes.FREE_SPACE) },
+                onOpenAppearance = { navController.navigate(SettingsRoutes.APPEARANCE) },
+                onOpenNotifications = { navController.navigate(SettingsRoutes.NOTIFICATIONS) },
+                onOpenAbout = { navController.navigate(SettingsRoutes.ABOUT) },
+            )
+        }
+        composable(SettingsRoutes.ACCOUNT) {
+            AccountSettingsScreen(
+                onNavigateUp = navController::navigateUp,
+                onConnectTelegram = { navController.navigate(AccountRoutes.CONNECT_TELEGRAM) },
+            )
+        }
+        composable(SettingsRoutes.CLOUD) {
+            CloudSettingsScreen(
+                onNavigateUp = navController::navigateUp,
+                onOpenDiagnostics = { navController.navigate(BackupRoutes.DIAGNOSTICS) },
+            )
+        }
+        composable(SettingsRoutes.APPEARANCE) {
+            AppearanceSettingsScreen(onNavigateUp = navController::navigateUp)
+        }
+        composable(SettingsRoutes.NOTIFICATIONS) {
+            NotificationsSettingsScreen(onNavigateUp = navController::navigateUp)
+        }
+        composable(SettingsRoutes.ABOUT) {
+            AboutSettingsScreen(onNavigateUp = navController::navigateUp)
         }
 
         composable(BackupRoutes.HUB) {

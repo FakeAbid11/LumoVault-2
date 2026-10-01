@@ -532,14 +532,7 @@ fun DiagnosticsScreen(
             item {
                 Row(
                     R.string.diag_telegram,
-                    stringResource(
-                        when (current.telegram) {
-                            TelegramWord.Connected -> R.string.diag_telegram_connected
-                            TelegramWord.WaitingForSignIn -> R.string.diag_telegram_waiting
-                            TelegramWord.NotConfigured -> R.string.diag_telegram_not_configured
-                            TelegramWord.Unavailable -> R.string.diag_telegram_unavailable
-                        },
-                    ),
+                    stringResource(current.telegram.labelRes),
                     // The same four answers the setup checklist gives, in its colours: connected is Done,
                     // waiting on the user is quiet, not-configured is an absence (outline, never red —
                     // nobody has been asked to sign in yet), and unavailable is the only one that means
@@ -1000,9 +993,12 @@ private fun ToggleRow(
  * same component draws "Free up space" and "Diagnostics", and a tick on those says nothing true — the screen
  * they open is not a state this one can confirm. A chevron says the one thing that is always true about an
  * entry row: there is somewhere to go.
+ *
+ * Internal because the settings hub is the same row — a titled door with a quiet note under it — and two
+ * copies of the chevron's reasoning is how they would start drawing different chevrons.
  */
 @Composable
-private fun EntryRow(title: String, subtitle: String, onClick: () -> Unit) {
+internal fun EntryRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

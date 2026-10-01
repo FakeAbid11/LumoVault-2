@@ -32,6 +32,7 @@ import com.lumovault.app.ui.navigation.BackupRoutes
 import com.lumovault.app.ui.navigation.LumoVaultDestination
 import com.lumovault.app.ui.navigation.navigateToTab
 import com.lumovault.app.ui.navigation.LumoVaultNavHost
+import com.lumovault.app.ui.navigation.SettingsRoutes
 import com.lumovault.app.ui.navigation.viewerRouteActive
 import com.lumovault.app.ui.navigation.icon
 import com.lumovault.app.ui.navigation.label
@@ -61,8 +62,11 @@ fun LumoVaultApp(
     // and the one that would be added here is the one that cannot name them. The standalone Telegram
     // reconnect is the same case wearing the setup flow's clothes: OnboardingScaffold draws a back bar on
     // the gradient, and the shell's opaque bar stacked above it made two titles where the user could only
-    // act on the lower one. The tab bar stays either way — it is how you get back to the library.
+    // act on the lower one. Settings is the fourth case with the same answer — its title is "Settings"
+    // rather than a tab's name, and its bar carries the gradient the rest of section 43's screens use.
+    // The tab bar stays either way — it is how you get back to the library.
     val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true ||
+        route?.startsWith(SettingsRoutes.PREFIX) == true ||
         route == AccountRoutes.CONNECT_TELEGRAM
 
     // The app's one snackbar. It lives here rather than in each screen because every destination is
@@ -80,10 +84,10 @@ fun LumoVaultApp(
                         onCycleThemeMode = onCycleThemeMode,
                         onNavigateUp = { if (isNested) navController.navigateUp() },
                         showNavigateUp = isNested,
-                        onOpenBackup = {
-                            navController.navigate(BackupRoutes.HUB) {
+                        onOpenSettings = {
+                            navController.navigate(SettingsRoutes.HUB) {
                                 // The gear stays in the bar on every tab, so a double tap on the way past the
-                                // backup screen would otherwise leave two of them, and back would retrace one.
+                                // settings hub would otherwise leave two of them, and back would retrace one.
                                 launchSingleTop = true
                             }
                         },
@@ -124,7 +128,7 @@ fun LumoVaultApp(
 private fun TopBar(
     destination: LumoVaultDestination,
     onCycleThemeMode: () -> Unit,
-    onOpenBackup: () -> Unit,
+    onOpenSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     showNavigateUp: Boolean,
 ) {
@@ -150,13 +154,13 @@ private fun TopBar(
                     contentDescription = stringResource(R.string.theme_toggle),
                 )
             }
-            // PRD section 42 puts Settings in this corner. It opens the backup and storage screen, which is
-            // where Phase 9's decisions live; the rest of section 43 stays Phase 10's, and an entry that
-            // promised them now would be a screen of placeholders.
-            IconButton(onClick = onOpenBackup) {
+            // PRD section 42 puts Settings in this corner, and section 43 gives it a hub: seven rows,
+            // five of them screens that had none, and the two that existed (Backup, Storage) reached from
+            // here rather than duplicated. The content description names the door, not the room behind it.
+            IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
-                    contentDescription = stringResource(R.string.backup_entry),
+                    contentDescription = stringResource(R.string.settings_title),
                 )
             }
         },

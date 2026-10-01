@@ -43,6 +43,10 @@ enum class LumoVaultDestination(val route: String) {
             route == AccountRoutes.CONNECT_TELEGRAM -> Cloud
             // Backup, health, diagnostics and free-up-space all belong to the cloud tab's work.
             route?.startsWith(BackupRoutes.PREFIX) == true -> Cloud
+            // So does settings: account and cloud describe the session this tab owns, and the rest hangs
+            // off the same top bar. Highlighting the tab a settings screen belongs to rather than
+            // un-highlighting all four keeps the bar answering where you are.
+            route?.startsWith(SettingsRoutes.PREFIX) == true -> Cloud
             else -> Start
         }
     }

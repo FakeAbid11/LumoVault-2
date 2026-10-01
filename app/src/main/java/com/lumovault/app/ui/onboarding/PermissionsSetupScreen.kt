@@ -204,8 +204,14 @@ private fun MediaAccessStatus.label(): String = stringResource(
     },
 )
 
+/**
+ * The permission's answer in the setup checklist's own words.
+ *
+ * Internal because the settings notifications screen reports the same fact from the same repository, and
+ * a second `when` deciding "Allowed" would be how the two screens started disagreeing about one grant.
+ */
 @Composable
-private fun NotificationsStatus.label(): String = stringResource(
+internal fun NotificationsStatus.label(): String = stringResource(
     when (this) {
         NotificationsStatus.Granted -> R.string.status_allowed
         NotificationsStatus.NotRequired -> R.string.status_done
