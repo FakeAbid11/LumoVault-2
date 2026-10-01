@@ -34,9 +34,10 @@ built and compiling; live Telegram sign-in is not (see *Telegram status*).
   be confused; permission, scanning, empty, error and pull-to-refresh states
 - The Phase 2 folder picker now lists real folders from the index instead of an empty state
 
-**Still not built, by design:** Settings beyond backup and storage, the About/licenses screen, and any
-release or signing work. Phase 10 was the hardening pass, and it is recorded below. Every earlier phase is
-recorded in the sections above, in order.
+**Still not built, by design:** any release or signing work. The two gaps this line used to name — Settings
+beyond backup and storage, and the About/licenses screen — were closed by the five UI/UX batches recorded
+below, whose settings hub now carries all seven categories of PRD section 43. Phase 10 was the hardening
+pass, and it is recorded below. Every earlier phase is recorded in the sections above, in order.
 
 **Video playback on Media3 ExoPlayer:** complete and CI-verified (run
 [36222746776](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36222746776) — 475 unit tests, 0 failed,
@@ -87,6 +88,27 @@ screens; debug APK built with both TDLib ABIs packaged). Screens only: no ViewMo
 navigation or backup behaviour was touched. What moved, and why, is in
 [A shared visual language, and what it fixed](#a-shared-visual-language-and-what-it-fixed). Nothing about this
 pass is verified on a phone — it changed exactly the things a JVM test cannot see.
+
+**UI/UX batches — feedback, states, motion, accessibility, settings:** complete and CI-verified, one push
+and one green run per batch, two of them red first with each red naming a real mistake:
+[36806479953](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36806479953) — one shell snackbar
+carries every bulk count and every failed write;
+[36810884166](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36810884166) — red, a padding overload
+no local check can see — and
+[36811207175](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36811207175) — one loading ring, one
+working column, one quiet strip;
+[36814102587](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36814102587) — one motion vocabulary;
+[36816016371](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36816016371) — red, `stringResource`
+called from inside a semantics lambda — and
+[36816245591](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36816245591) — a 48 dp touch floor,
+a role on every toggle, the viewer's way out named;
+[36820362736](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36820362736) — PRD section 43's
+settings hub and its five missing categories. The first four green runs each report 589 unit tests, 0 failed
+(59 classes); the settings run adds `SettingsRoutesTest` and reports 592 across 60 classes, debug APK
+published. Screens, view models and routes only — no repository, schema, worker or queue state changed, and
+no interface gained a member. What each batch changed is in
+[Five UI/UX batches, and what each one changed](#five-uiux-batches-and-what-each-one-changed), and none of
+the five has run on a phone.
 
 ## Build in the cloud — never locally
 
@@ -822,6 +844,79 @@ repeat one fact down four hundred rows or invent a variation the row does not ho
 Same caveat as the pass above: unit tests and the compiler gate this work, and whether a gradient behind the
 diagnostics list reads as branded or as tinted at 70 % font scale is a device question, not one this machine
 can answer.
+
+## Five UI/UX batches, and what each one changed
+
+The brief after the UI polish pass was to make the app's UI and UX better, agreed as five batches with one
+push and one CI read each — the same discipline as a phase, because what breaks when nobody can compile
+locally does not care how small the change is. Two rules held across all five: a failure the user caused is
+surfaced and every bulk action says how much it did, while single-tap quiet actions stay quiet and dialogs
+are reserved for bulk operations with no undo (trashing a selection, withdrawing a queue). Nothing touched a
+repository, a schema, a WorkManager request or the queue's states, and no interface gained a member at any
+point.
+
+**1 — Feedback** (`e056cd1`, run [36806479953](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36806479953),
+589 unit tests, 0 failed). The shell owns one `SnackbarHostState` — `LumoVaultApp` sits above every
+destination, including the viewer and the backup screens — and `ui/components/AppFeedback.kt` collects each
+screen's message flow into it, so messages queue in one place instead of a host per screen competing for the
+corner. The Photos, Albums, album-detail and viewer view models now emit what a bulk write actually did
+("Trashed 12 photos") or why a write actually failed, worded as an exception class or a digit-masked message
+per the logging rule, instead of letting the outcome fall into the state under the user's thumb.
+
+**2 — States** (`a330860` + `c6257a8`, runs
+[36810884166](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36810884166) red and
+[36811207175](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36811207175) green). Three shared
+components — `LoadingScreen`, `WorkingScreen`, `NoticeBanner` — replaced the per-screen approximations on
+Map, Cloud, Photos and album detail, so "still loading", "busy, here is why" and "here is a quiet note"
+wear one drawing each instead of a new one per screen. The red run was `.padding(horizontal = …, top = …)`,
+which matches no overload — a mistake no local check can see, and the reason the batches kept a static pass
+between every edit and every push.
+
+**3 — Motion** (`e07471c`, run
+[36814102587](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36814102587)). `ui/theme/Motion.kt`
+declares the vocabulary — chrome fades at 150 ms, the viewer's overlay at 200 ms — and the viewer's controls
+and the cloud viewer's scrim become one `AnimatedVisibility` each rather than a jump; every grid item carries
+`Modifier.animateItem()`, so inserts, removals and moves drift instead of teleporting. One shape, not a
+screen-by-screen decision.
+
+**4 — Accessibility** (`216f134` + `c4f44f8`, runs
+[36816016371](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36816016371) red and
+[36816245591](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36816245591) green). `RailWidth`
+became 48 dp — one floor for the thumb, shared by the date rail's ticks and the grid helpers, with the grid
+reserving the same token so three-column layouts did not move a pixel on any width the app supports. The
+free-up-space candidate rows and the backup toggles became row-level `toggleable`s carrying `Role.Checkbox`
+and `Role.Switch` with their inner controls inert to taps, because a control that both answers and handles a
+click announces itself twice. The cloud viewer's scrim gained a content description and `Role.Button`, so
+the way out has one name a screen reader can repeat. The red run was `stringResource` called from inside a
+`semantics {}` lambda, reported as "@Composable invocations can only happen from the context of a @Composable
+function" against a line that looks like an ordinary modifier chain: the string has to be resolved into a
+value before the lambda that needs it.
+
+**5 — Settings, PRD section 43** (`6847534`, run
+[36820362736](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36820362736), 592 unit tests across 60
+classes). The gear now opens a hub of seven rows under one `settings/` prefix, and the five categories that
+had no screen — Account, Cloud, Appearance, Notifications, About — are built on it; Backup and Storage are
+rows onto the screens that already exist rather than second copies of the queue and the free-space review.
+The shell hands every settings route its own bar over the same gradient and reports them as the Cloud tab's
+work, so the bottom bar never un-highlights itself. The screens hold the batches' two rules harder than any
+other: the cloud rows draw nothing until Room answers — `null` means *not looked up yet*, and neither
+"Not found yet" over a lookup in flight nor "0 items found" before the first count is a fact the app may
+print; notifications has no switch, because whether a notification can appear is Android's answer made
+where the row's button goes, re-read on every resume and worded by the same shared label the setup
+checklist uses; account offers exactly one action from the live session (reconnect when there is something
+to reconnect, sign out when there is a session) and confirms nothing before signing out, because the row's
+own note says what survives; appearance writes the same `ThemeMode` the palette icon cycles, so the bar and
+the list cannot hold two truths; and About prints `BuildConfig`'s version, the privacy promise in full and
+the licenses themselves rather than a button leading nowhere. `TelegramWord` now carries its label, so the
+diagnostics panel and the account screen cannot disagree about whether the user is signed in.
+
+**Not device-verified.** None of the five batches has run on a phone — they changed exactly the things a JVM
+test cannot see. What is covered is what is checkable off-device: `SettingsRoutesTest` pins the route
+judgments the shell makes from strings alone and the session's four words keeping four distinct sentences,
+and every batch passed the same static pass — brace and paren balance, every `R.string` read back against
+`strings.xml` and every newly-unread string removed, package/import agreement, and a full diff review —
+because the development machine cannot compile. The snackbar's wording on a screen, the motion's feel,
+TalkBack's reading of the new roles and the settings layouts are the developer's to confirm.
 
 ## Toolchain
 

@@ -191,7 +191,20 @@ Rules that have already caused a mistake here:
   complain about dead copy, so the miss surfaces as a screen with the wrong text rather than as a red
   build. Phase 7's first pass had a string no Kotlin read *and* one that was read — the add-media sheet was
   titled "New album". `strings.xml` well-formedness and `R.string.*` / `R.plurals.*` resolution are both
-  checkable without compiling; run them before pushing.
+  checkable without compiling; run them before pushing. The reverse direction bites too: moving a string's
+  only reader leaves a dead entry, and dead copy is the same unwired feature wearing its mirror image.
+
+- **`stringResource` cannot be called from inside a `semantics {}` or any other non-composable lambda.** CI
+  reports it as `@Composable invocations can only happen from the context of a @Composable function` at a
+  line that looks like an ordinary modifier chain (Batch 4's cloud-scrim close label did exactly this), which
+  sends you reading the modifier for a structural mistake that is not there. Resolve the string into a `val`
+  in the composable's body first and close over it.
+
+- **A visibility edit on a composable must keep `@Composable` inside the diff.** Replacing
+  `private fun EntryRow(…)` with `internal fun(…)` when the old text starts at the KDoc above it leaves the
+  annotation behind as an orphaned line — the head still reads correctly, and every call inside the function
+  becomes a compile error one CI run later. Frame the edit around the annotation, and read the function head
+  back afterwards; a brace-balance check will not catch it, because an orphaned annotation is balanced.
 
 ## Secrets and sensitive data
 
