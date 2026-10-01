@@ -119,6 +119,19 @@ pop transitions frame by frame — `enableOnBackInvokedCallback` opted in, ignor
 navigation API was read from the 2.10.2 sources jar before it was written, and `NavMotionTest` pins the
 route classification the four lambdas read. The feel itself is not device-verified.
 
+**Brand palette — one seed, one accent for transfers:** complete and CI-verified,
+[36869269469](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36869269469), 599 unit tests, 0 failed
+(62 classes), debug APK published. The design spec's `brandIndigo #2B5CE6` is now the hue every
+hue-bearing scheme role carries (rotated in place, tones untouched so the palette test's floors keep
+meaning the same thing), `LightPrimary` *is* the seed, and the spec's `syncing` role — `brandSky
+#4FA8FF` — tints the transfer marks that sit on chrome or the viewer's black backdrop. Marks over
+photographs stay white: sky-blue on the glyph scrim over a white sky computes to 1.9:1, under the floor
+the palette test already holds white glyphs to. Every assertion was replayed locally against the
+candidate hexes and against `Color.kt` as written before pushing; `BrandPaletteTest` pins the spec
+literals and the primary families' hue window. What moved is in
+[The brand palette: one seed, one accent](#the-brand-palette-one-seed-one-accent), and the seed's feel on
+a screen is not device-verified.
+
 ## Build in the cloud — never locally
 
 The development machine is not expected to compile Android. Do not run `gradlew assembleDebug`,
@@ -962,6 +975,37 @@ pushes, and an unknown route takes the app's general shape — five tests in a n
 [36829952541](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36829952541) alongside the rest. And
 the same caveat as everything else in this section: whether the fade-through's 100/50/200 timing and the
 viewer's 96 % read as calm on a real screen is a device question, not one this machine can answer.
+
+## The brand palette: one seed, one accent
+
+The design spec (named for `app_colors.dart`, applied here as the design it describes) names three
+colours and one relationship: `brandIndigo #2B5CE6` is the seed the whole Material scheme is built from,
+`brandSky #4FA8FF` is its lighter step, and `syncing` is an in-flight transfer accent equal to the sky.
+The scheme that shipped was a family of blues spread across twenty-six degrees of hue; every hue-bearing
+role — primary, secondary, outline, container, inverse, the surface tint ladder — now carries the seed's
+224.3-degree hue, rotated in place so each role keeps the tone `ThemePaletteTest` already encodes as ramp
+ordering and WCAG floors. `LightPrimary` is the seed itself: the brand colour should be what a
+light-scheme button wears. brandSky keeps the literal the spec drew — a little cyan of the seed, which is
+what "lighter sky-blue" says — and the error family, the scrims and the thumbnail accents stay out of the
+scheme exactly as their own comments demand.
+
+`SyncingAccent` (equal to brandSky) lands on the transfer marks that sit on chrome or the viewer's black
+backdrop: the backup bar's in-flight ring, both restore rings, the viewer's photo and video load
+spinners, and the viewer's upload arrow while it waits — still at the disabled alpha the wait state
+spells out, because `Busy` disables that button. Marks drawn over a photograph stay white: at 0x8C over a
+white sky, sky-blue computes to about 1.9:1, under the 3:1 floor `ThemePaletteTest` already holds white
+glyphs to, which is the arithmetic behind the badges' "cannot come from the colour scheme". The launcher
+background and foreground follow their Kotlin twins, the icon frame wearing the re-hued primary it has
+always mirrored.
+
+Both the orderings and the floors were proven twice before pushing: once against candidate hexes in a
+local replay of every `ThemePaletteTest` assertion, then again against `Color.kt` as actually written —
+with the tight floors where they were expected, `DarkOutline` at 3.13:1 on the lightest dark surface and
+the tonal pair at 1.37:1. `BrandPaletteTest` adds what prose cannot hold: the spec literals, syncing
+equal to the sky, the seed as light primary, and a 15-degree hue window around the primary and secondary
+families, reported by
+[36869269469](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36869269469). As with everything
+else here, whether indigo reads as indigo on a real screen is a device question.
 
 ## Toolchain
 
