@@ -307,7 +307,7 @@ fun MapScreen(
                 text = stringResource(R.string.map_tiles_unconfigured),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = SpaceMd, top = SpaceSm),
+                    .padding(start = SpaceMd, top = SpaceSm, end = SpaceMd),
             )
         }
 
@@ -372,14 +372,14 @@ fun MapScreen(
                 ),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = SpaceMd, top = SpaceSm),
+                    .padding(start = SpaceMd, top = SpaceSm, end = SpaceMd),
             )
         } else if (!state.hasPins && state.placedCount == 0) {
             NoticeBanner(
                 text = stringResource(R.string.map_no_positions),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = SpaceMd, top = SpaceSm),
+                    .padding(start = SpaceMd, top = SpaceSm, end = SpaceMd),
             )
         }
 
