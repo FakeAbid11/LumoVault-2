@@ -136,8 +136,16 @@ class TelegramAuthRepositoryImpl(
     }
 
     override fun cancelPendingRequest() {
-        // No network call: Telegram has nothing to cancel, and the next update corrects this anyway.
-        if (_state.value is TelegramAuthState.WaitingForCode || _state.value is TelegramAuthState.WaitingForPassword) {
+        // No network call: Telegram has nothing to cancel, and the next request re-reads the real state
+        // through `guard`'s `refresh()` anyway. `Failed` belongs here with the two waiting states — it is the
+        // refusal the user is looking at, and a wrong code or password must not strand them on a panel whose
+        // every exit, the change-number control and the system back gesture alike, routes through here.
+        // (TDLib sends no update to correct this one: its own state did not change.)
+        if (
+            _state.value is TelegramAuthState.WaitingForCode ||
+            _state.value is TelegramAuthState.WaitingForPassword ||
+            _state.value is TelegramAuthState.Failed
+        ) {
             _state.value = TelegramAuthState.ReadyForPhoneNumber
         }
     }

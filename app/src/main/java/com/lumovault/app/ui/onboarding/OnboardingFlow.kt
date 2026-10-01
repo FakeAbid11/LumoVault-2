@@ -149,10 +149,16 @@ fun OnboardingFlow(
             )
 
             LaunchedEffect(state.telegram) {
-                // A restored or freshly completed session moves on by itself; nothing else does.
+                // A restored or freshly completed session moves on by itself; nothing else does. Connect is
+                // popped *inclusively*: left on the stack, this effect re-fired on every return from
+                // Permissions and made that screen's back arrow bounce straight back here — an
+                // authenticated Connect can never be stayed on, so there is nothing to keep.
                 if (state.telegram is TelegramAuthState.Authenticated) {
                     navController.navigate(OnboardingStep.Permissions.route) {
-                        popUpTo(OnboardingStep.Connect.route) { saveState = true }
+                        popUpTo(OnboardingStep.Connect.route) {
+                            inclusive = true
+                            saveState = true
+                        }
                         launchSingleTop = true
                     }
                 }

@@ -226,6 +226,60 @@ class TelegramAuthFlowTest {
         assertEquals(TelegramAuthState.ReadyForPhoneNumber, repository.state.value)
     }
 
+    /**
+     * A refusal is a state the user must be able to leave.
+     *
+     * The sign-in panel follows Telegram's answers, and `Failed` is held on the panel the refusal
+     * happened on — which is right up to the moment the user asks to go back. Both exits from that
+     * panel, the change-number control and the system back gesture, route through
+     * [TelegramAuthRepository.cancelPendingRequest]; when it ignored `Failed`, back was consumed by the
+     * handler and then did nothing, and the only escape from a mistyped code was a correct one.
+     */
+    @Test
+    fun `backing out of a refused code returns to the phone prompt`() {
+        client.answer = { function ->
+            if (function is TdApi.CheckAuthenticationCode) {
+                throw TelegramRequestException(code = 400, reason = "AUTH_CODE_INVALID")
+            }
+            TdApi.Ok()
+        }
+
+        runBlocking { repository.submitCode("99999") }
+        assertEquals(
+            TelegramAuthFailure.Kind.InvalidCode,
+            (repository.state.value as TelegramAuthState.Failed).failure.kind,
+        )
+        val before = client.sent.size
+
+        repository.cancelPendingRequest()
+
+        assertEquals("backing out sends nothing to Telegram", before, client.sent.size)
+        assertEquals(TelegramAuthState.ReadyForPhoneNumber, repository.state.value)
+    }
+
+    /** The password panel has no change-number control at all, so back is its only way out of a refusal. */
+    @Test
+    fun `backing out of a refused password returns to the phone prompt`() {
+        client.answer = { function ->
+            if (function is TdApi.CheckAuthenticationPassword) {
+                throw TelegramRequestException(code = 400, reason = "PASSWORD_HASH_INVALID")
+            }
+            TdApi.Ok()
+        }
+
+        runBlocking { repository.submitPassword("not the password") }
+        assertEquals(
+            TelegramAuthFailure.Kind.PasswordIncorrect,
+            (repository.state.value as TelegramAuthState.Failed).failure.kind,
+        )
+        val before = client.sent.size
+
+        repository.cancelPendingRequest()
+
+        assertEquals(before, client.sent.size)
+        assertEquals(TelegramAuthState.ReadyForPhoneNumber, repository.state.value)
+    }
+
     @Test
     fun `an error from Telegram becomes LumoVault's own wording, never Telegram's text`() {
         client.answer = { function ->
