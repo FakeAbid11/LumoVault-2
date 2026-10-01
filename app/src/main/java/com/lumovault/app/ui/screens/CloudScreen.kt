@@ -56,6 +56,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -531,12 +534,20 @@ private fun CloudViewer(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(FullScreenScrim)
-            .clickable(onClick = onDismiss),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
+        // The scrim carries its own node, with its own name. On the root it was the opposite: one click
+        // handler merged the whole dialog — its text, its buttons, its disabled download — into a single
+        // unnamed row, so a screen reader offered the entire sheet as one thing you could not identify
+        // and never mentioned the way out of it.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(FullScreenScrim)
+                .semantics { contentDescription = stringResource(R.string.viewer_close) }
+                .clickable(role = Role.Button, onClick = onDismiss),
+        )
         Surface(
             modifier = Modifier.fillMaxWidth().padding(SpaceXxl),
             shape = RoundedCornerShape(MediaThumbCorner),

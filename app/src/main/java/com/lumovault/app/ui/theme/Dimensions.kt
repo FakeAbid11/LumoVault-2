@@ -39,12 +39,18 @@ internal val MediaGlyphIconSize = 16.dp
  * apart and leave the rail sitting on top of the rightmost column of photos — the strip is reserved, not
  * overlaid.
  *
+ * The strip draws nothing of its own: the ticks and the guide are anchored to its end, so a wider strip moves
+ * no ink — only the box a finger has to find. It is 48 dp because that is the touch-target floor stated at
+ * [MinTouchTarget], and because the grid reserves this same token the wider strip spends the rightmost
+ * column's padding rather than the column itself: three-column layouts on a 360 dp phone and a 411 dp one
+ * are unchanged.
+ *
  * The overlay is the second, wider measure: a transparent layer that reaches left over the grid and carries the
- * month's name. It exists because text that is *measured* inside a 26 dp strip is text that gets cut off — the
+ * month's name. It exists because text that is *measured* inside a 48 dp strip is text that gets cut off — the
  * strip is where the finger is, the overlay is where the words are, and only the strip takes the gesture, so
  * the overlay costs the grid nothing but a few pixels of a thumbnail while a drag is in progress.
  */
-internal val RailWidth = 26.dp
+internal val RailWidth = 48.dp
 internal val RailOverlayWidth = 104.dp
 internal val RailTickWidth = 3.dp
 internal val RailTickHeight = 12.dp

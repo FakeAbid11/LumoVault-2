@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.app.R
@@ -900,11 +902,18 @@ private fun OutcomeCard(detail: OutcomeDetail, onDismiss: () -> Unit) {
 @Composable
 private fun CandidateRow(candidate: FreeUpSpaceCandidate, checked: Boolean, onToggle: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = SpaceSm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            )
+            .padding(vertical = SpaceSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SpaceMd),
     ) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Checkbox(checked = checked, onCheckedChange = null)
         Column(modifier = Modifier.weight(1f)) {
             Text(text = candidate.displayName, style = MaterialTheme.typography.bodyMedium)
             Text(
@@ -962,6 +971,12 @@ private fun ToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MinTouchTarget)
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onChange,
+            )
             .padding(vertical = SpaceXs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SpaceMd),
@@ -974,7 +989,7 @@ private fun ToggleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
