@@ -5,6 +5,7 @@ import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,8 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.SubcomposeAsyncImage
 import com.lumovault.app.R
 import android.net.Uri
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import com.lumovault.app.data.map.MapTileProvider
 import com.lumovault.app.domain.map.MapClustering
 import com.lumovault.app.domain.model.MapBounds
@@ -655,7 +655,7 @@ private fun StripThumbnail(
             .size(size)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .pointerInput(photo.mediaStoreId) { detectTapGestures { onClick() } },
+            .clickable(role = Role.Button, onClick = onClick),
         contentScale = ContentScale.Crop,
     )
 }

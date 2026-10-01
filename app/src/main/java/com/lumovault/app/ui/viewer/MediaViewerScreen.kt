@@ -625,7 +625,8 @@ private fun MediaDetailsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = SpaceXl)
-                .padding(bottom = SpaceXl),
+                .padding(bottom = SpaceXl)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(SpaceMd),
         ) {
             Text(

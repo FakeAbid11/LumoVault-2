@@ -23,7 +23,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Cloud
@@ -557,7 +559,9 @@ private fun CloudViewer(
             tonalElevation = DialogTonalElevation,
         ) {
             Column(
-                modifier = Modifier.padding(SpaceLg),
+                modifier = Modifier
+                    .padding(SpaceLg)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(SpaceMd),
             ) {
                 val path = previewPath

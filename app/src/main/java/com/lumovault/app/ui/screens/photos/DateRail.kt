@@ -30,7 +30,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -133,7 +139,20 @@ fun DateRail(
     }
 
     val railDescription = stringResource(R.string.photos_date_rail)
+    val newerMonthLabel = stringResource(R.string.photos_date_rail_newer_month)
+    val olderMonthLabel = stringResource(R.string.photos_date_rail_older_month)
     val pillHeightPx = with(density) { PillHeight.toPx() }
+
+    fun jumpToMonth(offset: Int): Boolean {
+        val current = activeMonth?.let(months::indexOf)?.takeIf { it >= 0 } ?: 0
+        val target = (current + offset).coerceIn(months.indices)
+        if (target == current) return false
+        val month = months[target]
+        scrubbing = Scrubbing(month.yearMonth, (TimelineRail.fractionFor(months, month) ?: 0f) * trackPx)
+        announced = null
+        currentScrub.value.invoke(month.firstItemIndex)
+        return true
+    }
 
     Box(
         modifier = modifier
@@ -161,7 +180,22 @@ fun DateRail(
                 .align(Alignment.CenterEnd)
                 .width(RailWidth)
                 .fillMaxHeight()
-                .semantics { contentDescription = railDescription }
+                .semantics {
+                    contentDescription = railDescription
+                    stateDescription = monthLabel(activeMonth?.yearMonth ?: months.first().yearMonth)
+                    progressBarRangeInfo = ProgressBarRangeInfo(
+                        current = TimelineRail.fractionFor(months, activeMonth ?: months.first()) ?: 0f,
+                        range = 0f..1f,
+                    )
+                    setProgress { fraction ->
+                        scrubTo(fraction.coerceIn(0f, 1f) * trackPx)
+                        true
+                    }
+                    customActions = listOf(
+                        CustomAccessibilityAction(newerMonthLabel) { jumpToMonth(-1) },
+                        CustomAccessibilityAction(olderMonthLabel) { jumpToMonth(1) },
+                    )
+                }
                 // A vertical drag, because that is what a rail is: one finger along a strip of months. Taking
                 // the gesture also *claims* it, which matters for one reason — the grid under the rail would
                 // scroll on the same movement, and a scrubber whose own drag scrolls the list it is scrubbing
@@ -289,7 +323,6 @@ private fun pillTop(centrePx: Float, trackPx: Float, pillHeightPx: Float): Float
     return (centrePx - pillHeightPx / 2f).coerceIn(0f, maxTop)
 }
 
-@Composable
 private fun monthLabel(month: YearMonth): String =
     formatMonth(month, showYear = month.year != YearMonth.now().year)
 

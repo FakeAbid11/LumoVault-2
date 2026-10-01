@@ -49,7 +49,7 @@ fun LumoVaultApp(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
-    val currentDestination = LumoVaultDestination.forRoute(route)
+    val currentDestination = LumoVaultDestination.forRoute(route) ?: LumoVaultDestination.Start
     // An album screen is a child of the Albums tab rather than a fifth tab, so the bar keeps Albums
     // highlighted and only the back arrow changes.
     val isNested = route?.startsWith(AlbumRoutes.DETAIL_PREFIX) == true ||
@@ -95,7 +95,7 @@ fun LumoVaultApp(
                 }
             },
             bottomBar = {
-                if (isViewer) Unit else NavigationBar {
+                if (LumoVaultDestination.showsBottomNavigation(route)) NavigationBar {
                     LumoVaultDestination.entries.forEach { destination ->
                         NavigationBarItem(
                             selected = destination == currentDestination,

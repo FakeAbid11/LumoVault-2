@@ -2,6 +2,7 @@ package com.lumovault.app.ui.navigation
 
 import com.lumovault.app.ui.backup.TelegramWord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -9,8 +10,8 @@ import org.junit.Test
  * Section 43's routes, checked where a wrong answer would send the gear to the wrong room.
  *
  * Nothing renders — that needs a phone. What is checkable off-device are the two judgements the
- * shell makes from route strings alone: a settings screen must keep the Cloud tab highlighted (it is
- * that tab's work, exactly like backup), and every entry must stay under its prefix, because the
+ * shell makes from route strings alone: a settings screen must not claim one of the four primary tabs,
+ * and every entry must stay under its prefix, because the
  * shell decides "this screen draws its own bar" from that prefix alone — one route spelled bare
  * would stack two titles on one screen. The uniqueness pass exists for the reason every collision
  * test does: two names for one route means navigating to one arrives at whichever the graph
@@ -19,12 +20,15 @@ import org.junit.Test
 class SettingsRoutesTest {
 
     @Test
-    fun everySettingsRouteIsNestedUnderThePrefixAndKeepsTheCloudTabHighlighted() {
+    fun everySettingsRouteIsNestedUnderThePrefixAndHidesPrimaryNavigation() {
         settingsRoutes().forEach { route ->
-            assertEquals(
-                "$route is opened from the gear rather than a tab, so the bar must stay put",
-                LumoVaultDestination.Cloud,
+            assertNull(
+                "$route is opened from the gear rather than a tab, so it must not claim one",
                 LumoVaultDestination.forRoute(route),
+            )
+            assertTrue(
+                "$route owns no primary tab, so primary navigation must be hidden",
+                !LumoVaultDestination.showsBottomNavigation(route),
             )
             assertTrue(
                 "$route must carry the prefix the shell reads to hand the screen its own bar",

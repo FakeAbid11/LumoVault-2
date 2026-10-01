@@ -5,13 +5,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import com.lumovault.app.domain.model.ThemeMode
 
 private val LumoVaultDarkColors = darkColorScheme(
     primary = DarkPrimary,
     onPrimary = DarkOnPrimary,
+    inversePrimary = DarkInversePrimary,
     primaryContainer = DarkPrimaryContainer,
     onPrimaryContainer = DarkOnPrimaryContainer,
+    tertiary = DarkTertiary,
+    onTertiary = DarkOnTertiary,
+    tertiaryContainer = DarkTertiaryContainer,
+    onTertiaryContainer = DarkOnTertiaryContainer,
     secondary = DarkSecondary,
     onSecondary = DarkOnSecondary,
     secondaryContainer = DarkSecondaryContainer,
@@ -37,13 +43,19 @@ private val LumoVaultDarkColors = darkColorScheme(
     onErrorContainer = DarkOnErrorContainer,
     inverseSurface = DarkInverseSurface,
     inverseOnSurface = DarkOnInverseSurface,
+    scrim = Color.Black,
 )
 
 private val LumoVaultLightColors = lightColorScheme(
     primary = LightPrimary,
     onPrimary = LightOnPrimary,
+    inversePrimary = LightInversePrimary,
     primaryContainer = LightPrimaryContainer,
     onPrimaryContainer = LightOnPrimaryContainer,
+    tertiary = LightTertiary,
+    onTertiary = LightOnTertiary,
+    tertiaryContainer = LightTertiaryContainer,
+    onTertiaryContainer = LightOnTertiaryContainer,
     secondary = LightSecondary,
     onSecondary = LightOnSecondary,
     secondaryContainer = LightSecondaryContainer,
@@ -69,6 +81,7 @@ private val LumoVaultLightColors = lightColorScheme(
     onErrorContainer = LightOnErrorContainer,
     inverseSurface = LightInverseSurface,
     inverseOnSurface = LightOnInverseSurface,
+    scrim = Color.Black,
 )
 
 /**

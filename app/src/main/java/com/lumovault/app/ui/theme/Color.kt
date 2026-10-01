@@ -31,8 +31,13 @@ internal val DarkOnSurface = Color(0xFFE6EBF8)
 internal val DarkOnSurfaceVariant = Color(0xFFA9B3CE)
 internal val DarkPrimary = Color(0xFF4C7BFF)
 internal val DarkOnPrimary = Color(0xFF000B29)
+internal val DarkInversePrimary = Color(0xFF345BDD)
 internal val DarkPrimaryContainer = Color(0xFF1B2F67)
 internal val DarkOnPrimaryContainer = Color(0xFFCFDCFF)
+internal val DarkTertiary = Color(0xFF9CCBFF)
+internal val DarkOnTertiary = Color(0xFF003354)
+internal val DarkTertiaryContainer = Color(0xFF004B73)
+internal val DarkOnTertiaryContainer = Color(0xFFC9E6FF)
 internal val DarkOutline = Color(0xFF6E7B9E)
 
 // Light scheme: white + light blue surfaces, the same blue accent family. The primary is the seed
@@ -44,8 +49,13 @@ internal val LightOnSurface = Color(0xFF0C1120)
 internal val LightOnSurfaceVariant = Color(0xFF434D6B)
 internal val LightPrimary = BrandIndigo
 internal val LightOnPrimary = Color(0xFFFFFFFF)
+internal val LightInversePrimary = Color(0xFFB7C7FF)
 internal val LightPrimaryContainer = Color(0xFFD3DFFF)
 internal val LightOnPrimaryContainer = Color(0xFF001C6B)
+internal val LightTertiary = Color(0xFF006493)
+internal val LightOnTertiary = Color(0xFFFFFFFF)
+internal val LightTertiaryContainer = Color(0xFFC9E6FF)
+internal val LightOnTertiaryContainer = Color(0xFF001E30)
 internal val LightOutline = Color(0xFF66708C)
 
 /*
