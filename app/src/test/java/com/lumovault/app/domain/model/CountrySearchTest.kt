@@ -139,4 +139,22 @@ class OnboardingSummaryTest {
         assertFalse(BackupSource.NotNow.canRunAutomatic(folderCount = 3))
         assertFalse("never answered is not permission", (null as BackupSource?).canRunAutomatic(folderCount = 3))
     }
+
+    /** The checklist reads the same rule the write and the schedule obey, so it cannot tick an empty answer. */
+    @Test
+    fun `selected folders tick only when the selection is not empty`() {
+        assertEquals(
+            ChecklistStatus.Done,
+            summary(
+                progress = OnboardingProgress(
+                    backupSource = BackupSource.SelectedFolders,
+                    selectedFolders = listOf("DCIM/Camera/"),
+                ),
+            ).backupSourceItem.status,
+        )
+        assertEquals(
+            ChecklistStatus.Missing,
+            summary(progress = OnboardingProgress(backupSource = BackupSource.SelectedFolders)).backupSourceItem.status,
+        )
+    }
 }
