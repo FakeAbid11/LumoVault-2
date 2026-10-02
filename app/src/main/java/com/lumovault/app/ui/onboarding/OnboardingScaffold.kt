@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,7 +86,7 @@ fun OnboardingScaffold(
             // opens on arrival. The IME inset overlaps the navigation bar, which the scaffold's own
             // innerPadding contributes below, so the overlap is excluded rather than summed and the
             // button lands exactly on the keyboard's edge.
-            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars())),
+            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
     ) {
         Scaffold(
             containerColor = Color.Transparent,
