@@ -109,7 +109,14 @@ data class OnboardingSummary(
             when (progress.backupSource) {
                 null -> ChecklistStatus.Missing
                 BackupSource.NotNow -> ChecklistStatus.Skipped
-                else -> ChecklistStatus.Done
+                // "These folders" naming none is an empty answer, not a done one: the same rule that
+                // decides what the write and the schedule may do decides the tick, so the checklist
+                // cannot claim a step the backup engine cannot run.
+                else -> if (progress.backupSource.canRunAutomatic(progress.selectedFolders.size)) {
+                    ChecklistStatus.Done
+                } else {
+                    ChecklistStatus.Missing
+                }
             },
         )
 }

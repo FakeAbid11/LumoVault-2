@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -74,7 +78,14 @@ fun OnboardingScaffold(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(onboardingBackdrop()),
+            .background(onboardingBackdrop())
+            // Edge-to-edge hands the keyboard to the app as an inset instead of resizing the window
+            // (API 30+; adjustResize alone stopped doing it), so without this the pinned primary
+            // button — the step's whole point — drew behind the keyboard that every sign-in field
+            // opens on arrival. The IME inset overlaps the navigation bar, which the scaffold's own
+            // innerPadding contributes below, so the overlap is excluded rather than summed and the
+            // button lands exactly on the keyboard's edge.
+            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars())),
     ) {
         Scaffold(
             containerColor = Color.Transparent,

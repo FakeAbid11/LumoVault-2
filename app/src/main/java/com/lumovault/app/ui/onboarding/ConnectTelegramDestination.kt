@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.domain.telegram.TelegramAuthState
@@ -16,8 +18,11 @@ import com.lumovault.app.domain.telegram.TelegramAuthState
  * a reconnect in place" rather than reopening the whole six-screen flow — and until now that promise
  * had no route: the only sign-in UI lived inside the onboarding graph, and the Cloud tab's
  * needs-sign-in state was a dead sentence telling the user to go somewhere the app could not take
- * them. This screen hosts the same [ConnectTelegramScreen] over the same [OnboardingViewModel]: the
- * VM's init already reconnects TDLib and the auth state machine owns every transition from here.
+ * them. This screen hosts the same [ConnectTelegramScreen] over the same Activity-scoped
+ * [OnboardingViewModel] [LumoVaultRoot] created: the VM's init already reconnects TDLib and the auth
+ * state machine owns every transition from here. (Its default `viewModel()` used to construct a
+ * *second*, nav-entry-scoped instance — which is why the number and country typed during setup did
+ * not survive into a reconnect.)
  *
  * What differs from setup is only the exits. There is no step counter to walk back through and no
  * "continue without Telegram" to a permissions screen: signing in here ends by leaving, and the
@@ -27,7 +32,12 @@ import com.lumovault.app.domain.telegram.TelegramAuthState
 fun ConnectTelegramDestination(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: OnboardingViewModel = viewModel(),
+    viewModel: OnboardingViewModel = viewModel(
+        // The store LumoVaultRoot created this VM in is the Activity's; the NavHost would otherwise
+        // hand back a fresh instance per visit. The instance is a ComponentActivity, which is what
+        // carries the ViewModelStoreOwner.
+        viewModelStoreOwner = requireNotNull(LocalContext.current.findActivity() as? ViewModelStoreOwner),
+    ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 

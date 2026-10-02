@@ -39,6 +39,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -103,6 +105,15 @@ fun ConnectTelegramScreen(
     LaunchedEffect(panel) {
         if (panel != TelegramPanel.Code) codeDraft = ""
         if (panel != TelegramPanel.Password) passwordDraft = ""
+    }
+
+    // A refusal retires the code it refused. `Failed` deliberately holds this panel open, so without
+    // this the rejected digits would sit in the field — and the auto-submit below would fire them at
+    // Telegram's next WaitingForCode answer (a code-expiry re-emission, or a reconnect after process
+    // death restored the draft), spending attempt after attempt on a code that already failed, with
+    // nobody touching anything.
+    LaunchedEffect(state.telegram) {
+        if (state.telegram is TelegramAuthState.Failed) codeDraft = ""
     }
 
     // Telegram's own behaviour: a code that is complete is a code that is submitted. It fires only
@@ -221,6 +232,9 @@ fun ConnectTelegramScreen(
     if (pickerOpen) {
         CountryPicker(
             countries = state.countries,
+            // The list builds off-main after the view model starts; until it lands the sheet has
+            // nothing to show and must say that, not "no country matches that search".
+            loading = state.countries.isEmpty(),
             selected = state.selectedCountry,
             onSelected = {
                 onCountrySelected(it)
@@ -313,8 +327,17 @@ private fun CodeFields(
     // itself instead of waiting for a re-emission that cannot come. Telegram enforces the real limit
     // regardless; a refusal arrives in the banner.
     var secondsLeft by rememberSaveable { mutableStateOf(waiting?.timeoutSeconds ?: 0) }
+    // Armed per answer, not per composition: re-arming unconditionally would clobber the countdown a
+    // saver just restored on recreation. `armedFor` starts at the current answer, so first composition
+    // — restored or fresh — keeps the value it already has, and only a genuinely new WaitingForCode
+    // resets it. A resend answered with an identical value does not re-emit at all, and the tap below
+    // re-arms that case itself.
+    var armedFor by remember { mutableStateOf(waiting) }
     LaunchedEffect(waiting) {
-        if (waiting != null) secondsLeft = waiting.timeoutSeconds ?: 0
+        if (waiting != null && waiting != armedFor) {
+            armedFor = waiting
+            secondsLeft = waiting.timeoutSeconds ?: 0
+        }
     }
     LaunchedEffect(secondsLeft) {
         if (secondsLeft > 0) {
@@ -434,7 +457,12 @@ private fun CountryButton(country: Country?, onClick: () -> Unit, enabled: Boole
     Card(
         modifier = Modifier
             .clickable(enabled = enabled, onClick = onClick)
-            .semantics { role = Role.Button },
+            .semantics {
+                role = Role.Button
+                // The country's name is not on the chip — only the flag and dial code fit — so it is
+                // said here; without it a TalkBack user cannot confirm which country is selected.
+                country?.let { contentDescription = it.name }
+            },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
@@ -447,6 +475,9 @@ private fun CountryButton(country: Country?, onClick: () -> Unit, enabled: Boole
             Text(
                 text = country?.flag ?: "?",
                 style = MaterialTheme.typography.titleLarge,
+                // No country yet: the glyph is a placeholder, and left alone TalkBack reads it aloud
+                // as "question mark" ahead of the button's own purpose.
+                modifier = if (country == null) Modifier.clearAndSetSemantics { } else Modifier,
             )
             if (country != null) {
                 Text(

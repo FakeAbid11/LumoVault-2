@@ -190,6 +190,10 @@ fun FolderSelectionScreen(
         // draft to lose — and a "Continue" that pops to Sources leaves a user who chose folders with
         // no way to finish setup.
         onPrimary = onContinue,
+        // Nothing ticked means backup would be "on" against an empty answer — the same rule
+        // `canRunAutomatic` applies to the write itself, and the one the Sources screen enforces by
+        // routing here. The empty-list card explains why the button is waiting.
+        primaryEnabled = selectedFolders.isNotEmpty(),
         onBack = onBack,
         modifier = modifier,
     ) {
