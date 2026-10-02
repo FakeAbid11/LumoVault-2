@@ -80,6 +80,15 @@ fun deriveCloudState(
 
     val hasCachedLibrary = totalCount > 0 && items.isNotEmpty()
 
+    // The preparing steps are a spinner only when there is nothing to show. With a cached index the
+    // library stays on screen wearing the neutral "checking" pill — the rendering Scanning already gives —
+    // because every tab entry and pull-to-refresh walks through ValidatingChannel, and a full-screen
+    // "Preparing…" there replaced a healthy library for the length of a network round trip. `fromCache`
+    // stays false on purpose: nothing has said Telegram was unreachable yet, and the offline pill is
+    // reserved for the states that actually know it.
+    fun preparing(step: CloudUiState.Preparing.Step) =
+        if (hasCachedLibrary) library(fromCache = false, refreshing = true) else CloudUiState.Preparing(step)
+
     return when (init) {
         CloudInitState.Idle -> CloudUiState.Idle
 
@@ -95,9 +104,9 @@ fun deriveCloudState(
             CloudUiState.NeedsSignIn
         }
 
-        CloudInitState.SearchingChannel -> CloudUiState.Preparing(CloudUiState.Preparing.Step.Searching)
-        CloudInitState.ValidatingChannel -> CloudUiState.Preparing(CloudUiState.Preparing.Step.Validating)
-        CloudInitState.CreatingChannel -> CloudUiState.Preparing(CloudUiState.Preparing.Step.Creating)
+        CloudInitState.SearchingChannel -> preparing(CloudUiState.Preparing.Step.Searching)
+        CloudInitState.ValidatingChannel -> preparing(CloudUiState.Preparing.Step.Validating)
+        CloudInitState.CreatingChannel -> preparing(CloudUiState.Preparing.Step.Creating)
 
         is CloudInitState.Scanning -> if (hasCachedLibrary) {
             library(fromCache = false, refreshing = true)

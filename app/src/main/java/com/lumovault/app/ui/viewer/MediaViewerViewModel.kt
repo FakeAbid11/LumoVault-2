@@ -96,10 +96,14 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
      * was tapped. Which is the one failure a viewer must not have.
      */
     val listing: StateFlow<Listing> = combine(rows, request) { list, value ->
-        when (list) {
-            null -> Listing.Loading
+        when {
+            // Both halves have to have answered: a window without a request is the plain first page
+            // still streaming in while `open()`'s probe runs, and an index computed against nothing is
+            // -1 — which used to render as "this item is no longer here" for a photo that was plainly
+            // there, for as long as the probe took.
+            list == null || value == null -> Listing.Loading
             else -> {
-                val index = ViewerPresentation.pageIndex(list.map(Media::id), value?.mediaStoreId ?: NO_ID)
+                val index = ViewerPresentation.pageIndex(list.map(Media::id), value.mediaStoreId)
                 if (index < 0) Listing.Missing(list.size) else Listing.Ready(list, index)
             }
         }
@@ -283,10 +287,14 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     fun archiveCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
+        repointToSurvivor(id)
         launchWrite(
             "archive write",
             failureMessage = R.string.feedback_archive_failed,
-            onFailure = { retiring = false },
+            onFailure = {
+                retiring = false
+                restoreShownItem(id)
+            },
         ) {
             container.mediaOrganizationRepository.setArchived(listOf(id), true)
         }
@@ -296,13 +304,42 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     fun moveToTrashCurrent() {
         val id = currentItem.value?.id ?: return
         retiring = true
+        repointToSurvivor(id)
         launchWrite(
             "trash write",
             failureMessage = R.string.feedback_trash_failed,
-            onFailure = { retiring = false },
+            onFailure = {
+                retiring = false
+                restoreShownItem(id)
+            },
         ) {
             container.mediaOrganizationRepository.moveToTrash(listOf(id))
         }
+    }
+
+    /**
+     * Points `request` at the item that will occupy this page once the write removes the shown one,
+     * computed from the window the viewer already holds — which is why it runs *before* the write: when
+     * the source's query drops the row, `listing` steps straight from Ready to Ready-at-the-survivor and
+     * the pager is never torn down. Reacting to `Missing` instead is what produced the one-frame teardown
+     * of the pager, its chrome and any open sheet on every archive and trash.
+     *
+     * [survivorAfterRetirement] expects the list *after* the item left, so the retired id is dropped
+     * here first. Nothing to point at — an emptied window — leaves `request` alone and lets the honest
+     * `Missing` speak; the retirement collector below remains the safety net for exactly those cases.
+     */
+    private fun repointToSurvivor(retiredId: Long) {
+        val list = rows.value ?: return
+        val target = request.value?.target ?: return
+        val idsAfterRemoval = list.map(Media::id).filterNot { it == retiredId }
+        val survivor = ViewerPresentation.survivorAfterRetirement(idsAfterRemoval, page.value) ?: return
+        request.value = OpenRequest(survivor, target)
+    }
+
+    /** A failed retire write leaves the item on the device, so the pager goes back to showing it. */
+    private fun restoreShownItem(retiredId: Long) {
+        val target = request.value?.target ?: return
+        if (request.value?.mediaStoreId != retiredId) request.value = OpenRequest(retiredId, target)
     }
 
     fun addToAlbum(albumId: Long) {
@@ -378,9 +415,6 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
 
         /** How deep one tap is allowed to materialise a window; beyond it, paging is the answer. */
         const val WINDOW_PROBE_CEILING = 38_400
-
-        /** No request yet, so nothing to look for — which resolves to [Listing.Loading] either way. */
-        const val NO_ID = -1L
 
         val STOP_POLICY = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS)
         const val STOP_TIMEOUT_MILLIS = 5_000L

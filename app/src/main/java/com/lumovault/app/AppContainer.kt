@@ -590,9 +590,9 @@ class AppContainer(context: Context) {
 
     private fun unixNow(): Long = System.currentTimeMillis() / 1000
 
-    private companion object {
+    companion object {
         /** TDLib reserves 0 for "no identifier", so it also means "no channel adopted yet". */
-        const val NO_CHANNEL = 0L
+        private const val NO_CHANNEL = 0L
 
         /**
          * How long a queue pass waits for TDLib's handshake before it calls the account unusable.
@@ -600,7 +600,11 @@ class AppContainer(context: Context) {
          * Creating the client, sending its parameters and reading the authorization state is normally well
          * under a second; the rest is a mobile network. Beyond that a pass has nothing to do but try again
          * later, which [com.lumovault.app.data.backup.toPassDirective] is what asks for.
+         *
+         * Shared with the Cloud screen, which waits on the same handshake before asking whether the
+         * account is authenticated — reading the live state a moment after `connect()` would otherwise
+         * see a handshake still in progress and answer "not signed in".
          */
-        const val SESSION_HANDSHAKE_MILLIS = 15_000L
+        internal const val SESSION_HANDSHAKE_MILLIS = 15_000L
     }
 }

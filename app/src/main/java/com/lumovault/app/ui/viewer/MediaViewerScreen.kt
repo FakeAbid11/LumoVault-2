@@ -223,6 +223,12 @@ private fun ViewerPager(
             .collect { page -> if (page >= items.size - LOAD_AHEAD) viewModel.loadMore() }
     }
 
+    // The window can shrink under a pager that stayed composed — a retirement keeps this pager alive
+    // now, and trashing the last item leaves the kept page one past the new end. Land on the new last.
+    LaunchedEffect(pagerState, items.size) {
+        if (pagerState.currentPage > items.size - 1) pagerState.scrollToPage(items.size - 1)
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()

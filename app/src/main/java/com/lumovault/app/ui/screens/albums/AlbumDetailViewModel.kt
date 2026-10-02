@@ -72,6 +72,9 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
 
     private val target = MutableStateFlow<AlbumTarget?>(null)
     private val loadedLimit = MutableStateFlow(WINDOW_START)
+
+    /** Grows as the add sheet's grid is scrolled; see [libraryItems]. */
+    private val libraryLimit = MutableStateFlow(WINDOW_START)
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
 
     /**
@@ -181,15 +184,24 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     /**
-     * The library the "add photos" sheet lists.
+     * The library the "add photos" sheet lists, and how much of it the index holds in total.
      *
-     * Windowed by the media index's own limit rather than by the album's, because the sheet is choosing
-     * from the device and not from what is already here; the album's members come from
-     * [AlbumDetailUiState.memberIds] so the already-added ones show ticked.
+     * A growing window, the same shape the album grid and the timeline use: the sheet used to offer a
+     * fixed first page, which in a large library silently hid everything past it with no way to reach
+     * it and no word of why the scrolling stopped. `libraryTotal` is what tells the sheet to stop
+     * asking for more.
      */
-    val libraryItems: StateFlow<List<Media>> = container.mediaRepository
-        .observeWindow(SHEET_WINDOW)
+    val libraryItems: StateFlow<List<Media>> = libraryLimit
+        .flatMapLatest { limit -> container.mediaRepository.observeWindow(limit) }
         .stateIn(viewModelScope, STOP_POLICY, emptyList())
+
+    val libraryTotal: StateFlow<Int> = container.mediaRepository
+        .observeCount()
+        .stateIn(viewModelScope, STOP_POLICY, 0)
+
+    fun loadLibraryMore() {
+        libraryLimit.value += WINDOW_STEP
+    }
 
     fun addMedia(ids: Collection<Long>) {
         val albumId = (target.value as? AlbumTarget.User)?.albumId ?: return
@@ -421,8 +433,6 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         /** How many feedback lines wait for a screen that is still showing the previous one. */
         private const val MESSAGE_BUFFER = 8
 
-        /** How many library items the add sheet offers at once; the same bound as the timeline's first page. */
-        private const val SHEET_WINDOW = 300
         private val STOP_POLICY = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS)
         private const val STOP_TIMEOUT_MILLIS = 5_000L
     }

@@ -116,8 +116,17 @@ fun LumoVaultApp(
             LumoVaultNavHost(
                 navController = navController,
                 // The viewer's own chrome pads for the system bars it is drawn behind; every other screen lets
-                // the scaffold do it, which is what keeps a status bar from landing on top of a title.
-                modifier = if (isViewer) modifier else modifier.padding(innerPadding),
+                // the scaffold do it, which is what keeps a status bar from landing on top of a title. The
+                // screens that own their bar get the viewer's treatment for the *top* inset only — each of
+                // them paints the brand gradient full-height behind a transparent app bar of its own, and an
+                // outer top pad here was what cut that gradient off below the status bar, leaving the shell's
+                // flat surface colour as a two-tone stripe above it. The bottom stays: backup routes keep the
+                // shell's tab bar, and the rest still need the gesture-bar inset.
+                modifier = when {
+                    isViewer -> modifier
+                    ownsItsBar -> modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                    else -> modifier.padding(innerPadding)
+                },
             )
         }
     }

@@ -3,6 +3,7 @@ package com.lumovault.app.ui.screens.cloud
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.lumovault.app.AppContainer
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.CloudTypeCount
@@ -202,6 +203,14 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
                 // Repeated calls are safe, and needed: the Cloud tab can be opened without onboarding
                 // having touched TDLib, and a chat request before a session is meaningless.
                 container.telegramAuthRepository.connect()
+                // The handshake is asynchronous, and "is authenticated?" reads live state — so on this
+                // tab's very first sync of a process, the answer used to arrive before TDLib had
+                // finished starting and read as "signed out": the offline pill over a healthy cached
+                // library, or the connect dialog over a session that was fine. Waiting for a settled
+                // answer costs nothing once the session exists (awaitReady returns immediately) and
+                // bounds the wait at the same ceiling the queue's unattended pass uses; when it times
+                // out or reports no account, the synchronize below still derives the honest state.
+                container.telegramAuthRepository.awaitReady(AppContainer.SESSION_HANDSHAKE_MILLIS)
                 val adopted = container.cloudSync.synchronize()
                 if (adopted != null) {
                     // The index has just changed, which is the one moment recognition is certain to have

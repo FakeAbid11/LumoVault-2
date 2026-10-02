@@ -97,6 +97,7 @@ fun AlbumDetailScreen(
 
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val libraryItems by viewModel.libraryItems.collectAsStateWithLifecycle()
+    val libraryTotal by viewModel.libraryTotal.collectAsStateWithLifecycle()
 
     // Failures of this screen's writes, shown by the shell's one snackbar. Collected before the
     // unresolved-album return below, so the collector is never started and stopped by a branch.
@@ -207,6 +208,8 @@ fun AlbumDetailScreen(
         AddMediaSheet(
             albumName = state.userAlbum?.name.orEmpty(),
             items = libraryItems,
+            hasMoreToLoad = libraryItems.size < libraryTotal,
+            onLoadMore = viewModel::loadLibraryMore,
             alreadyMemberOf = state.memberIds,
             onDismiss = { adding = false },
             onConfirm = { ids ->
@@ -529,6 +532,8 @@ private fun ConfirmDialog(title: Int, body: Int, action: Int, onDismiss: () -> U
 private fun AddMediaSheet(
     albumName: String,
     items: List<Media>,
+    hasMoreToLoad: Boolean,
+    onLoadMore: () -> Unit,
     alreadyMemberOf: Set<Long>,
     onDismiss: () -> Unit,
     onConfirm: (Collection<Long>) -> Unit,
@@ -544,6 +549,19 @@ private fun AddMediaSheet(
         } else {
             chosenIds.split(",").mapTo(mutableSetOf()) { token -> token.toLong() }
         }
+    }
+
+    // The sheet's window grows the same way the album grid's does: near the edge, ask for more, until
+    // the index says there is nothing past it. A fixed first page here is how most of a large library
+    // became unreachable from the one screen that exists to reach it.
+    val sheetGridState = rememberLazyGridState()
+    LaunchedEffect(sheetGridState, items.size, hasMoreToLoad) {
+        snapshotFlow { sheetGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { lastVisible ->
+                if (hasMoreToLoad && items.isNotEmpty() && lastVisible >= items.size - LOAD_AHEAD) {
+                    onLoadMore()
+                }
+            }
     }
 
     AlertDialog(
@@ -575,7 +593,7 @@ private fun AddMediaSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    state = rememberLazyGridState(),
+                    state = sheetGridState,
                 ) {
                     items(items, key = { media -> media.id }) { media ->
                         val added = media.id in alreadyMemberOf
