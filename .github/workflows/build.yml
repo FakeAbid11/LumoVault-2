@@ -282,8 +282,12 @@ jobs:
       # the run summary have all already been published above, so a red lint still leaves a complete report
       # of what the run did prove, and the failure names lint's own findings instead of hiding them behind
       # an earlier step.
+      #
+      # The -D is the parse limit for TDLib's generated TdApi.java (~5 MB), repeated here from
+      # gradle.properties so the invocation and the file agree — without it lint receives that file as
+      # plain text and reports LintError instead of analysing anything.
       - name: Run Android Lint
-        run: ./gradlew lintDebug --stacktrace
+        run: ./gradlew -Didea.max.intellisense.filesize=32768 lintDebug --stacktrace
 
       # Published whether or not lint passed, because the report is what the next fix is written from.
       - name: Upload the lint report
