@@ -263,3 +263,36 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      # `room.schemaLocation` writes the exported schema JSON into app/schemas during assembleDebug, and
+      # until this step existed nothing ever looked at it: the hand-written DDL in LumoVaultDatabase is
+      # compared against Room's own generated schema only by publishing that schema where a human can diff
+      # it. `warn` rather than `error` because a run that failed before compilation produced no schemas, and
+      # in that case the build's own failure is the report that matters — not a missing artifact.
+      - name: Upload the exported Room schemas
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: LumoVault-room-schemas
+          path: app/schemas
+          if-no-files-found: warn
+          retention-days: 30
+
+      # Android Lint has never run on this project. It is deliberately last: the APK, the test totals and
+      # the run summary have all already been published above, so a red lint still leaves a complete report
+      # of what the run did prove, and the failure names lint's own findings instead of hiding them behind
+      # an earlier step.
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --stacktrace
+
+      # Published whether or not lint passed, because the report is what the next fix is written from.
+      - name: Upload the lint report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: LumoVault-lint-report
+          path: |
+            app/build/reports/lint-results*
+            app/build/outputs/lint-results*
+          if-no-files-found: warn
+          retention-days: 30

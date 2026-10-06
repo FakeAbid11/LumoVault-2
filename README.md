@@ -138,12 +138,14 @@ The development machine is not expected to compile Android. Do not run `gradlew 
 `gradlew build`, `gradlew test`, or an Android Studio build locally.
 
 ```
-commit + push  →  GitHub Actions  →  assembleDebug + testDebugUnitTest  →  LumoVault-debug-apk
+commit + push  →  GitHub Actions  →  assembleDebug + testDebugUnitTest + lintDebug
+                  →  LumoVault-debug-apk, LumoVault-room-schemas, LumoVault-lint-report
 ```
 
-`.github/workflows/build.yml` installs SDK platform 37, assembles the debug APK and runs the JVM
-unit tests, then uploads `app-debug.apk` as an artifact (30 days). Download it from the run's
-**Artifacts** section. A workflow run that has not gone green is not a build.
+`.github/workflows/build.yml` installs SDK platform 37, assembles the debug APK, runs the JVM
+unit tests and runs Android Lint (`lintDebug`), then uploads `app-debug.apk` as an artifact (30 days)
+and the exported Room schemas as a second one. Download either from the run's **Artifacts** section.
+A workflow run that has not gone green is not a build.
 
 Phases 2 and 3 did not change the workflow: nothing new needs a CI-side tool.
 
@@ -601,12 +603,10 @@ without importing it at the call site, a new parameter never passed, and an `Map
 
 **Still true after Phase 10:** the Phase 9 limitations are unchanged — no resumable restore, restored files go
 to `Pictures/LumoVault` and `Movies/LumoVault`, local-media discovery is periodic rather than push-based, and
-the free-space review still shows 400 items per visit. Three more belong to this phase's scope decisions:
+the free-space review still shows 400 items per visit. Two more belong to this phase's scope decisions:
 osmdroid's only teardown reachable from Compose is a pause, so a map view outlives the screen that made it
-until the process ends; "empty Trash" still asks Android to name every item in one consent request, because
-splitting it would hide files from the dialog that the dialog exists to show; and the reason a backup failed is
-recorded but never drawn — the failure copy exists in `strings.xml` with no screen reading it, which is a
-product decision rather than a hardening one.
+until the process ends; and "empty Trash" still asks Android to name every item in one consent request,
+because splitting it would hide files from the dialog that the dialog exists to show.
 
 ## Reinstall recovery — finding the channel that already exists
 

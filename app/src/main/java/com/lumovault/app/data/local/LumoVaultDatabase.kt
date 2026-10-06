@@ -26,12 +26,6 @@ import com.lumovault.app.data.local.restore.MediaRestoreDao
 import com.lumovault.app.data.local.restore.MediaRestoreEntity
 
 /**
- * Phase 1 shipped v1 with only `theme_mode` (an entity-free database is rejected by Room's
- * processor), Phase 2 added the rest of PRD section 61's `UserSettings`, and Phase 3 adds the
- * media index. Each step is an explicit migration: an installed app must not lose its theme or
- * its recorded setup choices, and no destructive fallback is used anywhere.
- */
-/**
  * The schema version the compiled entities describe, in one place.
  *
  * It is a `const` rather than the literal in the annotation below so [MigrationChainTest] can compare the
@@ -39,6 +33,11 @@ import com.lumovault.app.data.local.restore.MediaRestoreEntity
  * at runtime — which without this constant leaves nothing in the build able to notice that an entity gained
  * a column and no migration produces it. That mismatch is not a warning; it is a crash on the first launch
  * after an upgrade, on a person's own library.
+ *
+ * Phase 1 shipped v1 with only `theme_mode` (an entity-free database is rejected by Room's processor),
+ * Phase 2 added the rest of PRD section 61's `UserSettings`, and Phase 3 added the media index. Each step
+ * is an explicit migration: an installed app must not lose its theme or its recorded setup choices, and no
+ * destructive fallback is used anywhere.
  */
 internal const val LUMOVAULT_SCHEMA_VERSION = 11
 
@@ -116,7 +115,8 @@ abstract class LumoVaultDatabase : RoomDatabase() {
          * order: a schema that differs from the compiled one fails validation when the database is
          * opened on an existing install, not at build time.
          */
-        val MIGRATION_2_3 = object : Migration(2, 3) {            override fun migrate(db: SupportSQLiteDatabase) {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `media` (

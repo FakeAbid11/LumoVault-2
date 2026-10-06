@@ -562,6 +562,12 @@ class AppContainer(context: Context) {
         )
     }
 
+    /** Room's declared schema version, which is the number a failed migration is reported against. */
+    val databaseVersion: Int get() = database.openHelper.readableDatabase.version
+
+    /** Free space where staging would happen: the figure the upload path itself refuses to work under. */
+    fun backupFreeSpaceBytes(): Long = File(appContext.cacheDir, "backup_staging").usableSpace
+
     /**
      * Installs, replaces, or cancels the periodic pass so it matches what the settings now say.
      *
@@ -570,12 +576,6 @@ class AppContainer(context: Context) {
      * system — needs the schedule rebuilt from the stored preferences before anything else can be trusted to
      * run on its own.
      */
-    /** Room's declared schema version, which is the number a failed migration is reported against. */
-    val databaseVersion: Int get() = database.openHelper.readableDatabase.version
-
-    /** Free space where staging would happen: the figure the upload path itself refuses to work under. */
-    fun backupFreeSpaceBytes(): Long = File(appContext.cacheDir, "backup_staging").usableSpace
-
     fun refreshAutomaticBackup() {
         applicationScope.launch {
             backupScheduler.scheduleAutomaticPasses(settingsRepository.backupPreferences.first())

@@ -154,11 +154,16 @@ android {
 
     sourceSets {
         getByName("main") {
-            // TDLib's generated Client.java and TdApi.java, dropped here by CI. An absolute path so
-            // there is no question what the directory is relative to. Restricted to the debug variant
-            // deliberately: nothing in Phase 1-4 builds a release, and a source set pointing at a
-            // directory that exists only on the runner would break :assembleRelease with unresolved
-            // references for a reason that has nothing to do with release code.
+            // TDLib's generated Client.java and TdApi.java, dropped here by CI — a path relative to
+            // the module, into a directory that exists only on the runner, so nothing outside CI can
+            // compile against it at all.
+            //
+            // This is the *main* source set and therefore every variant, release included; that is
+            // deliberate rather than a restriction to debug. CI only ever builds `assembleDebug`,
+            // because that is the build that fetches TDLib first, so a release build attempted
+            // anywhere else fails on unresolved org.drinkless.tdlib references — which is the honest
+            // outcome for a variant whose native library nothing has fetched, not a release bug to
+            // paper over.
             java.directories.add("$projectDir/src/tdlib/java")
         }
     }
