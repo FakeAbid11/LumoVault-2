@@ -283,11 +283,16 @@ jobs:
       # of what the run did prove, and the failure names lint's own findings instead of hiding them behind
       # an earlier step.
       #
-      # The -D is the parse limit for TDLib's generated TdApi.java (~5 MB), repeated here from
-      # gradle.properties so the invocation and the file agree — without it lint receives that file as
-      # plain text and reports LintError instead of analysing anything.
+      # Two flags the first two runs earned:
+      #  - `--no-build-cache`: setup-gradle restores Gradle's build cache between runs, and a system
+      #    property is not a task input, so lintAnalyzeDebug came back FROM-CACHE with run 1's verdict and
+      #    the raised limit below was never actually exercised. A gate that can be answered from a cache is
+      #    not a gate; lint analyses the current sources or it does not run.
+      #  - `-D`: the parse limit for TDLib's generated TdApi.java (~5 MB), repeated here from
+      #    gradle.properties so the invocation and the file agree — without it lint receives that file as
+      #    plain text and reports LintError instead of analysing anything.
       - name: Run Android Lint
-        run: ./gradlew -Didea.max.intellisense.filesize=32768 lintDebug --stacktrace
+        run: ./gradlew --no-build-cache -Didea.max.intellisense.filesize=32768 lintDebug --stacktrace
 
       # Published whether or not lint passed, because the report is what the next fix is written from.
       - name: Upload the lint report
