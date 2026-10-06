@@ -338,7 +338,15 @@ data class BackupSourceLine(val source: BackupSource?, val folderCount: Int) {
     val canEnableAutomatic: Boolean
         get() = source.canRunAutomatic(folderCount)
 
-    @get:StringRes
+    /**
+     * The id [label] renders — a `R.string` for three of the four answers and a `R.plurals` for the
+     * fourth, so it is annotated as neither.
+     *
+     * It was `@get:StringRes`, which is simply not true of `backup_folders_selected`: Lint flagged the
+     * plural branch of [label] for reading a string as a plural, while the getter itself went
+     * unreported — a checker that agrees with the code only at some of its uses is worse than no
+     * annotation, because the next reader trusts it.
+     */
     val labelRes: Int
         get() = when {
             source == null -> R.string.backup_folders_entry_unanswered

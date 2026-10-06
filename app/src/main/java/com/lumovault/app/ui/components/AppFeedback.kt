@@ -1,7 +1,6 @@
 package com.lumovault.app.ui.components
 
 import android.content.res.Resources
-import androidx.annotation.StringRes
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,8 +14,15 @@ import kotlinx.coroutines.flow.Flow
  * [count] is set only for a message that comes in plurals, and is the quantity the plural form
  * selects as well as the number the sentence prints. Everything else leaves it null, so a count of
  * zero is never mistaken for "no message".
+ *
+ * [text] carries no resource annotation, and that is the truthful shape of it: it holds a `R.string`
+ * or a `R.plurals` id depending on [count], so neither `@StringRes` nor `@PluralsRes` is true of it.
+ * Declared as `@StringRes` it made Android Lint reject every `R.plurals` handed to this constructor
+ * *and* reject the plural branch of [resolve] for reading a string as a plural — the annotation was
+ * the defect, not the calls. [resolve] is the only reader, so the two kinds stay one decision in one
+ * place.
  */
-data class AppMessage(@StringRes val text: Int, val count: Int? = null) {
+data class AppMessage(val text: Int, val count: Int? = null) {
     fun resolve(resources: Resources): String =
         if (count == null) resources.getString(text)
         else resources.getQuantityString(text, count, count)
