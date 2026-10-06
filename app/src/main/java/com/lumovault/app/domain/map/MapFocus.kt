@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Where the map should centre next time it is shown.
  *
  * A hand-off rather than a route argument, and the reason is the bottom bar. The map's route is one of the
- * four the bar compares against to decide which tab is lit, so giving it optional path segments would make
+ * routes the bar compares against to decide which tab is lit, so giving it optional path segments would make
  * its destination route a pattern and stop the plain "map" navigation from matching it — a highlight bug on
  * the app's main bar, traded for nothing.
  *

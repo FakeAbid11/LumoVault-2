@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoAlbum
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -13,14 +14,20 @@ import com.lumovault.app.R
 import androidx.navigation.NavHostController
 
 /**
- * The four primary destinations from PRD section 42. Routes live here so no screen declares
- * a raw navigation string.
+ * The five primary destinations. Routes live here so no screen declares a raw navigation string.
+ *
+ * PRD section 42 drew four tabs with Settings behind a gear in the app bar; the redesign brief asks for
+ * Photos, Cloud, Albums, Map and Settings to be *immediately accessible* from the main navigation and to
+ * choose the architecture rather than preserve the layout — so Settings is the fifth tab and the gear is
+ * gone. It stays last because settings is where every app puts it and it is the least-visited door; the
+ * four content tabs keep PRD section 42's order.
  */
 enum class LumoVaultDestination(val route: String) {
     Photos("photos"),
     Albums("albums"),
     Cloud("cloud"),
-    Map("map");
+    Map("map"),
+    Settings(SettingsRoutes.HUB);
 
     companion object {
         /** LumoVault opens into the local library (PRD section 11). */
@@ -29,9 +36,9 @@ enum class LumoVaultDestination(val route: String) {
         /**
          * Which tab a route belongs to.
          *
-         * An album detail screen is not a tab, so it is reported as the one it sits under — otherwise
-         * opening an album would un-highlight the bar, and a bottom bar with nothing selected reads as a
-         * screen that has lost track of itself.
+         * A screen that is not itself a tab is reported as the one it sits under — otherwise opening an
+         * album or a settings category would un-highlight the bar, and a bottom bar with nothing selected
+         * reads as a screen that has lost track of itself.
          */
         fun forRoute(route: String?): LumoVaultDestination? = when {
             route == null -> Start
@@ -43,12 +50,20 @@ enum class LumoVaultDestination(val route: String) {
             route == AccountRoutes.CONNECT_TELEGRAM -> Cloud
             // Backup, health, diagnostics and free-up-space all belong to the cloud tab's work.
             route?.startsWith(BackupRoutes.PREFIX) == true -> Cloud
+            // The hub is the tab itself; every category beneath it keeps the tab lit, the way an album
+            // detail keeps Albums lit.
+            route?.startsWith(SettingsRoutes.PREFIX) == true -> Settings
             else -> null
         }
 
-        /** Settings is reached from the app bar, not from one of the four primary tabs. */
-        fun showsBottomNavigation(route: String?): Boolean =
-            route?.startsWith(SettingsRoutes.PREFIX) != true && !viewerRouteActive(route)
+        /**
+         * The bar leaves only for the viewer, where the photograph is the screen.
+         *
+         * Settings used to be excluded here — it was a pushed flow behind the app bar's gear, and a bar
+         * under it would have claimed a tab it did not belong to. It is a tab now, so its categories keep
+         * the bar the way every other screen under a tab does.
+         */
+        fun showsBottomNavigation(route: String?): Boolean = !viewerRouteActive(route)
     }
 }
 
@@ -73,6 +88,9 @@ private val LumoVaultDestination.labelRes: Int
         LumoVaultDestination.Albums -> R.string.nav_albums
         LumoVaultDestination.Cloud -> R.string.nav_cloud
         LumoVaultDestination.Map -> R.string.nav_map
+        // The hub's own title doubles as the tab's label: the word is "Settings" either way, and a second
+        // string saying the same thing is a second string to keep in step.
+        LumoVaultDestination.Settings -> R.string.settings_title
     }
 
 internal val LumoVaultDestination.icon: ImageVector
@@ -81,6 +99,7 @@ internal val LumoVaultDestination.icon: ImageVector
         LumoVaultDestination.Albums -> Icons.Filled.PhotoAlbum
         LumoVaultDestination.Cloud -> Icons.Filled.Cloud
         LumoVaultDestination.Map -> Icons.Filled.Map
+        LumoVaultDestination.Settings -> Icons.Filled.Settings
     }
 
 @Composable

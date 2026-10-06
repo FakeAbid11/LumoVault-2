@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * `onboardingResolved` starts false because the answer lives in Room: until the first row arrives
@@ -41,17 +40,4 @@ class LumoVaultViewModel(application: Application) : AndroidViewModel(applicatio
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = LumoVaultUiState(),
         )
-
-    /** Theme lives above the flow so the onboarding screens honour it too. */
-    fun cycleThemeMode() {
-        viewModelScope.launch {
-            container.settingsRepository.setThemeMode(uiState.value.themeMode.next())
-        }
-    }
-}
-
-private fun ThemeMode.next(): ThemeMode = when (this) {
-    ThemeMode.Dark -> ThemeMode.System
-    ThemeMode.System -> ThemeMode.Light
-    ThemeMode.Light -> ThemeMode.Dark
 }

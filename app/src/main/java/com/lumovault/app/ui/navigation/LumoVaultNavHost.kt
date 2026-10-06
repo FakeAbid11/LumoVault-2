@@ -29,7 +29,8 @@ import com.lumovault.app.ui.settings.SettingsHubScreen
 import com.lumovault.app.ui.viewer.MediaViewerScreen
 
 /**
- * The app's routes: the four tabs of PRD section 42, plus the album screens underneath one of them.
+ * The app's routes: the five tabs of the redesign (PRD section 42's four, plus Settings), and the
+ * album screens underneath one of them.
  *
  * A detail route is declared with its argument in the pattern rather than passed as a stateful parameter,
  * so it survives process death with the back stack — the album id or name is what comes back, and the
@@ -38,8 +39,8 @@ import com.lumovault.app.ui.viewer.MediaViewerScreen
 /**
  * The Phase 9 screens, all under one prefix so the shell can tell a nested route from a tab.
  *
- * They hang off the top bar rather than the bottom bar: PRD section 42 gives the four tabs to the library,
- * and backup is something you do to the library rather than a fifth place to look at it.
+ * They hang off a tab rather than being tabs themselves: PRD section 42 gives the content tabs to the
+ * library, and backup is something you do to the library rather than a fifth place to look at it.
  */
 object BackupRoutes {
     const val PREFIX = "backup/"
@@ -64,12 +65,13 @@ object AccountRoutes {
 }
 
 /**
- * PRD section 43's graph: the hub behind the gear, and the five categories that had no screen.
+ * PRD section 43's graph: the hub, and the five categories that had no screen.
  *
- * The same shape as Phase 9's routes — one prefix so the shell can tell a settings screen from a tab —
- * and for the same reason: settings hangs off the top bar because it is something you do to the library
- * rather than a fifth place to look at it. Every entry, hub included, lives under the prefix, so one
- * `startsWith` is all the shell and the tab map ever need.
+ * The same shape as Phase 9's routes — one prefix so the shell can tell a settings screen from a
+ * tab — and for the same reason: every settings entry, hub included, lives under the prefix, so one
+ * `startsWith` is all the shell and the tab map ever need. The prefix now decides membership rather
+ * than altitude: `Settings` is a bottom-bar destination, so its whole subtree keeps the bar and only
+ * the categories (children of the hub) draw a back arrow.
  */
 object SettingsRoutes {
     const val PREFIX = "settings/"
@@ -184,12 +186,13 @@ fun LumoVaultNavHost(
             ConnectTelegramDestination(onNavigateUp = navController::navigateUp)
         }
 
+        // The hub is the Settings tab's own screen, so it takes no back arrow: the gradient bar above
+        // it is the title only, and the bottom bar is how you leave.
         composable(SettingsRoutes.HUB) {
             SettingsHubScreen(
-                onNavigateUp = navController::navigateUp,
                 onOpenAccount = { navController.navigate(SettingsRoutes.ACCOUNT) },
-                // Backup and Storage are rows onto screens that already exist — the hub behind the old
-                // gear, and free-up-space — rather than a second copy of either.
+                // Backup and Storage are rows onto screens that already exist — the settings hub's
+                // sibling and free-up-space — rather than a second copy of either.
                 onOpenBackup = { navController.navigate(BackupRoutes.HUB) },
                 onOpenCloud = { navController.navigate(SettingsRoutes.CLOUD) },
                 onOpenStorage = { navController.navigate(BackupRoutes.FREE_SPACE) },

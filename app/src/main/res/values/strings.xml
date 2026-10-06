@@ -34,7 +34,6 @@
     <string name="media_kind_gif">GIF</string>
     <string name="media_badge_gif">GIF</string>
 
-    <string name="theme_toggle">Switch theme</string>
     <string name="back">Back</string>
     <string name="step_progress">%1$d of %2$d</string>
 
@@ -602,8 +601,9 @@
     <string name="restore_reason_cancelled">Download cancelled.</string>
     <string name="restore_reason_unknown">Could not restore this item. Try again.</string>
 
-    <!-- Settings (PRD section 43). The gear opens the hub; Backup and Storage rows reach the screens that
-         already exist, and these are the five that had no home. Same no-apostrophe rule as above. -->
+    <!-- Settings (PRD section 43). It is a bottom-bar destination of its own; Backup and Storage rows
+         reach the screens that already exist, and these are the five that had no home. Same
+         no-apostrophe rule as above. -->
     <string name="settings_title">Settings</string>
     <string name="settings_account">Account</string>
     <string name="settings_account_note">Telegram connection, reconnect and sign out</string>

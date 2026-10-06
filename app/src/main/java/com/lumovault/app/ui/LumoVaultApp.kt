@@ -2,9 +2,7 @@ package com.lumovault.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,12 +36,17 @@ import com.lumovault.app.ui.navigation.icon
 import com.lumovault.app.ui.navigation.label
 
 /**
- * The shell from PRD section 42: title bar, screen, and the Photos | Albums | Cloud | Map bar.
+ * The shell: title bar, screen, and the Photos | Albums | Cloud | Map | Settings bar.
+ *
+ * The bar carries no actions. The gear moved into the bar as the fifth tab (see [LumoVaultDestination])
+ * and the theme cycle went with it — theme choice is Settings > Appearance's System/Light/Dark, an
+ * explicit pick rather than a blind cycle, so the shortcut was duplicating a worse version of a control
+ * the app already had one screen deeper. What is left is the one thing only the shell can say: which
+ * tab this is, and — on a screen pushed under one — the way back.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LumoVaultApp(
-    onCycleThemeMode: () -> Unit,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -62,8 +65,9 @@ fun LumoVaultApp(
     // and the one that would be added here is the one that cannot name them. The standalone Telegram
     // reconnect is the same case wearing the setup flow's clothes: OnboardingScaffold draws a back bar on
     // the gradient, and the shell's opaque bar stacked above it made two titles where the user could only
-    // act on the lower one. Settings is the fourth case with the same answer — its title is "Settings"
-    // rather than a tab's name, and its bar carries the gradient the rest of section 43's screens use.
+    // act on the lower one. Settings keeps its own bar for the gradient rather than the title now: its
+    // title and the tab's label are the same word, but its bar carries the tint the rest of section 43's
+    // screens use, and the shell's flat surface painted across that tint is the same two-tone stripe.
     // The tab bar stays either way — it is how you get back to the library.
     val ownsItsBar = route?.startsWith(BackupRoutes.PREFIX) == true ||
         route?.startsWith(SettingsRoutes.PREFIX) == true ||
@@ -81,16 +85,8 @@ fun LumoVaultApp(
                 if (!isViewer && !ownsItsBar) {
                     TopBar(
                         destination = currentDestination,
-                        onCycleThemeMode = onCycleThemeMode,
                         onNavigateUp = { if (isNested) navController.navigateUp() },
                         showNavigateUp = isNested,
-                        onOpenSettings = {
-                            navController.navigate(SettingsRoutes.HUB) {
-                                // The gear stays in the bar on every tab, so a double tap on the way past the
-                                // settings hub would otherwise leave two of them, and back would retrace one.
-                                launchSingleTop = true
-                            }
-                        },
                     )
                 }
             },
@@ -136,8 +132,6 @@ fun LumoVaultApp(
 @Composable
 private fun TopBar(
     destination: LumoVaultDestination,
-    onCycleThemeMode: () -> Unit,
-    onOpenSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     showNavigateUp: Boolean,
 ) {
@@ -149,28 +143,10 @@ private fun TopBar(
             if (showNavigateUp) {
                 IconButton(onClick = onNavigateUp) {
                     Icon(
-                        imageVector = Icons.Filled.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
                     )
                 }
-            }
-        },
-        actions = {
-
-            IconButton(onClick = onCycleThemeMode) {
-                Icon(
-                    imageVector = Icons.Filled.Palette,
-                    contentDescription = stringResource(R.string.theme_toggle),
-                )
-            }
-            // PRD section 42 puts Settings in this corner, and section 43 gives it a hub: seven rows,
-            // five of them screens that had none, and the two that existed (Backup, Storage) reached from
-            // here rather than duplicated. The content description names the door, not the room behind it.
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = stringResource(R.string.settings_title),
-                )
             }
         },
     )

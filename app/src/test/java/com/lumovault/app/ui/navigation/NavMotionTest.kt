@@ -11,7 +11,7 @@ import org.junit.Test
  */
 class NavMotionTest {
     @Test
-    fun `the four tabs fade through instead of sliding`() {
+    fun `the five tabs fade through instead of sliding`() {
         LumoVaultDestination.entries.forEach { destination ->
             assertEquals(MotionShape.Tab, motionShapeOf(destination.route))
         }
@@ -30,9 +30,15 @@ class NavMotionTest {
     }
 
     @Test
-    fun `settings, backup and the reconnect door all slide`() {
-        assertEquals(MotionShape.Push, motionShapeOf(SettingsRoutes.HUB))
+    fun `the settings hub is a tab while its categories are pushes`() {
+        // The hub is the fifth destination, so arriving at it fades like every other tab; the
+        // categories beneath it are children of that tab and keep the slide of a push.
+        assertEquals(MotionShape.Tab, motionShapeOf(SettingsRoutes.HUB))
         assertEquals(MotionShape.Push, motionShapeOf(SettingsRoutes.ABOUT))
+    }
+
+    @Test
+    fun `backup and the reconnect door all slide`() {
         assertEquals(MotionShape.Push, motionShapeOf(BackupRoutes.HUB))
         assertEquals(MotionShape.Push, motionShapeOf(AccountRoutes.CONNECT_TELEGRAM))
         assertEquals(MotionShape.Push, motionShapeOf(OnboardingStep.Connect.route))

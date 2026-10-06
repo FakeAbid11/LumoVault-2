@@ -63,7 +63,8 @@ import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.util.openAppDetailsSettings
 
 /**
- * PRD section 43's screens: the hub behind the gear, and the five categories that had no home.
+ * PRD section 43's screens: the hub, now a bottom-bar destination of its own, and the five categories
+ * that had no home.
  *
  * They are one file because they share one vocabulary — a door with a note, a label with an answer,
  * a paragraph that explains — and because none of them is allowed to assert anything it has not
@@ -78,7 +79,7 @@ import com.lumovault.app.util.openAppDetailsSettings
 @Composable
 private fun SettingsScaffold(
     title: String,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -93,12 +94,16 @@ private fun SettingsScaffold(
             TopAppBar(
                 title = { Text(title) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                // The hub is a tab root, so it has nothing to go back to: the categories keep the
+                // arrow (their parent is the hub), and the root draws no empty slot for one.
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
+                    if (onNavigateUp != null) {
+                        IconButton(onClick = onNavigateUp) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                            )
+                        }
                     }
                 },
             )
@@ -111,7 +116,7 @@ private fun SettingsScaffold(
  * The list every category draws its rows into.
  *
  * The hub's own padding and rhythm — settings is the backup screens' sibling, and a different gutter
- * would make the two halves of one gear icon feel unrelated. Rows use [EntryRow]'s touch floor
+ * would make two configuration screens feel unrelated. Rows use [EntryRow]'s touch floor
  * already, so the spacing here only decides how far apart the doors stand.
  */
 @Composable
@@ -265,7 +270,6 @@ private fun ThemeOption(label: String, selected: Boolean, onSelect: () -> Unit) 
  */
 @Composable
 fun SettingsHubScreen(
-    onNavigateUp: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenCloud: () -> Unit,
@@ -277,7 +281,6 @@ fun SettingsHubScreen(
 ) {
     SettingsScaffold(
         title = stringResource(R.string.settings_title),
-        onNavigateUp = onNavigateUp,
         modifier = modifier,
     ) { padding ->
         SettingsList(padding) {
@@ -465,8 +468,8 @@ fun CloudSettingsScreen(
 /**
  * The appearance category: PRD section 44's three answers as one pick-one group.
  *
- * The selection writes the same stored [ThemeMode] the palette icon cycles, so the bar's control and
- * this list can never hold two different truths about the theme. "Follow system" is a first-class
+ * The selection writes the one stored [ThemeMode] the whole app reads, so this list and the theme
+ * system can never hold two different truths about it. "Follow system" is a first-class
  * row rather than an escape hatch, and the note says the shipped default is Dark — which is section
  * 44's rule — so an untouched install reads as chosen rather than unexplained.
  */

@@ -918,20 +918,21 @@ value before the lambda that needs it.
 
 **5 — Settings, PRD section 43** (`6847534`, run
 [36820362736](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36820362736), 592 unit tests across 60
-classes). The gear now opens a hub of seven rows under one `settings/` prefix, and the five categories that
-had no screen — Account, Cloud, Appearance, Notifications, About — are built on it; Backup and Storage are
-rows onto the screens that already exist rather than second copies of the queue and the free-space review.
-The shell hands every settings route its own bar over the same gradient and reports them as the Cloud tab's
-work, so the bottom bar never un-highlights itself. The screens hold the batches' two rules harder than any
-other: the cloud rows draw nothing until Room answers — `null` means *not looked up yet*, and neither
+classes). The gear opened a hub of seven rows under one `settings/` prefix — with the redesign below
+that hub is a bottom-bar tab of its own — and the five categories that had no screen — Account, Cloud,
+Appearance, Notifications, About — are built on it; Backup and Storage are rows onto the screens that
+already exist rather than second copies of the queue and the free-space review. The shell handed every
+settings route its own bar over the same gradient and reported them as the Cloud tab's work at the time;
+the redesign made Settings a tab, so its routes light their own tab now. The screens hold the batches'
+two rules harder than any other: the cloud rows draw nothing until Room answers — `null` means *not looked up yet*, and neither
 "Not found yet" over a lookup in flight nor "0 items found" before the first count is a fact the app may
 print; notifications has no switch, because whether a notification can appear is Android's answer made
 where the row's button goes, re-read on every resume and worded by the same shared label the setup
 checklist uses; account offers exactly one action from the live session (reconnect when there is something
 to reconnect, sign out when there is a session) and confirms nothing before signing out, because the row's
-own note says what survives; appearance writes the same `ThemeMode` the palette icon cycles, so the bar and
-the list cannot hold two truths; and About prints `BuildConfig`'s version, the privacy promise in full and
-the licenses themselves rather than a button leading nowhere. `TelegramWord` now carries its label, so the
+own note says what survives; appearance writes the one stored `ThemeMode` the whole app reads (the
+top bar's palette icon left with the redesign, so the list is now the only control); and About prints
+`BuildConfig`'s version, the privacy promise in full and the licenses themselves rather than a button leading nowhere. `TelegramWord` now carries its label, so the
 diagnostics panel and the account screen cannot disagree about whether the user is signed in.
 
 **Not device-verified.** None of the five batches has run on a phone — they changed exactly the things a JVM
@@ -969,9 +970,9 @@ non-deprecated `NavHost` overloads carry the predictive parameters, that the ges
 omission is a Material scale-out, not ours. Below Android 13 the flag is ignored and back behaves exactly
 as it always has.
 
-`NavMotionTest` pins the classification the lambdas judge from route strings alone: the four tab routes
-fade, `viewer/` scales, an album *under* the Albums tab still slides, settings/backup/reconnect/setup are
-pushes, and an unknown route takes the app's general shape — five tests in a new class, reported by
+`NavMotionTest` pins the classification the lambdas judge from route strings alone: the tab routes
+fade, `viewer/` scales, an album *under* the Albums tab still slides, settings categories, backup,
+reconnect and setup are pushes, and an unknown route takes the app's general shape — reported by
 [36829952541](https://github.com/FakeAbid11/LumoVault-2/actions/runs/36829952541) alongside the rest. And
 the same caveat as everything else in this section: whether the fade-through's 100/50/200 timing and the
 viewer's 96 % read as calm on a real screen is a device question, not one this machine can answer.
@@ -1069,7 +1070,7 @@ app/src/main/java/com/lumovault/app/
 │                             metadata extraction pass
 └── ui/
     ├── LumoVaultRoot.kt      launch decision: onboarding or main
-    ├── LumoVaultApp.kt       the four-tab shell, which stands down on the chrome the viewer owns
+    ├── LumoVaultApp.kt       the five-tab shell, which stands down on the chrome the viewer owns
     ├── onboarding/           the six screens, their flow host, and flow state
     ├── navigation/           main destinations, routes, and the viewer's route
     ├── viewer/               the pager, its three renderers, the details sheet, and the zoom arithmetic

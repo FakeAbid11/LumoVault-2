@@ -2,36 +2,35 @@ package com.lumovault.app.ui.navigation
 
 import com.lumovault.app.ui.backup.TelegramWord
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Section 43's routes, checked where a wrong answer would send the gear to the wrong room.
+ * Section 43's routes, checked where a wrong answer would send the settings tab to the wrong room.
  *
  * Nothing renders — that needs a phone. What is checkable off-device are the two judgements the
- * shell makes from route strings alone: a settings screen must not claim one of the four primary tabs,
- * and every entry must stay under its prefix, because the
- * shell decides "this screen draws its own bar" from that prefix alone — one route spelled bare
- * would stack two titles on one screen. The uniqueness pass exists for the reason every collision
- * test does: two names for one route means navigating to one arrives at whichever the graph
- * registered first.
+ * shell makes from route strings alone: every settings screen must light the Settings tab (the hub
+ * *is* that tab, and the categories are its children), and every entry must stay under its prefix,
+ * because the shell reads that prefix to give the category its own gradient bar. The uniqueness pass
+ * exists for the reason every collision test does: two names for one route means navigating to one
+ * arrives at whichever the graph registered first.
  */
 class SettingsRoutesTest {
 
     @Test
-    fun everySettingsRouteIsNestedUnderThePrefixAndHidesPrimaryNavigation() {
+    fun everySettingsRouteIsNestedUnderThePrefixAndLightsTheSettingsTab() {
         settingsRoutes().forEach { route ->
-            assertNull(
-                "$route is opened from the gear rather than a tab, so it must not claim one",
+            assertEquals(
+                "$route belongs to the Settings tab, so it must light that tab and no other",
+                LumoVaultDestination.Settings,
                 LumoVaultDestination.forRoute(route),
             )
             assertTrue(
-                "$route owns no primary tab, so primary navigation must be hidden",
-                !LumoVaultDestination.showsBottomNavigation(route),
+                "$route keeps primary navigation: settings is a bottom-bar destination, not a pushed flow",
+                LumoVaultDestination.showsBottomNavigation(route),
             )
             assertTrue(
-                "$route must carry the prefix the shell reads to hand the screen its own bar",
+                "$route must carry the prefix the shell reads to hand its categories their own bar",
                 route.startsWith(SettingsRoutes.PREFIX),
             )
         }

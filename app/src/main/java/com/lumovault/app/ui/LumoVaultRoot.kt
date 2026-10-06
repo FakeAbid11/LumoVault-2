@@ -26,7 +26,7 @@ fun LumoVaultRoot(viewModel: LumoVaultViewModel = viewModel()) {
         when {
             !uiState.onboardingResolved -> StartupSurface()
             !uiState.onboardingCompleted -> OnboardingFlow(viewModel = viewModel())
-            else -> LumoVaultApp(onCycleThemeMode = viewModel::cycleThemeMode)
+            else -> LumoVaultApp()
         }
     }
 }
