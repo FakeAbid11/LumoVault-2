@@ -43,6 +43,13 @@ interface AlbumRepository {
     /** Which of [mediaStoreIds] are already members, so a picker can show them ticked. */
     suspend fun membersWithin(albumId: Long, mediaStoreIds: Collection<Long>): List<Long>
 
+    /**
+     * The album's whole membership as the grid draws it, unwindowed — [observeContents] without the
+     * `LIMIT`. Select all is the only caller: the count the strip prints is the count the actions act
+     * on, so the set may not stop at the loaded pages.
+     */
+    suspend fun allMemberIds(albumId: Long): List<Long>
+
     /** Which albums contain this item, for the sheet that adds it to more. */
     suspend fun albumsContaining(mediaStoreId: Long): List<Long>
 

@@ -69,6 +69,8 @@ internal class MediaRepositoryImpl(
     override fun observeWindow(limit: Int): Flow<List<Media>> =
         dao.observeWindow(limit).map { rows -> rows.map(MediaEntity::toMedia) }
 
+    override suspend fun visibleIds(): List<Long> = dao.visibleIds()
+
     override fun observeCount(): Flow<Int> = dao.observeCount()
 
     override fun observeCountByType(): Flow<Map<MediaType, Int>> =

@@ -162,6 +162,23 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         selection.value = emptySet()
     }
 
+    /**
+     * Every id this album holds, with the same rule as the timeline's select all: the strip's count
+     * is what the actions will act on, so the set may not stop at the loaded window. The three
+     * targets mirror [contentsOf] one for one — an album of any kind answers with its whole self.
+     */
+    fun selectAll() {
+        val current = target.value ?: return
+        launchWrite("select all") {
+            selection.value = when (current) {
+                is AlbumTarget.User -> container.albumRepository.allMemberIds(current.albumId)
+                is AlbumTarget.System -> container.mediaOrganizationRepository.allIdsIn(current.album)
+                is AlbumTarget.LocalFolder ->
+                    container.mediaOrganizationRepository.allIdsInLocalFolder(current.relativePath)
+            }.toSet()
+        }
+    }
+
     fun setFavorite(favorite: Boolean) = withSelected(R.string.feedback_favorite_failed) { ids ->
         container.mediaOrganizationRepository.setFavorite(ids, favorite)
     }
@@ -258,12 +275,44 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
     fun deleteForever(launch: (IntentSenderRequest) -> Unit, onUnsupported: () -> Unit) {
         val chosen = selection.value
         if (chosen.isEmpty()) return
-        requestDeletion(
-            ids = chosen,
-            uris = urisForIds(items.value.orEmpty(), chosen),
-            launch = launch,
-            onUnsupported = onUnsupported,
-        )
+        viewModelScope.launch {
+            try {
+                // Named from the whole Trash, not the scrolled window: the selection can now reach
+                // past what is loaded (select all), and an item this request cannot name is an item
+                // the user is about to lose without Android ever showing it in the consent dialog —
+                // the rule [emptyTrash] already follows, applied to a subset of its own.
+                val count = container.mediaOrganizationRepository.trashedCount()
+                val trashed = if (count == 0) {
+                    emptyList()
+                } else {
+                    container.mediaOrganizationRepository
+                        .observeContents(SystemAlbum.Trash, count)
+                        .first()
+                }
+                val named = trashed.filter { it.id in chosen }
+                if (named.isEmpty()) {
+                    // Nothing the device can show: every chosen row is organisation for a file the
+                    // index no longer holds, which is bookkeeping rather than deletion — the same
+                    // answer [emptyTrash] gives in its place.
+                    container.mediaOrganizationRepository.forgetDeletedLocally(chosen)
+                    selection.value = emptySet()
+                    return@launch
+                }
+                requestDeletion(
+                    ids = chosen,
+                    uris = named.map { it.contentUri },
+                    launch = launch,
+                    onUnsupported = onUnsupported,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // The same "cannot ask" state the refusal path shows: the honest answer when the
+                // device could not be reached is a banner, not a crash mid-consent-flow.
+                Log.w(TAG, "delete request failed: ${error.javaClass.simpleName}")
+                onUnsupported()
+            }
+        }
     }
 
     /**
@@ -356,9 +405,6 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
         pendingDeletion = ids
         launch(IntentSenderRequest.Builder(request.intentSender).setFillInIntent(null).build())
     }
-
-    private fun urisForIds(items: List<Media>, ids: Set<Long>): List<String> =
-        items.filter { it.id in ids }.map { it.contentUri }
 
     private suspend fun contentsOf(target: AlbumTarget?, limit: Int): Flow<List<Media>?> = when (target) {
         is AlbumTarget.User -> container.albumRepository.observeContents(target.albumId, limit)

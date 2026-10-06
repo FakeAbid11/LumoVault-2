@@ -43,6 +43,9 @@ class FakeMediaDao(private val store: OrganizationStore) : MediaDao {
 
     override suspend fun currentCount(): Int = store.media.values.count { visible(it) }
 
+    override suspend fun visibleIds(): List<Long> =
+        store.media.values.filter { store.visible(it.mediaStoreId) }.map { it.mediaStoreId }
+
     override suspend fun upsertAll(items: List<MediaEntity>) {
         // `INSERT OR REPLACE`, which rebuilds the row: the point of the fake being faithful here is that
         // organisation lives in *another* table, so a rewrite cannot reach it.
@@ -169,6 +172,8 @@ class FakeAlbumDao(private val store: OrganizationStore) : AlbumDao {
     }
 
     override suspend fun countMembers(albumId: Long): Int = store.members.count { it.albumId == albumId }
+
+    override suspend fun allMemberIds(albumId: Long): List<Long> = memberIds(albumId).filter(store::inAlbumView)
 
     override suspend fun removeMembers(albumId: Long, ids: Collection<Long>): Int {
         val matching = store.members.filter { it.albumId == albumId && it.mediaStoreId in ids }.toSet()
@@ -324,6 +329,40 @@ class FakeSystemAlbumDao(private val store: OrganizationStore) : SystemAlbumDao 
                 limit,
             )
         }
+
+    // Select all's reads: each window above as ids only, with no `LIMIT`, over the same predicates —
+    // the fake mirrors its twin the same way the SQL twin is held to its own in SelectAllIdsRealSqlTest.
+    override suspend fun favoriteIds(): List<Long> = organizedIds { it.favorite }
+
+    override suspend fun archivedIds(): List<Long> = organizedIds { it.archived }
+
+    override suspend fun trashedMediaIds(): List<Long> =
+        store.organization.values
+            .filter { it.trashedAt > 0L && store.media.containsKey(it.mediaStoreId) }
+            .map { it.mediaStoreId }
+
+    override suspend fun byTypeIds(mediaType: String): List<Long> =
+        albumViewIds { it.mediaType == mediaType }
+
+    override suspend fun byPathIds(pattern: String): List<Long> =
+        albumViewIds { it.relativePath.like(pattern) }
+
+    override suspend fun recentlyAddedIds(sinceSeconds: Long): List<Long> =
+        albumViewIds { it.dateAddedSeconds >= sinceSeconds }
+
+    override suspend fun folderContentsIds(relativePath: String): List<Long> =
+        albumViewIds { it.relativePath == relativePath }
+
+    /** [observeOrganized]'s predicate without the window: the flag, not trashed, and the file exists. */
+    private fun organizedIds(predicate: (MediaOrganizationEntity) -> Boolean): List<Long> =
+        store.organization.values
+            .filter { predicate(it) && it.trashedAt == 0L && store.media.containsKey(it.mediaStoreId) }
+            .map { it.mediaStoreId }
+
+    private fun albumViewIds(predicate: (MediaEntity) -> Boolean): List<Long> =
+        store.media.values
+            .filter { store.inAlbumView(it.mediaStoreId) && predicate(it) }
+            .map { it.mediaStoreId }
 
     private fun observeOrganized(limit: Int, predicate: (MediaOrganizationEntity) -> Boolean) =
         store.tick.map {

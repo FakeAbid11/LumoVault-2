@@ -194,6 +194,19 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Every id the timeline can show — not just the pages scrolled so far.
+     *
+     * The count the strip prints is the count the actions act on, so the set may not stop at the
+     * loaded window: "select all" that meant "all that happens to be loaded" would report 300 over a
+     * library of 30,000. One unwindowed read; every write downstream already chunks id lists.
+     */
+    fun selectAll() {
+        launchWrite("select all", failureMessage = R.string.feedback_action_failed) {
+            selection.value = container.mediaRepository.visibleIds().toSet()
+        }
+    }
+
+    /**
      * Queues the selection and asks for a pass.
      *
      * Enqueueing is a database write and starting the work is a separate call, so a process that dies

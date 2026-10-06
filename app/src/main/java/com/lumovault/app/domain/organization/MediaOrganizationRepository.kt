@@ -49,6 +49,16 @@ interface MediaOrganizationRepository {
     /** What is filed in one folder, by its normalized relative path. */
     fun observeLocalFolderContents(relativePath: String, limit: Int): Flow<List<Media>>
 
+    /**
+     * Every id [album] holds, unwindowed — [observeContents] without the `LIMIT`. Select all is the
+     * only caller, and the set must match what the grid draws: the strip's count is the count the
+     * actions act on. The pairing is asserted against real SQLite in `SelectAllIdsRealSqlTest`.
+     */
+    suspend fun allIdsIn(album: SystemAlbum): List<Long>
+
+    /** Every id one device folder holds, unwindowed — [observeLocalFolderContents] without the `LIMIT`. */
+    suspend fun allIdsInLocalFolder(relativePath: String): List<Long>
+
     /** Which of [mediaStoreIds] are favourited, for the badge on a grid cell. */
     fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>>
 

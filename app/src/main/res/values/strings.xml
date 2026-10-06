@@ -225,9 +225,13 @@
     <string name="backup_progress_percent">%1$d%%</string>
     <string name="backup_preparing">Preparing…</string>
     <string name="backup_action">Back up</string>
-    <string name="backup_selected_count">%1$d selected</string>
+    <!-- One count for every selection strip, wherever a selection can happen. -->
+    <plurals name="selected_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
     <string name="backup_cell_selected">Selected</string>
-    <string name="backup_selection_clear">Clear</string>
+    <string name="selection_clear">Clear</string>
     <string name="backup_cancel">Cancel</string>
     <string name="backup_cancel_confirm_title">Cancel pending backup?</string>
     <string name="backup_cancel_confirm_body">Items still waiting are withdrawn. What already uploaded stays in your channel, and anything withdrawn can be queued again.</string>
@@ -386,7 +390,6 @@
     <string name="album_cover_unavailable">Empty album</string>
     <string name="album_gone_title">Can\'t open this album</string>
     <string name="album_gone_body">It was deleted, or this link describes an album this app cannot find.</string>
-    <string name="album_selected_count">%1$d selected</string>
     <string name="album_add_sheet_title">Add to %1$s</string>
     <string name="album_add_sheet_add_action">Add %1$d</string>
     <string name="album_already_in_album">Already in this album</string>
@@ -564,8 +567,7 @@
     <string name="free_space_action">Free up space</string>
     <string name="free_space_review_refresh">Check again</string>
     <string name="free_space_review_empty">Nothing safely backed up is ready to remove right now. Check again after a backup finishes.</string>
-    <string name="free_space_select_all">Select all</string>
-    <string name="free_space_clear_selection">Clear</string>
+    <string name="selection_select_all">Select all</string>
     <string name="free_space_confirm_title">Remove these from this device?</string>
     <plurals name="free_space_confirm_body">
         <item quantity="one">%1$d item, about %2$s. Android will ask you to confirm, and only the files you approve are removed. Cloud copies stay.</item>

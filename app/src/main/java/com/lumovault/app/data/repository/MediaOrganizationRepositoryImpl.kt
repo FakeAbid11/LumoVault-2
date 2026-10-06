@@ -97,6 +97,22 @@ class MediaOrganizationRepositoryImpl(
         systemAlbums.observeFolderContents(FolderPaths.normalize(relativePath), limit)
             .map { list -> list.map(MediaEntity::toMedia) }
 
+    // The same case split as [observeContents] above it, one for one: an album of any kind answers
+    // select all with the whole set its window is a page of, and a new case has to fail both or neither.
+    override suspend fun allIdsIn(album: SystemAlbum): List<Long> = when (album) {
+        SystemAlbum.Favorites -> systemAlbums.favoriteIds()
+        SystemAlbum.Archive -> systemAlbums.archivedIds()
+        SystemAlbum.Trash -> systemAlbums.trashedMediaIds()
+        SystemAlbum.Videos -> systemAlbums.byTypeIds(checkNotNull(album.mediaType).storageKey)
+        SystemAlbum.Camera, SystemAlbum.Screenshots, SystemAlbum.Downloads ->
+            systemAlbums.byPathIds(checkNotNull(album.pathLikePattern))
+        SystemAlbum.RecentlyAdded ->
+            systemAlbums.recentlyAddedIds(nowSeconds() - recentlyAddedWindowSeconds)
+    }
+
+    override suspend fun allIdsInLocalFolder(relativePath: String): List<Long> =
+        systemAlbums.folderContentsIds(FolderPaths.normalize(relativePath))
+
     override fun observeFavoritesWithin(mediaStoreIds: Collection<Long>): Flow<Set<Long>> {
         // Guarded because an empty `IN ()` is not valid SQL, and a window with nothing in it yet is an
         // ordinary first frame on an empty device rather than an error.

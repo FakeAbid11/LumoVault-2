@@ -122,4 +122,30 @@ class AlbumDaoRealSqlTest {
         // Same creation time means the higher id — the later insert — comes first.
         assertEquals(listOf("Third", "Second", "First"), names)
     }
+
+    @Test
+    fun allMemberIdsIsTheMembershipWithoutTheWindowsLimit() = runBlocking {
+        database.mediaDao().upsertAll(
+            listOf(
+                FakeMediaRow(id = 401, dateAddedSeconds = 1_000).toEntity(),
+                FakeMediaRow(id = 402, dateAddedSeconds = 2_000).toEntity(),
+                FakeMediaRow(id = 403, dateAddedSeconds = 3_000).toEntity(),
+            ),
+        )
+        val albumId = database.albumDao().insert(AlbumEntity(name = "Trips", createdAt = 500))
+        database.albumDao().addMembers(albumId, listOf(401, 402, 403), now = 1)
+
+        val windowed = database.albumDao().observeContent(albumId, 2).first().map { it.mediaStoreId }
+        val all = database.albumDao().allMemberIds(albumId)
+
+        // The window stops at its LIMIT — 401 is the oldest, so it is the one left on the floor —
+        // while the ids answer carries the whole membership the strip's count is about.
+        assertEquals(setOf(402L, 403L), windowed.toSet())
+        assertEquals(setOf(401L, 402L, 403L), all.toSet())
+
+        // And both agree on Trash: a trashed member the grid never drew is not a selection either,
+        // because the strip's count is the count the actions will act on.
+        database.mediaOrganizationDao().setTrashedAt(401, 9)
+        assertEquals(setOf(402L, 403L), database.albumDao().allMemberIds(albumId).toSet())
+    }
 }

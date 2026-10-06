@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.BrokenImage
@@ -30,13 +29,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -52,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -75,8 +72,10 @@ import com.lumovault.app.ui.components.WorkingScreen
 import com.lumovault.app.ui.screens.photos.DateRail
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.screens.photos.BackupOverview
-import com.lumovault.app.ui.screens.photos.PhotosUiState
+import com.lumovault.app.ui.components.ActionIcon
+import com.lumovault.app.ui.components.SelectionBar
 import com.lumovault.app.ui.screens.photos.PhotosViewModel
+import com.lumovault.app.ui.screens.photos.PhotosUiState
 import com.lumovault.app.util.DayDistance
 import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.formatDay
@@ -214,6 +213,7 @@ fun PhotosScreen(
             BackupBar(
                 selectionSize = selected.size,
                 summary = backup.summary,
+                onSelectAll = viewModel::selectAll,
                 onBackUp = viewModel::backUpSelected,
                 onFavorite = { viewModel.setFavoriteSelected(true) },
                 onArchive = viewModel::archiveSelected,
@@ -277,16 +277,19 @@ fun PhotosScreen(
  * Only drawn when there is something to say — the caller decides, and decides the grid's bottom inset from
  * the same answer. A permanent "0 items to back up" bar would be the loudest thing on the screen and would
  * say nothing, and a bar that floats over the last row of photos hides the cell the user was reaching for.
+ * All three faces are the shared [SelectionBar]: same surface, same rhythm, so the strip does not swap
+ * shape under the user as its news changes.
  *
- * Three of the actions are icons rather than words so that all four fit one phone width: they are the same
- * three marks the cell itself uses when a single photo is chosen, so the strip repeats a vocabulary the
- * thumbnail has already taught instead of naming it again in text. "Clear" is an icon for the same reason, and
- * every one of them is labelled for TalkBack by its content description.
+ * The actions are icons rather than words so that they and the count fit one phone width before the row
+ * needs a scroll: the same marks the cell itself uses when a single photo is chosen, so the strip repeats
+ * a vocabulary the thumbnail has already taught instead of naming it again in text. Every one of them is
+ * labelled for TalkBack by its content description.
  */
 @Composable
 private fun BackupBar(
     selectionSize: Int,
     summary: BackupQueueSummary,
+    onSelectAll: () -> Unit,
     onBackUp: () -> Unit,
     onFavorite: () -> Unit,
     onArchive: () -> Unit,
@@ -296,73 +299,57 @@ private fun BackupBar(
     onRetryFailed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.padding(SpaceSm),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            modifier = Modifier.padding(start = SpaceMd, end = SpaceXs, top = SpaceXs, bottom = SpaceXs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpaceXs),
+    when {
+        selectionSize > 0 -> SelectionBar(
+            label = pluralStringResource(R.plurals.selected_count, selectionSize, selectionSize),
+            modifier = modifier.padding(SpaceSm),
         ) {
-            when {
-                selectionSize > 0 -> {
-                    Text(
-                        text = stringResource(R.string.backup_selected_count, selectionSize),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    // Organisation first, backup last. Favourite, archive and Trash are decisions about the
-                    // library; "Back Up" is the one that costs the user data, so it sits at the end where
-                    // the thumb finishes. They share a strip because they act on the same selection.
-                    ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_favorite_action, onFavorite)
-                    ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
-                    ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
-                    ActionIcon(Icons.Filled.Close, R.string.backup_selection_clear, onClear)
-                    Button(onClick = onBackUp) {
-                        Text(stringResource(R.string.backup_action))
-                    }
-                }
+            // Select all speaks for the selection itself, so it leads. Then the organisation marks:
+            // favourite, archive and Trash are decisions about the library; "Back Up" is the one that
+            // costs the user data, so it sits at the end where the thumb finishes. They share a strip
+            // because they act on the same selection.
+            ActionIcon(Icons.Filled.SelectAll, R.string.selection_select_all, onSelectAll)
+            ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_favorite_action, onFavorite)
+            ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
+            ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
+            ActionIcon(Icons.Filled.Close, R.string.selection_clear, onClear)
+            Button(onClick = onBackUp) {
+                Text(stringResource(R.string.backup_action))
+            }
+        }
 
-                summary.isActive -> {
-                    // Counts, not a percentage: the queue knows how many items exist and how many are
-                    // done, and a percentage of a queue that can grow mid-run would be a guess.
-                    Text(
-                        text = stringResource(
-                            R.string.backup_progress_count,
-                            summary.backedUp + summary.failed + 1,
-                            summary.total,
-                        ),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (summary.inFlight > 0) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(MarkInline),
-                            color = SyncingAccent,
-                            strokeWidth = RingStroke,
-                        )
-                    }
-                    TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.backup_cancel))
-                    }
-                }
+        summary.isActive -> SelectionBar(
+            // Counts, not a percentage: the queue knows how many items exist and how many are
+            // done, and a percentage of a queue that can grow mid-run would be a guess.
+            label = stringResource(
+                R.string.backup_progress_count,
+                summary.backedUp + summary.failed + 1,
+                summary.total,
+            ),
+            modifier = modifier.padding(SpaceSm),
+        ) {
+            if (summary.inFlight > 0) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(MarkInline),
+                    color = SyncingAccent,
+                    strokeWidth = RingStroke,
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.backup_cancel))
+            }
+        }
 
-                else -> {
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.backup_failed_count,
-                            summary.failed,
-                            summary.failed,
-                        ),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onRetryFailed) {
-                        Text(stringResource(R.string.backup_retry_failed))
-                    }
-                }
+        else -> SelectionBar(
+            label = pluralStringResource(
+                R.plurals.backup_failed_count,
+                summary.failed,
+                summary.failed,
+            ),
+            modifier = modifier.padding(SpaceSm),
+        ) {
+            TextButton(onClick = onRetryFailed) {
+                Text(stringResource(R.string.backup_retry_failed))
             }
         }
     }
@@ -591,23 +578,13 @@ private fun LibraryUnavailable(onRetry: () -> Unit) {
     )
 }
 
-/**
- * A labelled icon button. Every one of these actions is undescribed until its content description is
- * read, and a heart with no label leaves the user guessing whether it marks the selection or the cell.
- */
-@Composable
-private fun ActionIcon(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(imageVector = icon, contentDescription = stringResource(label))
-    }
-}
-
-
 /** Rows of cells fetched ahead of the viewport edge, so scrolling does not hit a blank tail. */
 private const val LOAD_AHEAD = 24
 
 /**
  * The room the grid leaves at its foot when the selection/progress strip is on screen: the strip's own height,
- * its two margins and a little of the last row so the bar's shadow does not fall across a thumbnail.
+ * its two margins and a little of the last row so the bar's shadow does not fall across a thumbnail. Grows
+ * with the strip's own padding — the shared [SelectionBar] pads its row a step deeper than the original
+ * copy did, and an inset counted against the old height would let the bar kiss the last row.
  */
-private val BottomBarInset = 84.dp
+private val BottomBarInset = 92.dp

@@ -375,6 +375,10 @@ private class FakeLibrary : MediaRepository {
     override fun observeCountByType(): Flow<Map<MediaType, Int>> = flowOf(emptyMap())
 
     override fun observeFolders(): Flow<List<String>> = flowOf(emptyList())
+
+    // The timeline's select-all read; an automatic pass never asks for it. The rule it exists for —
+    // the id set being the window's set without a limit — is asserted in SelectAllIdsRealSqlTest.
+    override suspend fun visibleIds(): List<Long> = emptyList()
 }
 
 private class FakeOnboarding : OnboardingRepository {

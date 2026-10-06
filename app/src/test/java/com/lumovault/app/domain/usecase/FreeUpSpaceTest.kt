@@ -291,6 +291,14 @@ private class FakeOrganization : MediaOrganizationRepository {
     override suspend fun trashedMediaIds(): List<Long> = emptyList()
 
     override suspend fun trashedCount(): Int = 0
+
+    // Select all never runs inside the free-up-space pass; the reads are pinned where they are
+    // derived — MediaOrganizationRepositoryTest holds the routing, SelectAllIdsRealSqlTest the SQL —
+    // so the stub answers with nothing rather than copying the logic.
+    override suspend fun allIdsIn(album: com.lumovault.app.domain.model.SystemAlbum): List<Long> =
+        emptyList()
+
+    override suspend fun allIdsInLocalFolder(relativePath: String): List<Long> = emptyList()
 }
 
 private class SpaceLibrary : MediaRepository {
@@ -312,4 +320,8 @@ private class SpaceLibrary : MediaRepository {
     override fun observeCountByType(): Flow<Map<MediaType, Int>> = flowOf(emptyMap())
 
     override fun observeFolders(): Flow<List<String>> = flowOf(emptyList())
+
+    // The timeline's select-all read; this pass never asks for it. The rule it exists for — the id
+    // set being the window's set without a limit — is asserted in SelectAllIdsRealSqlTest.
+    override suspend fun visibleIds(): List<Long> = emptyList()
 }

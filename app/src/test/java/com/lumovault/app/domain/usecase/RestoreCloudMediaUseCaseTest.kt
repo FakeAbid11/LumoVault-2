@@ -554,6 +554,10 @@ private class RestoredLibrary : MediaRepository {
     override fun observeCountByType(): Flow<Map<MediaType, Int>> = flowOf(emptyMap())
 
     override fun observeFolders(): Flow<List<String>> = flowOf(listOf("Pictures/LumoVault/"))
+
+    // The timeline's select-all read; a restore never asks for it. The rule it exists for — the id
+    // set being the window's set without a limit — is asserted in SelectAllIdsRealSqlTest.
+    override suspend fun visibleIds(): List<Long> = emptyList()
 }
 
 private const val CHAT = 1_000L

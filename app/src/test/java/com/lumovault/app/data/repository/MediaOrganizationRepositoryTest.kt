@@ -324,6 +324,53 @@ class MediaOrganizationRepositoryTest {
         assertEquals(true, store.organizationOf(1L)?.favorite)
     }
 
+    /**
+     * Select all's routing, checked where a wrong branch would name the wrong room: every system
+     * album and the device-folder case answer with exactly the set their own window draws. The SQL
+     * behind each answer is held to the same standard against a real database in
+     * `SelectAllIdsRealSqlTest`; what is under test here is that the repository sends the question
+     * to the right DAO method for the album it was asked about.
+     */
+    @Test
+    fun everySelectAllAnswerIsTheSameSetItsWindowDraws() = runBlocking {
+        store.index(
+            FakeMediaRow(1L),
+            FakeMediaRow(2L, type = MediaType.Video),
+            FakeMediaRow(3L, relativePath = "Pictures/Other/"),
+            FakeMediaRow(4L, relativePath = "Pictures/Other/"),
+        )
+        repository.setFavorite(listOf(1L, 3L), true)
+        repository.setArchived(listOf(2L), true)
+        repository.moveToTrash(listOf(3L))
+
+        listOf(
+            SystemAlbum.Favorites,
+            SystemAlbum.Archive,
+            SystemAlbum.Videos,
+            SystemAlbum.Trash,
+            SystemAlbum.RecentlyAdded,
+        ).forEach { album ->
+            assertEquals(
+                "$album: select all may not drift from the window the grid draws",
+                repository.observeContents(album, 100).first().map { it.id }.toSet(),
+                repository.allIdsIn(album).toSet(),
+            )
+        }
+
+        assertEquals(
+            "the folder case normalises its path the same way on both sides",
+            repository.observeLocalFolderContents("Pictures/Other/", 100).first().map { it.id }.toSet(),
+            repository.allIdsInLocalFolder("Pictures/Other/").toSet(),
+        )
+
+        // And the sets themselves, so a routing bug that agreed with its own wrong answer still fails:
+        // the favourited-then-trashed row leaves Favorites, and the archived video stays in Videos.
+        assertEquals(setOf(1L), repository.allIdsIn(SystemAlbum.Favorites).toSet())
+        assertEquals(setOf(2L), repository.allIdsIn(SystemAlbum.Videos).toSet())
+        assertEquals(setOf(3L), repository.allIdsIn(SystemAlbum.Trash).toSet())
+        assertEquals(setOf(4L), repository.allIdsInLocalFolder("Pictures/Other/").toSet())
+    }
+
     private companion object {
         const val DAY = 86_400L
         const val YEAR = 365L * DAY

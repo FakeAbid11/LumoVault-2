@@ -102,6 +102,22 @@ interface AlbumDao {
     @Query("SELECT COUNT(*) FROM album_media WHERE album_id = :albumId")
     suspend fun countMembers(albumId: Long): Int
 
+    /**
+     * The album's whole membership as the grid draws it, unwindowed — [observeContent] without the
+     * `LIMIT`, for select all. The Trash filter is load-bearing for the same reason it is there: the
+     * strip's count is the count the actions act on, and a trashed member the grid never drew would
+     * be a selection cell the user cannot see.
+     */
+    @Query(
+        """
+        SELECT am.media_store_id FROM album_media am
+        JOIN media m ON m.media_store_id = am.media_store_id
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE am.album_id = :albumId AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun allMemberIds(albumId: Long): List<Long>
+
     /** How many memberships went away, which is what lets the UI report the ones that were there. */
     @Query("DELETE FROM album_media WHERE album_id = :albumId AND media_store_id IN (:ids)")
     suspend fun removeMembers(albumId: Long, ids: Collection<Long>): Int
@@ -427,6 +443,76 @@ interface SystemAlbumDao {
         """,
     )
     fun observeRecentlyAdded(sinceSeconds: Long, limit: Int): Flow<List<MediaEntity>>
+
+    /*
+     * Select all's reads: each window above as ids only, with no `LIMIT` — same joins, same `WHERE`,
+     * because a set that drifts from what the grid draws is a count that lies. Ordering is a window's
+     * business and a selection is a set, so it is dropped. Each pair (window vs ids) is asserted as
+     * one set against real SQLite in `SelectAllIdsRealSqlTest`.
+     */
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE o.favorite = 1 AND o.trashed_at = 0
+        """,
+    )
+    suspend fun favoriteIds(): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE o.archived = 1 AND o.trashed_at = 0
+        """,
+    )
+    suspend fun archivedIds(): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE o.trashed_at > 0
+        """,
+    )
+    suspend fun trashedMediaIds(): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.media_type = :mediaType AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun byTypeIds(mediaType: String): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.relative_path LIKE :pattern AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun byPathIds(pattern: String): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.date_added_seconds >= :sinceSeconds AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun recentlyAddedIds(sinceSeconds: Long): List<Long>
+
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE m.relative_path = :relativePath AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun folderContentsIds(relativePath: String): List<Long>
 }
 
 /** The eight system-album counts, as one row. */

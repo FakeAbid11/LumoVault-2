@@ -17,6 +17,15 @@ interface MediaRepository {
     /** Total indexed items, so the UI can say whether more exist beyond the window. */
     fun observeCount(): Flow<Int>
 
+    /**
+     * Every id the timeline can show, as one list: [observeWindow] without the window.
+     *
+     * Select all is the only caller, and it needs the ids the grid has not scrolled to yet — the
+     * strip's count and the set an action writes to have to be the same set, or "500 selected" backs
+     * up 300. The pairing with the window is asserted against real SQLite in `SelectAllIdsRealSqlTest`.
+     */
+    suspend fun visibleIds(): List<Long>
+
     fun observeCountByType(): Flow<Map<MediaType, Int>>
 
     /** Distinct folders in the index, for the backup-source picker. */

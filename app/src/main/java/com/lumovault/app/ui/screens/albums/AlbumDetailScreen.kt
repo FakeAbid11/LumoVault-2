@@ -3,8 +3,6 @@ package com.lumovault.app.ui.screens.albums
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,14 +24,13 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,8 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,11 +50,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.components.ActionIcon
 import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaCell
 import com.lumovault.app.ui.components.NoticeBanner
 import com.lumovault.app.ui.components.PlaceholderScreen
+import com.lumovault.app.ui.components.SelectionBar
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
@@ -191,6 +188,7 @@ fun AlbumDetailScreen(
                 selectionSize = state.selection.size,
                 canEditMembership = state.isUserAlbum,
                 isTrash = isTrash,
+                onSelectAll = viewModel::selectAll,
                 onClear = viewModel::clearSelection,
                 onFavorite = { viewModel.setFavorite(true) },
                 onUnfavorite = { viewModel.setFavorite(false) },
@@ -443,12 +441,15 @@ private fun MediaGrid(
  *
  * Favourite and archive appear as both directions because an album detail screen is where a user changes
  * their mind, and an action that only ever adds is a button that breaks once the item is already marked.
+ * The strip itself — surface, count, scroll — is the shared [SelectionBar], the same one the timeline
+ * draws, so a selection looks and behaves the same in both places.
  */
 @Composable
 private fun AlbumActionBar(
     selectionSize: Int,
     canEditMembership: Boolean,
     isTrash: Boolean,
+    onSelectAll: () -> Unit,
     onClear: () -> Unit,
     onFavorite: () -> Unit,
     onUnfavorite: () -> Unit,
@@ -459,51 +460,25 @@ private fun AlbumActionBar(
     onRemoveFromAlbum: () -> Unit,
     onDeleteForever: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(GridSpacing),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    SelectionBar(
+        label = pluralStringResource(R.plurals.selected_count, selectionSize, selectionSize),
+        modifier = Modifier.fillMaxWidth().padding(GridSpacing),
     ) {
-        Row(
-            // Scrollable rather than compressed: Trash plus six organisation marks plus a count and a
-            // Clear do not fit a narrow phone, and squeezing them shrinks every tap target at once.
-            modifier = Modifier
-                .padding(horizontal = SpaceMd, vertical = SpaceSm)
-                .horizontalScroll(rememberScrollState()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpaceXs),
-        ) {
-            Text(
-                text = stringResource(R.string.album_selected_count, selectionSize),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(end = SpaceXs),
-            )
-            if (isTrash) {
-                ActionIcon(Icons.Filled.Restore, R.string.trash_restore_action, onRestore)
-                ActionIcon(Icons.Filled.Delete, R.string.trash_delete_forever_action, onDeleteForever)
-            } else {
-                ActionIcon(Icons.Filled.Favorite, R.string.organization_favorite_action, onFavorite)
-                ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_unfavorite_action, onUnfavorite)
-                ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
-                ActionIcon(Icons.Filled.Unarchive, R.string.organization_unarchive_action, onUnarchive)
-                ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
-                if (canEditMembership) {
-                    ActionIcon(Icons.Filled.PhotoLibrary, R.string.album_remove_from_album_action, onRemoveFromAlbum)
-                }
-            }
-            TextButton(onClick = onClear, modifier = Modifier.padding(start = SpaceXxs)) {
-                Text(stringResource(R.string.backup_selection_clear))
+        ActionIcon(Icons.Filled.SelectAll, R.string.selection_select_all, onSelectAll)
+        if (isTrash) {
+            ActionIcon(Icons.Filled.Restore, R.string.trash_restore_action, onRestore)
+            ActionIcon(Icons.Filled.Delete, R.string.trash_delete_forever_action, onDeleteForever)
+        } else {
+            ActionIcon(Icons.Filled.Favorite, R.string.organization_favorite_action, onFavorite)
+            ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_unfavorite_action, onUnfavorite)
+            ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
+            ActionIcon(Icons.Filled.Unarchive, R.string.organization_unarchive_action, onUnarchive)
+            ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
+            if (canEditMembership) {
+                ActionIcon(Icons.Filled.PhotoLibrary, R.string.album_remove_from_album_action, onRemoveFromAlbum)
             }
         }
-    }
-}
-
-@Composable
-private fun ActionIcon(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(imageVector = icon, contentDescription = stringResource(label))
+        ActionIcon(Icons.Filled.Close, R.string.selection_clear, onClear)
     }
 }
 

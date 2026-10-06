@@ -802,8 +802,8 @@ fun FreeUpSpaceScreen(
                     ) {
                         Text(
                             stringResource(
-                                if (state.allSelected) R.string.free_space_clear_selection
-                                else R.string.free_space_select_all,
+                                if (state.allSelected) R.string.selection_clear
+                                else R.string.selection_select_all,
                             ),
                         )
                     }

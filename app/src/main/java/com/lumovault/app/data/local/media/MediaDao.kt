@@ -37,6 +37,24 @@ interface MediaDao {
     )
     fun observeCount(): Flow<Int>
 
+    /**
+     * Every id the timeline can show, unwindowed — [observeWindow]'s set without its `LIMIT`.
+     *
+     * "Select all" asks for the whole library while the grid has only rendered its first pages, and
+     * the count the strip then prints is the count the actions will act on — so the answer has to be
+     * the same set the window query would return if nothing limited it: same joins, same `WHERE`,
+     * ids only. Ordering is dropped because a selection is a set. The pair is asserted against real
+     * SQLite in `SelectAllIdsRealSqlTest`.
+     */
+    @Query(
+        """
+        SELECT m.media_store_id FROM media m
+        LEFT JOIN media_organization o ON o.media_store_id = m.media_store_id
+        WHERE COALESCE(o.archived, 0) = 0 AND COALESCE(o.trashed_at, 0) = 0
+        """,
+    )
+    suspend fun visibleIds(): List<Long>
+
     @Query(
         """
         SELECT m.media_type AS mediaType, COUNT(*) AS itemCount FROM media m

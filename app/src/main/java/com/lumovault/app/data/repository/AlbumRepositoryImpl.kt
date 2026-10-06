@@ -80,6 +80,8 @@ class AlbumRepositoryImpl(
         return mediaStoreIds.chunked(MAX_IDS_PER_QUERY).flatMap { albums.membersWithin(albumId, it) }
     }
 
+    override suspend fun allMemberIds(albumId: Long): List<Long> = albums.allMemberIds(albumId)
+
     override suspend fun albumsContaining(mediaStoreId: Long): List<Long> =
         albums.albumsContaining(mediaStoreId)
 
