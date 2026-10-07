@@ -70,6 +70,26 @@ class RestoreCloudMediaUseCase(
     }
 
     /**
+     * Begins a whole selection as one serial pass, and returns as soon as it has been handed over.
+     *
+     * Serial because the alternative is not "faster" but worse: one launch per selected item puts every
+     * transfer in flight at once, and each one polls TDLib twice a second for the file it is waiting on —
+     * a select-all over a large channel is tens of thousands of concurrent poll loops against a client
+     * that was asked, by [transfer]'s own priority, to treat this as *the* file the user is waiting for.
+     * One at a time keeps that true for every item in the batch, and costs only ordering.
+     *
+     * The caller's count is the count handed here, read after this call returns: every target has been
+     * accepted for a run by then, and none of them has been *refused* by a decision this call cannot see
+     * — those belong to the job rows they produce, which is where the grid draws them.
+     */
+    fun startAll(targets: List<CloudRestoreTarget>) {
+        if (targets.isEmpty()) return
+        scope.launch {
+            targets.forEach { target -> restore(target) }
+        }
+    }
+
+    /**
      * Runs one restore to its end. Exposed for the reason the queue runner's `run` is: a retry after a
      * restart, and a test, both need the body without the launching.
      */

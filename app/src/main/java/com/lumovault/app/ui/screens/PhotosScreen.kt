@@ -1,7 +1,6 @@
 package com.lumovault.app.ui.screens
 
 import android.content.Context
-import android.net.Uri
 import com.lumovault.app.util.openAppDetailsSettings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,6 +29,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,7 +54,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -79,6 +78,7 @@ import com.lumovault.app.ui.screens.photos.PhotosUiState
 import com.lumovault.app.util.DayDistance
 import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.formatDay
+import com.lumovault.app.util.MediaShare
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import com.lumovault.app.ui.theme.GridCellMinSize
@@ -87,10 +87,10 @@ import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.MarkInline
 import com.lumovault.app.ui.theme.RailWidth
 import com.lumovault.app.ui.theme.RingStroke
+import com.lumovault.app.ui.theme.SelectionBarInset
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
-import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.ui.theme.SyncingAccent
 
 /**
@@ -111,6 +111,9 @@ fun PhotosScreen(
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // One context for the one share utility: the strip below never builds an intent itself.
+    val context = LocalContext.current
 
     // Failures of the bar's writes and the counts of its bulk successes, shown by the shell's one
     // snackbar. Collected before any state can route around it, so a line is never lost to a branch.
@@ -149,7 +152,7 @@ fun PhotosScreen(
     val showBar = selected.isNotEmpty() ||
         backup.summary.isActive ||
         backup.summary.failed > 0
-    val bottomInset = if (showBar) BottomBarInset else GridSpacing
+    val bottomInset = if (showBar) SelectionBarInset else GridSpacing
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -214,6 +217,7 @@ fun PhotosScreen(
                 selectionSize = selected.size,
                 summary = backup.summary,
                 onSelectAll = viewModel::selectAll,
+                onShare = { viewModel.shareSelected { items -> MediaShare.share(context, items) } },
                 onBackUp = viewModel::backUpSelected,
                 onFavorite = { viewModel.setFavoriteSelected(true) },
                 onArchive = viewModel::archiveSelected,
@@ -290,6 +294,7 @@ private fun BackupBar(
     selectionSize: Int,
     summary: BackupQueueSummary,
     onSelectAll: () -> Unit,
+    onShare: () -> Unit,
     onBackUp: () -> Unit,
     onFavorite: () -> Unit,
     onArchive: () -> Unit,
@@ -304,11 +309,13 @@ private fun BackupBar(
             label = pluralStringResource(R.plurals.selected_count, selectionSize, selectionSize),
             modifier = modifier.padding(SpaceSm),
         ) {
-            // Select all speaks for the selection itself, so it leads. Then the organisation marks:
+            // Select all speaks for the selection itself, so it leads; Share comes next because it
+            // hands the same selection elsewhere without changing it. Then the organisation marks:
             // favourite, archive and Trash are decisions about the library; "Back Up" is the one that
             // costs the user data, so it sits at the end where the thumb finishes. They share a strip
             // because they act on the same selection.
             ActionIcon(Icons.Filled.SelectAll, R.string.selection_select_all, onSelectAll)
+            ActionIcon(Icons.Filled.Share, R.string.share_action, onShare)
             ActionIcon(Icons.Filled.FavoriteBorder, R.string.organization_favorite_action, onFavorite)
             ActionIcon(Icons.Filled.Archive, R.string.organization_archive_action, onArchive)
             ActionIcon(Icons.Filled.Delete, R.string.organization_trash_action, onTrash)
@@ -580,11 +587,3 @@ private fun LibraryUnavailable(onRetry: () -> Unit) {
 
 /** Rows of cells fetched ahead of the viewport edge, so scrolling does not hit a blank tail. */
 private const val LOAD_AHEAD = 24
-
-/**
- * The room the grid leaves at its foot when the selection/progress strip is on screen: the strip's own height,
- * its two margins and a little of the last row so the bar's shadow does not fall across a thumbnail. Grows
- * with the strip's own padding — the shared [SelectionBar] pads its row a step deeper than the original
- * copy did, and an inset counted against the old height would let the bar kiss the last row.
- */
-private val BottomBarInset = 92.dp

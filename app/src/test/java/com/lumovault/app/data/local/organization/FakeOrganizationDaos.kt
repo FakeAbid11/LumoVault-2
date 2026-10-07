@@ -4,6 +4,7 @@ import com.lumovault.app.data.local.media.LocalNameMatch
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.MediaTypeCount
+import com.lumovault.app.data.local.media.ShareMediaRow
 import com.lumovault.app.data.local.organization.LocalFolderRow
 import com.lumovault.app.domain.model.SystemAlbum
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,14 @@ import kotlinx.coroutines.flow.map
 class FakeMediaDao(private val store: OrganizationStore) : MediaDao {
     /** One index row by id — the lookup a restore makes after its scan, and Free Up Space before a delete. */
     override suspend fun rowFor(id: Long): MediaEntity? = store.media[id]
+
+    // Faithful rather than stubbed: both are the same keyed reads the real query makes. This one
+    // answers in the requested order, which the real `IN (…)` does not promise; the repository
+    // re-sequences the rows itself, so the order here is a convenience, not a contract.
+    override suspend fun rowsFor(ids: List<Long>): List<MediaEntity> = ids.mapNotNull { store.media[it] }
+
+    override suspend fun shareTargets(ids: List<Long>): List<ShareMediaRow> =
+        rowsFor(ids).map { ShareMediaRow(uri = it.contentUri, mimeType = it.mimeType) }
 
     override fun observeWindow(limit: Int): Flow<List<MediaEntity>> = store.tick.map {
         store.media.values.filter { row -> store.visible(row.mediaStoreId) }
@@ -76,7 +85,7 @@ class FakeMediaDao(private val store: OrganizationStore) : MediaDao {
 
     override suspend fun findByName(names: List<String>): List<LocalNameMatch> =
         store.media.values.filter { it.displayName in names }
-            .map { LocalNameMatch(it.displayName, it.sizeBytes) }
+            .map { LocalNameMatch(mediaId = it.mediaStoreId, displayName = it.displayName, sizeBytes = it.sizeBytes) }
 
     private fun visible(entity: MediaEntity) = store.visible(entity.mediaStoreId)
 }

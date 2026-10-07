@@ -35,6 +35,20 @@ internal val MediaGlyphSize = 26.dp
 internal val MediaGlyphIconSize = 16.dp
 
 /**
+ * The ring a selected cell wears, wherever selection exists: thicker than a hairline, because a 1 dp ring
+ * on a dark thumbnail reads as an artefact rather than as a choice. Photos, albums and Cloud all draw the
+ * same ring so a selection looks like one mode across the app.
+ */
+internal val SelectionRing = 2.5.dp
+
+/**
+ * The bottom gap a selection strip leaves so the grid's last row stays tappable under it. One number for
+ * the same reason as the ring: the strip is the same surface on every screen, and a grid that reserved a
+ * different height per screen would leave its last row half-covered wherever it forgot.
+ */
+internal val SelectionBarInset = 92.dp
+
+/**
  * The timeline's date rail. Its width is also the padding the grid gives up to it, so the two cannot drift
  * apart and leave the rail sitting on top of the rightmost column of photos — the strip is reserved, not
  * overlaid.

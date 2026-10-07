@@ -2,6 +2,7 @@ package com.lumovault.app.data.repository
 
 import androidx.room.withTransaction
 import com.lumovault.app.data.local.LumoVaultDatabase
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.cloud.CloudChannelDao
 import com.lumovault.app.data.local.cloud.CloudChannelEntity
 import com.lumovault.app.data.local.cloud.CloudMediaDao
@@ -30,6 +31,14 @@ class CloudIndexRepositoryImpl(
 ) : CloudIndexRepository {
     override fun observeWindow(limit: Int): Flow<List<CloudMedia>> =
         media.observeWindow(limit).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun allIds(): List<Long> = media.allIds()
+
+    override suspend fun itemsFor(ids: Collection<Long>): List<CloudMedia> =
+        ids.distinct()
+            .chunked(MAX_IDS_PER_QUERY)
+            .flatMap { chunk -> media.rowsFor(chunk) }
+            .map { it.toDomain() }
 
     override fun observeCount(): Flow<Int> = media.observeCount()
 

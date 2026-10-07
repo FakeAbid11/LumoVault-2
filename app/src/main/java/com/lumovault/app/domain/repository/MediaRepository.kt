@@ -2,6 +2,7 @@ package com.lumovault.app.domain.repository
 
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.model.ShareableMedia
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -25,6 +26,15 @@ interface MediaRepository {
      * up 300. The pairing with the window is asserted against real SQLite in `SelectAllIdsRealSqlTest`.
      */
     suspend fun visibleIds(): List<Long>
+
+    /**
+     * The share targets for these ids: content URI plus MIME type, one row per id the index still
+     * holds. Select all can name rows the grid never loaded — the strip's count and the share sheet
+     * must be the same set — so sharing reads its own rows rather than the window, chunked against
+     * the query ceiling. An id the index no longer holds is skipped rather than guessed at: a share
+     * of a file that has left the device shares nothing, never a stale path.
+     */
+    suspend fun shareablesFor(ids: Collection<Long>): List<ShareableMedia>
 
     fun observeCountByType(): Flow<Map<MediaType, Int>>
 

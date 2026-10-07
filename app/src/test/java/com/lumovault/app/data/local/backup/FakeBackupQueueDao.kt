@@ -464,10 +464,10 @@ class FakeBackupQueueDao : BackupQueueDao {
         return matching.size
     }
 
-    override suspend fun hashesStillOnDevice(hashes: Collection<String>): List<String> =
+    override suspend fun mediaIdsStillOnDevice(hashes: Collection<String>): List<HashedMediaId> =
         rows.values
             .filter { it.contentHash in hashes && it.contentHash.isNotBlank() && it.mediaStoreId in media }
-            .map { it.contentHash }
+            .map { HashedMediaId(hash = it.contentHash, mediaId = it.mediaStoreId) }
 
     private fun put(ids: LongArray, type: MediaType) {
         ids.forEach { media[it] = FakeMediaRow(type = type, dateAddedSeconds = it) }

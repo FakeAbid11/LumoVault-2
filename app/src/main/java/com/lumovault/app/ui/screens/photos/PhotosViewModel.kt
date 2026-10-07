@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.MediaAccessStatus
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.model.groupByDay
 import com.lumovault.app.ui.components.AppMessage
 import kotlinx.coroutines.CancellationException
@@ -203,6 +204,29 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     fun selectAll() {
         launchWrite("select all", failureMessage = R.string.feedback_action_failed) {
             selection.value = container.mediaRepository.visibleIds().toSet()
+        }
+    }
+
+    /**
+     * Resolves the selection to share targets — content URIs plus MIME types, read for the whole
+     * selection and not only the loaded window — and hands them to the screen to put on Android's
+     * share sheet through the one [com.lumovault.app.util.MediaShare] utility.
+     *
+     * The selection is kept: sharing changes nothing about the library, and a user who shares three
+     * photos and then archives them is doing both acts to the same three.
+     */
+    fun shareSelected(onShare: (List<ShareableMedia>) -> Unit) {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+        launchWrite("share selection") {
+            val shareables = container.mediaRepository.shareablesFor(ids)
+            if (shareables.isEmpty()) {
+                // The rows the selection named have left the index — a file deleted from another
+                // app a moment ago. Say so rather than opening a share sheet with nothing behind it.
+                _messages.tryEmit(AppMessage(R.string.share_nothing))
+            } else {
+                onShare(shareables)
+            }
         }
     }
 

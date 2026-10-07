@@ -15,6 +15,21 @@ import kotlinx.coroutines.flow.Flow
 interface CloudIndexRepository {
     fun observeWindow(limit: Int): Flow<List<CloudMedia>>
 
+    /**
+     * Every message id in the index — [observeWindow] without the window, ids only. Select all is
+     * the only caller: the strip's count and the set an action touches have to be the same set, or
+     * "2,000 selected" restores 300. The pairing with the window is asserted against real SQLite in
+     * `CloudSelectAllRealSqlTest`.
+     */
+    suspend fun allIds(): List<Long>
+
+    /**
+     * The records for these message ids — what a selection's actions act on, window or no window.
+     * Chunked against the query ceiling in the implementation; an id the index no longer holds is
+     * skipped rather than invented.
+     */
+    suspend fun itemsFor(ids: Collection<Long>): List<CloudMedia>
+
     fun observeCount(): Flow<Int>
 
     fun observeTypeCounts(): Flow<List<CloudTypeCount>>

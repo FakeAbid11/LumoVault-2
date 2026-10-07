@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -399,6 +400,20 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
         // inside that folder.
         is ViewerTarget.Folder ->
             container.mediaOrganizationRepository.observeLocalFolderContents(target.relativePath, limit)
+
+        // The cloud window's own copies on this device, in cloud order: a tap from the Cloud grid walks
+        // the cloud, and only rows the device holds — an item without local bytes has nothing this pager
+        // could draw, and the Cloud screen opens its details-and-download sheet for those instead. The
+        // media count rides along purely as an invalidation signal: a restore that lands writes a media
+        // row, and the list must notice that without waiting for a cloud-side change.
+        is ViewerTarget.Cloud ->
+            combine(
+                container.cloudIndexRepository.observeWindow(limit),
+                container.mediaRepository.observeCount(),
+            ) { window, _ -> window }
+                .flatMapLatest { window ->
+                    flow { emit(container.localPresenceLookup.localMediaFor(window)) }
+                }
     }
 
     private data class OpenRequest(val mediaStoreId: Long, val target: ViewerTarget) {

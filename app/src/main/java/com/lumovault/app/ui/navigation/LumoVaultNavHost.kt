@@ -179,7 +179,14 @@ fun LumoVaultNavHost(
         }
 
         composable(LumoVaultDestination.Cloud.route) {
-            CloudScreen(onConnectTelegram = { navController.navigate(AccountRoutes.CONNECT_TELEGRAM) })
+            CloudScreen(
+                onConnectTelegram = { navController.navigate(AccountRoutes.CONNECT_TELEGRAM) },
+                // A cloud item the device holds opens the *shared* viewer on its local row, swiping
+                // through the cloud's own list — the Cloud tab never grows a second viewer.
+                onOpenCloudMedia = { mediaId ->
+                    navController.navigate(ViewerRoutes.of(mediaId, ViewerTarget.Cloud))
+                },
+            )
         }
 
         composable(AccountRoutes.CONNECT_TELEGRAM) {

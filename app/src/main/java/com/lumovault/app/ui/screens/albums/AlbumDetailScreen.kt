@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,10 +65,10 @@ import com.lumovault.app.ui.theme.GridCellMinSize
 import com.lumovault.app.ui.theme.GridSpacing
 import com.lumovault.app.ui.theme.LumoVaultType
 import com.lumovault.app.ui.theme.SpaceLg
-import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
 import com.lumovault.app.ui.theme.SpaceXs
 import com.lumovault.app.ui.theme.SpaceXxs
+import com.lumovault.app.util.MediaShare
 
 /**
  * One album: its items, and the organisation actions over the ones the user selects.
@@ -100,6 +102,9 @@ fun AlbumDetailScreen(
     // Failures of this screen's writes, shown by the shell's one snackbar. Collected before the
     // unresolved-album return below, so the collector is never started and stopped by a branch.
     CollectAppMessages(viewModel.messages)
+
+    // One context for the one share utility; the strip below never builds an intent itself.
+    val context = LocalContext.current
 
     var renaming by rememberSaveable { mutableStateOf(false) }
     // The prompt stays open until the rename lands; see the create prompt in AlbumsScreen for why
@@ -190,6 +195,7 @@ fun AlbumDetailScreen(
                 canEditMembership = state.isUserAlbum,
                 isTrash = isTrash,
                 onSelectAll = viewModel::selectAll,
+                onShare = { viewModel.shareSelected { items -> MediaShare.share(context, items) } },
                 onClear = viewModel::clearSelection,
                 onFavorite = { viewModel.setFavorite(true) },
                 onUnfavorite = { viewModel.setFavorite(false) },
@@ -451,6 +457,7 @@ private fun AlbumActionBar(
     canEditMembership: Boolean,
     isTrash: Boolean,
     onSelectAll: () -> Unit,
+    onShare: () -> Unit,
     onClear: () -> Unit,
     onFavorite: () -> Unit,
     onUnfavorite: () -> Unit,
@@ -466,6 +473,7 @@ private fun AlbumActionBar(
         modifier = Modifier.fillMaxWidth().padding(GridSpacing),
     ) {
         ActionIcon(Icons.Filled.SelectAll, R.string.selection_select_all, onSelectAll)
+        ActionIcon(Icons.Filled.Share, R.string.share_action, onShare)
         if (isTrash) {
             ActionIcon(Icons.Filled.Restore, R.string.trash_restore_action, onRestore)
             ActionIcon(Icons.Filled.Delete, R.string.trash_delete_forever_action, onDeleteForever)

@@ -108,6 +108,13 @@ class SynchronizeCloudUseCaseTest {
         var finishedWith: Pair<Long, Boolean>? = null
 
         override fun observeWindow(limit: Int): Flow<List<CloudMedia>> = flowOf(emptyList())
+
+        // Unused by the walk: select all and the Cloud selection actions are asserted in
+        // `CloudSelectAllRealSqlTest`, and this fake only has to keep the interface it
+        // implements the real one.
+        override suspend fun allIds(): List<Long> = emptyList()
+
+        override suspend fun itemsFor(ids: Collection<Long>): List<CloudMedia> = emptyList()
         override fun observeCount(): Flow<Int> = flowOf(saved?.let { 1 } ?: 0)
         override fun observeTypeCounts(): Flow<List<CloudTypeCount>> = flowOf(emptyList())
         override suspend fun currentCount(): Int = pagesWritten.sumOf { it.size }

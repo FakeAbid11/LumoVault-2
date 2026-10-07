@@ -10,6 +10,7 @@ import com.lumovault.app.LumoVaultApplication
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.FolderPaths
 import com.lumovault.app.domain.model.Media
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.model.SystemAlbum
 import com.lumovault.app.domain.organization.Album
 import com.lumovault.app.ui.components.AppMessage
@@ -176,6 +177,28 @@ class AlbumDetailViewModel(application: Application) : AndroidViewModel(applicat
                 is AlbumTarget.LocalFolder ->
                     container.mediaOrganizationRepository.allIdsInLocalFolder(current.relativePath)
             }.toSet()
+        }
+    }
+
+    /**
+     * Resolves the selection to share targets and hands them to the screen for Android's share
+     * sheet, through the same [com.lumovault.app.util.MediaShare] utility every other surface uses.
+     *
+     * The selection is deliberately kept — [withSelected] clears because its actions *change* the
+     * album, and sharing changes nothing about it. Rows the index no longer holds are skipped by
+     * the repository; when nothing at all can be shared the screen says so instead of opening an
+     * empty sheet.
+     */
+    fun shareSelected(onShare: (List<ShareableMedia>) -> Unit) {
+        val ids = selection.value
+        if (ids.isEmpty()) return
+        launchWrite("share selection") {
+            val shareables = container.mediaRepository.shareablesFor(ids)
+            if (shareables.isEmpty()) {
+                _messages.tryEmit(AppMessage(R.string.share_nothing))
+            } else {
+                onShare(shareables)
+            }
         }
     }
 

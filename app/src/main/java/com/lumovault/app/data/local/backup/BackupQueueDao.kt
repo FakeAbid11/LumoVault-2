@@ -512,22 +512,30 @@ interface BackupQueueDao {
     suspend fun countIn(state: String): Int
 
     /**
-     * Which of [hashes] the device's own media files are backed by, right now.
+     * Which of [hashes] the device's own media files are backed by, right now — and which row
+     * backs each.
      *
      * The join to `media` is the whole point. A backup record outlives the file it was made from — that
      * is PRD section 72's cloud-only state, and the record must survive — so a claimed hash on its own
      * says only "this content was seen here". Joined, it says the original is still on the device, which
-     * is the difference the Cloud screen draws between *local + cloud* and *cloud only*.
+     * is the difference the Cloud screen draws between *local + cloud* and *cloud only* — and the row id
+     * is what lets a cloud tap open that file in the shared viewer, and the share sheet hand it over.
      */
     @Query(
         """
-        SELECT b.content_hash FROM backup_queue b
+        SELECT b.content_hash AS hash, b.media_store_id AS mediaId FROM backup_queue b
         JOIN media m ON m.media_store_id = b.media_store_id
         WHERE b.content_hash IN (:hashes)
         """,
     )
-    suspend fun hashesStillOnDevice(hashes: Collection<String>): List<String>
+    suspend fun mediaIdsStillOnDevice(hashes: Collection<String>): List<HashedMediaId>
 }
+
+/** A manifest hash, and the device row that still holds the bytes it names. */
+data class HashedMediaId(
+    val hash: String,
+    val mediaId: Long,
+)
 
 /** The grouped-count projection. Mapped into [com.lumovault.app.domain.backup.BackupQueueSummary] in
  * the repository, so the arithmetic that the progress line shows is testable without a database. */

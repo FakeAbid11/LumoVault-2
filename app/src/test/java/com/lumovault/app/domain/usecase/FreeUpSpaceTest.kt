@@ -3,6 +3,7 @@ package com.lumovault.app.domain.usecase
 import com.lumovault.app.domain.backup.UploadState
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.organization.MediaOrganizationRepository
 import com.lumovault.app.domain.repository.FreeUpSpaceRepository
 import com.lumovault.app.domain.repository.MediaRepository
@@ -324,4 +325,9 @@ private class SpaceLibrary : MediaRepository {
     // The timeline's select-all read; this pass never asks for it. The rule it exists for — the id
     // set being the window's set without a limit — is asserted in SelectAllIdsRealSqlTest.
     override suspend fun visibleIds(): List<Long> = emptyList()
+
+    // Share's rows come from the same table the window draws; the pairing is asserted against
+    // real SQLite in `ShareTargetsRealSqlTest`. Nothing under test here shares, so the answer is
+    // empty rather than a copy of the real query.
+    override suspend fun shareablesFor(ids: Collection<Long>): List<ShareableMedia> = emptyList()
 }

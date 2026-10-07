@@ -42,6 +42,7 @@ import com.lumovault.app.ui.theme.FavoriteAccent
 import com.lumovault.app.ui.theme.MediaBadgeInset
 import com.lumovault.app.ui.theme.MediaGlyphIconSize
 import com.lumovault.app.ui.theme.MediaThumbCorner
+import com.lumovault.app.ui.theme.SelectionRing
 
 /**
  * A single grid cell. Reused by the later Albums, Archive, Trash and Cloud screens, which is why
@@ -220,5 +221,3 @@ private fun ThumbnailPlaceholder(icon: ImageVector? = null) {
     }
 }
 
-/** Thicker than a hairline, because a 1 dp ring on a dark thumbnail is a line the eye reads as an artefact. */
-private val SelectionRing = 2.5.dp

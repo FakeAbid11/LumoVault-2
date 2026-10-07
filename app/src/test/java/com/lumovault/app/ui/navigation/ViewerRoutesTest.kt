@@ -23,6 +23,7 @@ class ViewerRoutesTest {
             ViewerTarget.SystemAlbumView(SystemAlbum.Camera),
             ViewerTarget.SystemAlbumView(SystemAlbum.Trash),
             ViewerTarget.SystemAlbumView(SystemAlbum.RecentlyAdded),
+            ViewerTarget.Cloud,
         )
 
         sources.forEach { source ->
@@ -56,6 +57,11 @@ class ViewerRoutesTest {
         assertEquals(ViewerTarget.Photos, ViewerTarget.decode("system", "Memories"))
         assertEquals(ViewerTarget.Photos, ViewerTarget.decode(null, null))
         assertEquals(ViewerTarget.Photos, ViewerTarget.decode("", ""))
+
+        // The cloud kind needs no argument, and "cloud" is a list rather than a fallback: an old
+        // back stack that carries it must reopen on the cloud's own rows, not on the timeline.
+        assertEquals(ViewerTarget.Cloud, ViewerTarget.decode("cloud", "-"))
+        assertEquals(ViewerTarget.Cloud, ViewerTarget.decode("cloud", null))
     }
 
     @Test

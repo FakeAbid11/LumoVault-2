@@ -7,7 +7,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,11 +30,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -48,12 +55,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -73,11 +83,16 @@ import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
 import com.lumovault.app.domain.restore.RestoreJob
+import com.lumovault.app.domain.restore.RestoreState
+import com.lumovault.app.domain.telegram.CloudFailure
+import com.lumovault.app.ui.components.ActionIcon
+import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaGlyph
 import com.lumovault.app.ui.components.MediaPill
 import com.lumovault.app.ui.components.PillTone
 import com.lumovault.app.ui.components.PlaceholderScreen
+import com.lumovault.app.ui.components.SelectionBar
 import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.components.WorkingScreen
 import com.lumovault.app.ui.screens.cloud.RestoreAction
@@ -89,6 +104,7 @@ import com.lumovault.app.util.dayDistance
 import com.lumovault.app.util.toByteText
 import com.lumovault.app.util.formatDay
 import com.lumovault.app.util.formatDuration
+import com.lumovault.app.util.MediaShare
 import java.time.LocalDate
 import com.lumovault.app.ui.theme.FullScreenScrim
 import com.lumovault.app.ui.theme.GridCellMinSize
@@ -100,6 +116,8 @@ import com.lumovault.app.ui.theme.MediaBadgeScrim
 import com.lumovault.app.ui.theme.MediaThumbCorner
 import com.lumovault.app.ui.theme.OnMedia
 import com.lumovault.app.ui.theme.OverlayFadeMillis
+import com.lumovault.app.ui.theme.SelectionBarInset
+import com.lumovault.app.ui.theme.SelectionRing
 import com.lumovault.app.ui.theme.SpaceLg
 import com.lumovault.app.ui.theme.SpaceMd
 import com.lumovault.app.ui.theme.SpaceSm
@@ -113,22 +131,57 @@ import com.lumovault.app.ui.theme.SpaceXxl
  * A cell's picture comes from Telegram's *thumbnail* file only. Where that cannot be resolved —
  * because this build carries no TDLib binary, or the transfer has not finished — the cell keeps its
  * labelled placeholder, which is what section 21 asks for instead of a silent full-size fetch.
+ *
+ * Selection behaves like every other media grid: long press to start, tap to extend, and the shared
+ * [SelectionBar] to act. A tap on an item the device holds opens the *shared* viewer on that local row;
+ * only an item the device lacks falls back to the details-and-download sheet, because a viewer with no
+ * bytes to draw would be a second viewer — and this screen is deliberately not growing one.
  */
 @Composable
 fun CloudScreen(
     onConnectTelegram: () -> Unit = {},
+    onOpenCloudMedia: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: CloudViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val restoreJobs by viewModel.restoreJobs.collectAsStateWithLifecycle()
     val restoreJob by viewModel.restoreJob.collectAsStateWithLifecycle()
+    val selectedIds by viewModel.selected.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // One context for the one share utility — this screen never builds an intent itself — and one
+    // scope for the single suspend a tap makes (does the pressed item have a local row?).
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Share and selection feedback, shown by the shell's one snackbar: collected before any branch
+    // can route around it, so a line is never lost to a state change.
+    CollectAppMessages(viewModel.messages)
+
     var selected by remember { mutableStateOf<CloudMedia?>(null) }
     // `remember`, not `rememberSaveable`: the ask belongs to this visit, and it comes back on the next one
     // while the account is still missing. Persisting it would let a single dismissal silence the tab
     // forever, which is not what a skipped account deserves.
     var connectDialogDismissed by remember { mutableStateOf(false) }
+
+    /**
+     * One tap on a cloud item: the shared viewer when the device holds a copy, the details-and-
+     * download sheet when it does not. Which of the two is decided by a fresh lookup rather than by
+     * the badge the cell drew, because the badge is a flow's last answer and this is the row's state
+     * now — opening a pager over a file that has just left the device would be a black screen.
+     */
+    fun openItem(item: CloudMedia) {
+        scope.launch {
+            val localId = viewModel.localMediaIdFor(item)
+            if (localId != null) {
+                onOpenCloudMedia(localId)
+            } else {
+                selected = item
+                viewModel.focusing(item)
+            }
+        }
+    }
 
     // Re-sync on every resume: session, channel and account can each change while LumoVault is
     // backgrounded, and an answer remembered from last time would be wrong.
@@ -191,18 +244,49 @@ fun CloudScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            is CloudUiState.Failed -> CloudUnavailable(onRetry = viewModel::refresh)
+            is CloudUiState.Failed -> CloudUnavailable(
+                failure = current.failure,
+                onRetry = viewModel::refresh,
+                onConnect = onConnectTelegram,
+            )
 
             is CloudUiState.Library -> CloudTimeline(
                 state = current,
+                selection = selectedIds,
                 onLoadMore = viewModel::loadMore,
-                onSelect = { item ->
-                    selected = item
-                    viewModel.focusing(item)
+                // One tap opens, one long press selects, and after that every tap toggles — the same
+                // touch rule as the Photos grid, decided here because it is a fact about the touch
+                // and not about the data.
+                onCellClick = { item ->
+                    if (selectedIds.isEmpty()) openItem(item) else viewModel.toggleSelection(item.messageId)
                 },
+                onCellLongClick = { item -> viewModel.toggleSelection(item.messageId) },
                 previewPathFor = viewModel::previewPath,
                 restoreJobs = restoreJobs,
             )
+        }
+
+        // The strip every media selection acts from — the same [SelectionBar] Photos and the album
+        // screens draw, with the same count rule: this size is the whole collection's selection, not
+        // the loaded page, because select-all read ids the grid never loaded.
+        if (selectedIds.isNotEmpty()) {
+            SelectionBar(
+                label = pluralStringResource(R.plurals.selected_count, selectedIds.size, selectedIds.size),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(GridSpacing),
+            ) {
+                // Select all leads because it speaks for the selection itself, then share, then the
+                // download — the one action that costs the user's data, under the thumb — then clear.
+                // The same order and the same glyphs the other strips teach.
+                ActionIcon(Icons.Filled.SelectAll, R.string.selection_select_all, viewModel::selectAll)
+                ActionIcon(Icons.Filled.Share, R.string.share_action) {
+                    viewModel.shareSelected { items -> MediaShare.share(context, items) }
+                }
+                ActionIcon(Icons.Filled.CloudDownload, R.string.cloud_download_action, viewModel::restoreSelected)
+                ActionIcon(Icons.Filled.Close, R.string.selection_clear, viewModel::clearSelection)
+            }
         }
     }
 
@@ -232,12 +316,16 @@ fun CloudScreen(
         )
     }
 
-    // The sheet already dismisses on a tap anywhere outside the picture, but the system back gesture was
-    // not one of them — and a full-screen overlay that swallows back feels stuck rather than focused.
-    // The ViewModel is told too, so the job-row observation stops with the sheet instead of outliving it.
-    BackHandler(enabled = selected != null) {
-        selected = null
-        viewModel.focusing(null)
+    // Back means "stop the top-most thing this screen is doing": the open sheet, then the
+    // selection — and never the tab, which a back press from a selection strip would otherwise take
+    // with it. The Photos grid orders it the same way.
+    BackHandler(enabled = selected != null || selectedIds.isNotEmpty()) {
+        if (selected != null) {
+            selected = null
+            viewModel.focusing(null)
+        } else {
+            viewModel.clearSelection()
+        }
     }
 
     // The overlay exits over the picture it was showing, not over the grid behind it: `selected` is null the
@@ -272,8 +360,10 @@ fun CloudScreen(
 @Composable
 private fun CloudTimeline(
     state: CloudUiState.Library,
+    selection: Set<Long>,
     onLoadMore: () -> Unit,
-    onSelect: (CloudMedia) -> Unit,
+    onCellClick: (CloudMedia) -> Unit,
+    onCellLongClick: (CloudMedia) -> Unit,
     previewPathFor: suspend (CloudMedia) -> String?,
     restoreJobs: Map<Long, RestoreJob>,
 ) {
@@ -290,7 +380,14 @@ private fun CloudTimeline(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = GridCellMinSize),
         state = gridState,
-        contentPadding = PaddingValues(GridSpacing),
+        // The strip's room at the foot, the same number as the Photos grid's: without it the last
+        // row sits under the selection bar — the cell the user was reaching for.
+        contentPadding = PaddingValues(
+            start = GridSpacing,
+            top = GridSpacing,
+            end = GridSpacing,
+            bottom = if (selection.isNotEmpty()) SelectionBarInset else GridSpacing,
+        ),
         horizontalArrangement = Arrangement.spacedBy(GridSpacing),
         verticalArrangement = Arrangement.spacedBy(GridSpacing),
         modifier = Modifier.fillMaxSize(),
@@ -310,13 +407,17 @@ private fun CloudTimeline(
                 )
             }
             items(items = day.items, key = { item -> "cloud-${item.messageId}" }) { item ->
+                val job = restoreJobs[item.messageId]
                 CloudMediaCell(
                     item = item,
                     modifier = Modifier.animateItem(),
                     onDevice = item.messageId in state.localMatches,
-                    onClick = { onSelect(item) },
+                    selected = item.messageId in selection,
+                    onClick = { onCellClick(item) },
+                    onLongClick = { onCellLongClick(item) },
                     previewPathFor = previewPathFor,
-                    restoring = restoreJobs[item.messageId]?.state?.isLive == true,
+                    restoring = job?.state?.isLive == true,
+                    failed = job?.state == RestoreState.Failed,
                 )
             }
         }
@@ -397,20 +498,24 @@ private fun CloudDayHeader(epochDay: Long, modifier: Modifier = Modifier) {
  * through the same two components: a duration bottom-end, a "GIF" tag bottom-end, a play mark bottom-start. A
  * user who has learned where the timeline puts a mark should not have to relearn it in the cloud.
  *
- * "On this device" is the only state with a mark, and it is drawn at top-start where the local grid puts a
- * photo's backup state — the same corner for the same kind of question, "what has happened to this file".
- * "Cloud only" draws nothing, for the reason the local cell gives for an un-backuped photo: it is where every
- * item on this screen starts, so marking it is not information, it is the grid covered in clouds until the few
- * cells that differ stop standing out.
+ * Top-start is the cell's journey, one mark at a time, where the local grid puts a photo's backup
+ * state — the same corner for the same kind of question, "what has happened to this file". Cloud-only
+ * is *stated* rather than left implied: unlike the local grid's default, it mixes with "on this
+ * device" on one screen, and the difference is the question this screen exists to answer. A failed
+ * download wears the retry mark above everything but a selection's tick, which replaces them all while
+ * it is chosen — one mark per cell, never a stack.
  */
 @Composable
 private fun CloudMediaCell(
     item: CloudMedia,
     modifier: Modifier = Modifier,
     onDevice: Boolean,
+    selected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     previewPathFor: suspend (CloudMedia) -> String?,
     restoring: Boolean,
+    failed: Boolean,
 ) {
     var previewPath by remember(item.messageId, item.previewRemoteFileId) { mutableStateOf<String?>(null) }
 
@@ -422,7 +527,14 @@ private fun CloudMediaCell(
         modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(MediaThumbCorner))
-            .clickable(onClick = onClick),
+            // Long press starts a selection and every later tap extends it — the touch rule the
+            // Photos grid teaches, passed down here as two plain callbacks.
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .border(
+                width = if (selected) SelectionRing else 0.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(MediaThumbCorner),
+            ),
     ) {
         val path = previewPath
         if (path.isNullOrBlank()) {
@@ -440,10 +552,37 @@ private fun CloudMediaCell(
             )
         }
 
-        if (onDevice) {
-            MediaGlyph(
+        // One mark, decided in one place. The tick leads — a cell being chosen has no interesting
+        // state to show at the same moment — then a failed download (the state with a remedy), then
+        // the honest pair: on this device, or in the cloud.
+        when {
+            selected -> MediaGlyph(
+                icon = Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.backup_cell_selected),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(MediaBadgeInset),
+            )
+
+            failed -> MediaGlyph(
+                icon = Icons.Filled.Refresh,
+                contentDescription = stringResource(R.string.cloud_badge_download_failed),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(MediaBadgeInset),
+            )
+
+            onDevice -> MediaGlyph(
                 icon = Icons.Filled.CloudDone,
                 contentDescription = stringResource(R.string.cloud_badge_on_device),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(MediaBadgeInset),
+            )
+
+            else -> MediaGlyph(
+                icon = Icons.Filled.Cloud,
+                contentDescription = stringResource(R.string.cloud_badge_cloud_only),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(MediaBadgeInset),
@@ -642,14 +781,52 @@ private fun CloudViewer(
 }
 
 @Composable
-private fun CloudUnavailable(onRetry: () -> Unit) {
+private fun CloudUnavailable(
+    failure: CloudFailure,
+    onRetry: () -> Unit,
+    onConnect: () -> Unit,
+) {
+    // What happened, then what the user can do about it — one door per cause. The cause decides
+    // both the words and the button: a signed-out session's remedy is a door, not a retry, and a
+    // rate limit's remedy is patience rather than a red error. Nothing here ever shows the
+    // exception or the status code behind it; those stay in the log, class name only.
+    val kind = failure.kind
+    val title = when (kind) {
+        CloudFailure.Kind.NotAuthenticated -> R.string.cloud_needs_signin_title
+        CloudFailure.Kind.RateLimited -> R.string.cloud_error_paused_title
+
+        CloudFailure.Kind.ChannelUnusable,
+        CloudFailure.Kind.ChannelCreationFailed,
+        CloudFailure.Kind.MarkerRejected,
+        -> R.string.cloud_error_setup_title
+
+        else -> R.string.cloud_error_title
+    }
+    val body = when (kind) {
+        CloudFailure.Kind.NotAuthenticated -> R.string.cloud_needs_signin_body
+        CloudFailure.Kind.RateLimited -> R.string.cloud_error_paused_body
+
+        CloudFailure.Kind.ChannelUnusable,
+        CloudFailure.Kind.ChannelCreationFailed,
+        CloudFailure.Kind.MarkerRejected,
+        -> R.string.cloud_error_setup_body
+
+        else -> R.string.cloud_error_body
+    }
+
     PlaceholderScreen(
-        title = stringResource(R.string.cloud_error_title),
-        description = stringResource(R.string.cloud_error_body),
-        icon = Icons.Filled.CloudOff,
+        title = stringResource(title),
+        description = stringResource(body),
+        icon = if (kind == CloudFailure.Kind.NotAuthenticated) Icons.Filled.Cloud else Icons.Filled.CloudOff,
         action = {
-            Button(onClick = onRetry) {
-                Text(stringResource(R.string.error_retry))
+            if (kind == CloudFailure.Kind.NotAuthenticated) {
+                Button(onClick = onConnect) {
+                    Text(stringResource(R.string.cloud_connect_action))
+                }
+            } else {
+                Button(onClick = onRetry) {
+                    Text(stringResource(R.string.error_retry))
+                }
             }
         },
     )

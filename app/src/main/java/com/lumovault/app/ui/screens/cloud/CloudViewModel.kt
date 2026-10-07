@@ -5,16 +5,23 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.AppContainer
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.R
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.CloudTypeCount
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.restore.CloudRestoreTarget
 import com.lumovault.app.domain.restore.RestoreJob
 import com.lumovault.app.domain.telegram.CloudFailure
+import com.lumovault.app.ui.components.AppMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -53,6 +60,30 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
      * blank forever with the failure written only to the log.
      */
     private val syncFailed = MutableStateFlow(false)
+
+    /**
+     * Which message ids the user has chosen. Ids rather than rows: the selection outlives any
+     * window, and [CloudSelection] holds the only two rules it follows — toggle, and an unwindowed
+     * select-all.
+     */
+    private val selection = CloudSelection { container.cloudIndexRepository.allIds() }
+
+    /** The ids chosen — the strip's count and the cells' ticks read this one set. */
+    val selected: StateFlow<Set<Long>> = selection.selected
+
+    /**
+     * One-shot feedback for actions taken from this screen, as the strings to show.
+     *
+     * Failures and counts only, buffered the way the other grids buffer theirs: a burst of failures
+     * is better reported newest-first than by stalling the action that reported them, and a line
+     * waiting with no collector while the screen is away is dropped rather than shown somewhere
+     * else later.
+     */
+    private val _messages = MutableSharedFlow<AppMessage>(
+        extraBufferCapacity = MESSAGE_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val messages: SharedFlow<AppMessage> = _messages.asSharedFlow()
 
     private val items: StateFlow<List<CloudMedia>> = loadedLimit
         .flatMapLatest { limit -> container.cloudIndexRepository.observeWindow(limit) }
@@ -160,6 +191,86 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         loadedLimit.value = loadedLimit.value + WINDOW_STEP
     }
 
+    /** A tap toggles once a selection exists; a long press starts one. The screen decides which. */
+    fun toggleSelection(messageId: Long) = selection.toggle(messageId)
+
+    fun clearSelection() = selection.clear()
+
+    /**
+     * Every message id the index holds — not the pages scrolled so far. The count the strip prints
+     * is the count the actions act on, which is the same rule the local timeline's select-all obeys.
+     */
+    fun selectAll() = launchWrite("cloud select all", failureMessage = R.string.feedback_action_failed) {
+        selection.selectAll()
+        null
+    }
+
+    /**
+     * Hands the selection to Android's share sheet through the app's one share utility.
+     *
+     * Only local copies travel. A cloud item this device does not hold has no bytes to share, and
+     * sending its thumbnail would give the receiver something it would read as the photo — so how
+     * many were in that state is said out loud instead of quietly skipped, and when *nothing* can be
+     * shared no sheet opens: [onShare] fires only for a share that will really happen.
+     */
+    fun shareSelected(onShare: (List<ShareableMedia>) -> Unit) =
+        launchWrite("cloud share", failureMessage = R.string.feedback_action_failed) {
+            val ids = selection.selected.value
+            if (ids.isEmpty()) return@launchWrite null
+
+            val items = container.cloudIndexRepository.itemsFor(ids)
+            val matched = container.localPresenceLookup.localMediaIds(items)
+            val rows = container.localPresenceLookup.rowsForMedia(matched.values)
+            val shareables = rows
+                .filter { row -> row.contentUri.isNotBlank() }
+                .map { row -> ShareableMedia(uri = row.contentUri, mimeType = row.mimeType) }
+                .distinctBy { it.uri }
+
+            val offDevice = items.size - matched.size
+            if (offDevice > 0) {
+                _messages.tryEmit(AppMessage(R.plurals.cloud_share_off_device_count, offDevice))
+            }
+            when {
+                shareables.isNotEmpty() -> onShare(shareables)
+                // The off-device line above already said why no sheet opened; asking again what
+                // went wrong when nothing went wrong would be noise.
+                offDevice == 0 -> _messages.tryEmit(AppMessage(R.string.share_nothing))
+            }
+            null
+        }
+
+    /**
+     * Hands the selection to the restore engine the item sheet already uses — one path, one job table,
+     * one progress bar — as a single serial pass rather than one launch per item, so a select-all cannot
+     * put thousands of transfers in flight at once. Duplicates and items already resident are refused by
+     * that engine itself, so starting the whole selection is safe; the count reported is the count of
+     * records handed to it, read after that hand-off rather than before, and it says *requested* because
+     * that is the only claim the hand-off can make — which of them the engine then started, or refused,
+     * is decided below this point and shown on each cell's own job row.
+     */
+    fun restoreSelected() =
+        launchWrite("cloud restore selection", failureMessage = R.string.feedback_action_failed) {
+            val ids = selection.selected.value
+            if (ids.isEmpty()) return@launchWrite null
+
+            val items = container.cloudIndexRepository.itemsFor(ids)
+            if (items.isEmpty()) {
+                null
+            } else {
+                container.restoreCloudMedia.startAll(items.map(CloudRestoreTarget::from))
+                AppMessage(R.plurals.cloud_restore_requested_count, items.size)
+            }
+        }
+
+    /**
+     * The device row behind one cloud item, for opening it in the shared viewer — or null when the
+     * device holds no copy. Null is the honest answer for a cloud-only item, and it is what keeps
+     * the screen offering the details-and-download sheet for those instead of a viewer with no
+     * bytes to draw.
+     */
+    suspend fun localMediaIdFor(item: CloudMedia): Long? =
+        container.localPresenceLookup.localMediaIds(listOf(item))[item.messageId]
+
     /** The sheet opened on one record; null when it closed. See [restoreTarget]. */
     fun focusing(item: CloudMedia?) {
         restoreTarget.value = item
@@ -231,8 +342,37 @@ class CloudViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Runs one intent the grid has already committed to, and stays honest when it throws.
+     *
+     * Cancellation is rethrown; everything else is one class-name log line — a SQLite or TDLib
+     * message can quote a path or a chat title — plus [failureMessage] for the screen, because an
+     * action that failed and said nothing is indistinguishable from one that did nothing. [block]
+     * returns the line to show once it has fully completed: a count may never claim work that did
+     * not finish, which is why it is the block's answer rather than a value captured up front.
+     */
+    private fun launchWrite(
+        description: String,
+        failureMessage: Int? = null,
+        block: suspend () -> AppMessage?,
+    ) {
+        viewModelScope.launch {
+            try {
+                block()?.let { message -> _messages.tryEmit(message) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                android.util.Log.w(TAG, "$description failed: ${error.javaClass.simpleName}")
+                failureMessage?.let { message -> _messages.tryEmit(AppMessage(message)) }
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "LumoVaultCloud"
+
+        /** How many feedback lines wait for a screen that is still showing the previous one. */
+        const val MESSAGE_BUFFER = 8
 
         /** Same widening-window approach as the local timeline, for the same reason. */
         const val WINDOW_START = 300

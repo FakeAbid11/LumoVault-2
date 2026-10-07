@@ -14,6 +14,22 @@ interface CloudMediaDao {
     @Query("SELECT * FROM cloud_media ORDER BY date_seconds DESC, message_id DESC LIMIT :limit")
     fun observeWindow(limit: Int): Flow<List<CloudMediaEntity>>
 
+    /**
+     * Every message id the index holds — [observeWindow] without its `LIMIT`, ids only.
+     *
+     * "Select all" asks for the whole cloud while the grid has drawn its first window, and the count
+     * the strip prints is the count the actions act on, so the answer may not stop at the loaded
+     * pages. Ids and not records: a selection of ten thousand is ten thousand longs, not ten thousand
+     * objects. The pairing with the window is asserted against real SQLite in
+     * `CloudSelectAllRealSqlTest`.
+     */
+    @Query("SELECT message_id FROM cloud_media")
+    suspend fun allIds(): List<Long>
+
+    /** The records for these message ids, in no promised order; chunked by the caller. */
+    @Query("SELECT * FROM cloud_media WHERE message_id IN (:ids)")
+    suspend fun rowsFor(ids: List<Long>): List<CloudMediaEntity>
+
     @Query("SELECT COUNT(*) FROM cloud_media")
     fun observeCount(): Flow<Int>
 

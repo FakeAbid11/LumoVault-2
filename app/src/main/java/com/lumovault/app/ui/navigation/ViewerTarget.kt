@@ -48,11 +48,27 @@ sealed interface ViewerTarget {
         override val argument: String get() = android.net.Uri.encode(relativePath)
     }
 
+    /**
+     * Swiping through the cloud library's own copies on this device: the list a Cloud tap opened,
+     * and nothing else.
+     *
+     * A list like every other, which is what lets the Cloud screen open the *shared* viewer rather
+     * than growing one of its own — same pager, same chrome, same favourite/archive/share actions,
+     * over the local rows behind the cloud window. Items the device does not hold are absent from
+     * the list by construction, and the Cloud screen offers its details-and-download sheet for
+     * those instead of a viewer with no bytes to draw.
+     */
+    data object Cloud : ViewerTarget {
+        override val kind: String get() = KIND_CLOUD
+        override val argument: String get() = NO_ARGUMENT
+    }
+
     companion object {
         const val KIND_PHOTOS = "photos"
         const val KIND_ALBUM = "album"
         const val KIND_SYSTEM = "system"
         const val KIND_FOLDER = "folder"
+        const val KIND_CLOUD = "cloud"
 
         /** A path segment cannot be empty, so "this kind needs no argument" needs a word of its own. */
         const val NO_ARGUMENT = "-"
@@ -78,6 +94,8 @@ sealed interface ViewerTarget {
                 ?.takeIf { it != NO_ARGUMENT }
                 ?.let { Folder(com.lumovault.app.domain.model.FolderPaths.normalize(android.net.Uri.decode(it))) }
                 ?: Photos
+
+            KIND_CLOUD -> Cloud
 
             else -> Photos
         }

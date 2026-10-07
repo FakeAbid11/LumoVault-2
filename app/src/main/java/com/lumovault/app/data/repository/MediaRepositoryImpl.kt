@@ -1,5 +1,6 @@
 package com.lumovault.app.data.repository
 
+import com.lumovault.app.data.local.MAX_IDS_PER_QUERY
 import com.lumovault.app.data.local.media.MediaDao
 import com.lumovault.app.data.local.media.MediaEntity
 import com.lumovault.app.data.local.media.toMedia
@@ -11,6 +12,7 @@ import com.lumovault.app.data.local.metadata.MediaMetadataDao
 import com.lumovault.app.data.local.organization.MediaOrganizationDao
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.repository.MediaRepository
 import com.lumovault.app.domain.repository.SyncResult
 import kotlinx.coroutines.flow.Flow
@@ -70,6 +72,12 @@ internal class MediaRepositoryImpl(
         dao.observeWindow(limit).map { rows -> rows.map(MediaEntity::toMedia) }
 
     override suspend fun visibleIds(): List<Long> = dao.visibleIds()
+
+    override suspend fun shareablesFor(ids: Collection<Long>): List<ShareableMedia> =
+        ids.distinct()
+            .chunked(MAX_IDS_PER_QUERY)
+            .flatMap { chunk -> dao.shareTargets(chunk) }
+            .map { row -> ShareableMedia(uri = row.uri, mimeType = row.mimeType) }
 
     override fun observeCount(): Flow<Int> = dao.observeCount()
 

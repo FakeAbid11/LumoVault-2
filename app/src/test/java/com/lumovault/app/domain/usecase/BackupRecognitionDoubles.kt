@@ -34,6 +34,13 @@ class FakeCloudIndexRepository : CloudIndexRepository {
 
     override fun observeWindow(limit: Int): Flow<List<CloudMedia>> = flowOf(emptyList())
 
+    // Select all and selection actions are the Cloud screen's own pass; the complete-collection
+    // rule lives in `CloudSelectAllRealSqlTest` against real SQLite, so this fake answers empty
+    // rather than carrying a second copy of that query.
+    override suspend fun allIds(): List<Long> = emptyList()
+
+    override suspend fun itemsFor(ids: Collection<Long>): List<CloudMedia> = emptyList()
+
     override fun observeCount(): Flow<Int> = flowOf(byHash.size)
 
     override fun observeTypeCounts(): Flow<List<CloudTypeCount>> = flowOf(emptyList())

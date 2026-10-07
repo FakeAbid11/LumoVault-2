@@ -126,7 +126,7 @@ interface MediaDao {
     suspend fun clear()
 
     /**
-     * Which of [names] exist on this device at exactly [sizes]' byte count, as pairs.
+     * Which of [names] exist on this device at that name's byte count, each with its row id.
      *
      * Used to label a cloud item *local + cloud* rather than *cloud-only*. Name alone is not enough —
      * `IMG_0001.jpg` is ordinary in three folders — and a hash would mean reading originals, which
@@ -135,16 +135,53 @@ interface MediaDao {
      */
     @Query(
         """
-        SELECT display_name AS displayName, size_bytes AS sizeBytes FROM media
+        SELECT media_store_id AS mediaId, display_name AS displayName, size_bytes AS sizeBytes FROM media
         WHERE display_name IN (:names)
         """,
     )
     suspend fun findByName(names: List<String>): List<LocalNameMatch>
+
+    /**
+     * Full rows for these ids, without the visibility filter. Order is *not* part of the answer —
+     * an `IN (…)` list is walked through the index and comes back in key order — so a caller whose
+     * own contract is a sequence has to re-sequence the rows itself.
+     *
+     * This is the Cloud screen's reach-through: an item in the channel whose copy is on this device
+     * is addressed by *its* MediaStore id, and the question "which rows are these" must not also
+     * answer "which of them may Photos show" — an archived or trashed local copy still exists and
+     * the viewer a cloud tap opens must find it. Chunked by the caller against the query ceiling.
+     */
+    @Query("SELECT * FROM media WHERE media_store_id IN (:ids)")
+    suspend fun rowsFor(ids: List<Long>): List<MediaEntity>
+
+    /**
+     * What a share sends for these ids: the receiver's address and the file's declared type, and
+     * nothing else — a share sheet never needs a date or a dimension, and reading columns it will
+     * not show is work the tap already waited long enough for.
+     *
+     * [contentUri] is MediaStore's own `content://` value, which is what makes it grantable and
+     * readable by the receiving app; there is no path column in this answer to leak instead.
+     */
+    @Query(
+        """
+        SELECT content_uri AS uri, mime_type AS mimeType FROM media
+        WHERE media_store_id IN (:ids)
+        """,
+    )
+    suspend fun shareTargets(ids: List<Long>): List<ShareMediaRow>
 }
 
 data class LocalNameMatch(
+    /** MediaStore's row id, so a name match can reach the row itself and not only its label. */
+    val mediaId: Long,
     val displayName: String,
     val sizeBytes: Long,
+)
+
+/** The share projection: an address and a type, which is the whole of [MediaShare]'s contract. */
+data class ShareMediaRow(
+    val uri: String,
+    val mimeType: String,
 )
 
 data class MediaTypeCount(

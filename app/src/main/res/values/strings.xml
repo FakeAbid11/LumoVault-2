@@ -188,32 +188,49 @@
     <string name="cloud_needs_signin_body">Sign in to your Telegram account to load your LumoVault Backup library.</string>
     <!-- The ask that follows a skipped setup: one sentence about what has not been happening, one about what signing in starts. -->
     <string name="cloud_connect_dialog_title">Telegram is not connected</string>
-    <string name="cloud_connect_dialog_body">You set up without an account, so nothing has been backing up. Sign in and the photos waiting on this phone go to your LumoVault Backup channel, which then loads here.</string>
+    <string name="cloud_connect_dialog_body">You set up without an account, so nothing has been backing up. Sign in and the photos waiting on this phone go to your LumoVault cloud, which then loads here.</string>
     <string name="cloud_connect_dialog_dismiss">Not now</string>
     <string name="cloud_connect_action">Connect Telegram</string>
     <string name="cloud_preparing_title">Setting up your cloud</string>
-    <string name="cloud_step_searching">Looking for your LumoVault Backup channel…</string>
-    <string name="cloud_step_validating">Checking your cloud channel…</string>
-    <string name="cloud_step_creating">Creating your LumoVault Backup channel…</string>
+    <string name="cloud_step_searching">Looking for your cloud backup…</string>
+    <string name="cloud_step_validating">Checking your cloud backup…</string>
+    <string name="cloud_step_creating">Setting up your cloud backup…</string>
     <string name="cloud_scanning_title">Reading your cloud library</string>
-    <string name="cloud_empty_title">Your cloud is empty</string>
-    <string name="cloud_empty_body">Photos and videos you back up to LumoVault will appear here.</string>
-    <string name="cloud_error_title">Couldn\'t load your cloud</string>
-    <string name="cloud_error_body">Something went wrong while reaching Telegram. Your device photos are unaffected.</string>
+    <string name="cloud_empty_title">Nothing is backed up yet</string>
+    <string name="cloud_empty_body">Photos and videos you back up are stored here — a second copy of your library, safe even if this phone is lost. Start a backup from the Photos tab to fill it.</string>
+    <string name="cloud_error_title">Couldn\'t reach your cloud</string>
+    <string name="cloud_error_body">We couldn\'t load your cloud library. Check your internet connection and try again — your device photos are unaffected.</string>
     <string name="cloud_offline_notice">You\'re offline. Showing the cloud library this device already has.</string>
     <string name="cloud_refreshing_notice">Checking for new items…</string>
     <string name="cloud_badge_on_device">On this device</string>
-    <string name="cloud_badge_cloud_only">In cloud</string>
+    <string name="cloud_badge_cloud_only">In the cloud only</string>
+    <string name="cloud_badge_download_failed">Download failed</string>
     <string name="cloud_viewer_unnamed">Untitled item</string>
     <string name="cloud_viewer_size">%1$s</string>
-    <string name="cloud_viewer_dates_from_message">dated from Telegram</string>
-    <string name="cloud_viewer_preview_shown">Showing Telegram\'s preview. The original is still in your channel.</string>
+    <string name="cloud_viewer_dates_from_message">dated when it was uploaded</string>
+    <string name="cloud_viewer_preview_shown">Showing a preview. The original stays safely in your cloud.</string>
     <string name="cloud_viewer_no_preview">No preview available for this item.</string>
     <string name="cloud_download_action">Download to device</string>
     <string name="cloud_viewer_close">Close</string>
+    <!-- One cause, one sentence about what happened, one about what to do: these are the only words
+         the Cloud tab shows when it cannot do its job. The cause itself (a status code, an
+         exception) never leaves the log. -->
+    <string name="cloud_error_paused_title">Your cloud is taking a short break</string>
+    <string name="cloud_error_paused_body">Telegram asked the app to wait a moment. Nothing is wrong with your library — try again in a few minutes.</string>
+    <string name="cloud_error_setup_title">Couldn\'t set up your cloud backup</string>
+    <string name="cloud_error_setup_body">Try again — if it keeps failing, reconnect your Telegram account from Settings.</string>
     <plurals name="cloud_items_found">
         <item quantity="one">%1$d item found</item>
         <item quantity="other">%1$d items found</item>
+    </plurals>
+    <!-- Sharing and downloads from a selection: how many really travelled, and how many could not. -->
+    <plurals name="cloud_share_off_device_count">
+        <item quantity="one">%1$d of these is only in the cloud. Download it first to share.</item>
+        <item quantity="other">%1$d of these are only in the cloud. Download them first to share.</item>
+    </plurals>
+    <plurals name="cloud_restore_requested_count">
+        <item quantity="one">%1$d download requested</item>
+        <item quantity="other">%1$d downloads requested</item>
     </plurals>
 
     <!-- Phase 5: backup. The notification and the in-app progress line read from the same queue
@@ -232,6 +249,10 @@
     </plurals>
     <string name="backup_cell_selected">Selected</string>
     <string name="selection_clear">Clear</string>
+    <!-- One label for the share action wherever media can be shared — the Photos strip, the album
+         strip, the Cloud strip and the viewer all name the same button the same way. -->
+    <string name="share_action">Share</string>
+    <string name="share_nothing">Nothing here can be shared right now.</string>
     <string name="backup_cancel">Cancel</string>
     <string name="backup_cancel_confirm_title">Cancel pending backup?</string>
     <string name="backup_cancel_confirm_body">Items still waiting are withdrawn. What already uploaded stays in your channel, and anything withdrawn can be queued again.</string>
@@ -593,7 +614,7 @@
     <string name="restore_completed">Saved on this device.</string>
     <string name="restore_cancel_action">Cancel</string>
     <string name="restore_cloud_remains">The copy in LumoVault stays either way.</string>
-    <string name="restore_reason_gone">That file is no longer in your LumoVault channel.</string>
+    <string name="restore_reason_gone">That file is no longer stored in your LumoVault cloud.</string>
     <string name="restore_reason_auth">Sign in to Telegram again to download it.</string>
     <string name="restore_reason_network">Telegram connection was interrupted. Try again.</string>
     <string name="restore_reason_rate">Telegram asked us to wait a moment. Try again shortly.</string>

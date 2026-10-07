@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -67,9 +68,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaMetadata
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.ViewerTarget
+import com.lumovault.app.util.MediaShare
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -193,6 +196,7 @@ private fun ViewerPager(
     onOpenMap: () -> Unit,
 ) {
     val items = state.items
+    val context = LocalContext.current
     val pagerState = rememberPagerState(initialPage = state.initialPage, pageCount = { items.size })
 
     val currentItem by viewModel.currentItem.collectAsStateWithLifecycle()
@@ -304,6 +308,14 @@ private fun ViewerPager(
                     onBackUp = viewModel::backUpCurrent,
                     onRetry = viewModel::retryCurrent,
                     onFavorite = { viewModel.setFavorite(!favorite) },
+                    onShare = {
+                        shown?.let { media ->
+                            MediaShare.share(
+                                context,
+                                listOf(ShareableMedia(uri = media.contentUri, mimeType = media.mimeType)),
+                            )
+                        }
+                    },
                     onInfo = { showingDetails = true },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -498,6 +510,7 @@ private fun ViewerActionBar(
     onBackUp: () -> Unit,
     onRetry: () -> Unit,
     onFavorite: () -> Unit,
+    onShare: () -> Unit,
     onInfo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -524,6 +537,16 @@ private fun ViewerActionBar(
                         else R.string.organization_favorite_action,
                     ),
                     tint = if (isFavorite) FavoriteAccent else OnMedia,
+                )
+            }
+
+            IconButton(onClick = onShare) {
+                Icon(
+                    imageVector = Icons.Filled.Share,
+                    // The row's other controls name themselves for TalkBack the same way; an
+                    // unlabelled share glyph would be the one button a screen reader cannot name.
+                    contentDescription = stringResource(R.string.share_action),
+                    tint = OnMedia,
                 )
             }
 

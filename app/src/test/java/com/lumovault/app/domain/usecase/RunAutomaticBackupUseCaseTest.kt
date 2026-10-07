@@ -10,6 +10,7 @@ import com.lumovault.app.domain.model.BackupSource
 import com.lumovault.app.domain.model.Media
 import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.OnboardingProgress
 import com.lumovault.app.domain.model.ThemeMode
@@ -379,6 +380,11 @@ private class FakeLibrary : MediaRepository {
     // The timeline's select-all read; an automatic pass never asks for it. The rule it exists for —
     // the id set being the window's set without a limit — is asserted in SelectAllIdsRealSqlTest.
     override suspend fun visibleIds(): List<Long> = emptyList()
+
+    // Share's rows come from the same table the window draws; the pairing is asserted against
+    // real SQLite in `ShareTargetsRealSqlTest`. Nothing under test here shares, so the answer is
+    // empty rather than a copy of the real query.
+    override suspend fun shareablesFor(ids: Collection<Long>): List<ShareableMedia> = emptyList()
 }
 
 private class FakeOnboarding : OnboardingRepository {
