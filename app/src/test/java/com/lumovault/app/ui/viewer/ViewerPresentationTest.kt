@@ -117,6 +117,59 @@ class ViewerPresentationTest {
     }
 
     @Test
+    fun theCloudIndexSpeaksOnlyWhereTheQueueCannot() {
+        assertEquals(
+            "a photo opened from the Cloud tab is in the user's channel whatever the local queue knows, " +
+                "and 'not backed up' would contradict the badge that cell was tapped through",
+            ViewerBackupStatus.BackedUp,
+            ViewerPresentation.backupAction(null, inCloudIndex = true).status,
+        )
+        assertEquals(
+            "the queue stays silent about an untouched file either way",
+            ViewerPresentation.backupAction(null).status,
+            ViewerPresentation.backupAction(null, inCloudIndex = false).status,
+        )
+        assertEquals(
+            "an upload this user started and watched fail is still a failure — cloud history must not " +
+                "paper over a row that has something to say",
+            ViewerBackupStatus.Failed,
+            ViewerPresentation.backupAction(UploadState.Failed, inCloudIndex = true).status,
+        )
+        assertEquals(
+            "and an upload still running is still running",
+            ViewerBackupAction.Busy(status = ViewerBackupStatus.Uploading),
+            ViewerPresentation.backupAction(UploadState.Uploading, inCloudIndex = true),
+        )
+    }
+
+    @Test
+    fun storageIsWhereASecondCopyExistsAndNowhereElse() {
+        assertEquals(
+            ViewerStorage.DeviceAndCloud,
+            ViewerPresentation.storageLocation(ViewerBackupStatus.BackedUp, fromCloudIndex = false),
+        )
+        assertEquals(
+            "the cloud index is a second signal of its own — it holds files the queue never saw",
+            ViewerStorage.DeviceAndCloud,
+            ViewerPresentation.storageLocation(ViewerBackupStatus.NotBackedUp, fromCloudIndex = true),
+        )
+        assertEquals(
+            "half a copy is not a copy: an upload in flight has not landed anywhere yet",
+            ViewerStorage.DeviceOnly,
+            ViewerPresentation.storageLocation(ViewerBackupStatus.Uploading, fromCloudIndex = false),
+        )
+        assertEquals(
+            ViewerStorage.DeviceOnly,
+            ViewerPresentation.storageLocation(ViewerBackupStatus.Failed, fromCloudIndex = false),
+        )
+        assertEquals(
+            "a local photo with no record of ever being sent is genuinely on this device alone",
+            ViewerStorage.DeviceOnly,
+            ViewerPresentation.storageLocation(ViewerBackupStatus.NotBackedUp, fromCloudIndex = false),
+        )
+    }
+
+    @Test
     fun aFileThatSaysNothingGetsFourRowsAndNoInvention() {
         val plain = photo(sizeBytes = 1024L, taken = null, width = 0, height = 0)
 

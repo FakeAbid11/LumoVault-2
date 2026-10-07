@@ -51,9 +51,22 @@ object ViewerPresentation {
     fun survivorAfterRetirement(survivorIds: List<Long>, retiredIndex: Int): Long? =
         survivorIds.getOrNull(retiredIndex.coerceAtMost(survivorIds.size - 1))
 
-    /** The backup control for one state. */
-    fun backupAction(state: UploadState?): ViewerBackupAction =
-        when (backupCellStatus(state)) {
+    /**
+     * The backup control for one state.
+     *
+     * [inCloudIndex] is the cloud's own word for the file, and it is consulted exactly once, before the
+     * queue is: a photograph opened from the Cloud tab was named by a row in the user's channel, so when
+     * the local queue has nothing recorded about it, "not backed up" would contradict the badge the Cloud
+     * grid drew on the very cell that was tapped. A queue row that *does* speak still wins — an upload
+     * this user started and watched fail is a failure, and cloud history must not paper over it.
+     */
+    fun backupAction(state: UploadState?, inCloudIndex: Boolean = false): ViewerBackupAction =
+        if (state == null && inCloudIndex) {
+            ViewerBackupAction.Show(
+                status = ViewerBackupStatus.BackedUp,
+                enabled = true,
+            )
+        } else when (backupCellStatus(state)) {
             // `BACKED_UP` still offers something, because PRD section 13's own panel example is a
             // "Backup again" button. Offering it is a second copy in the user's channel, and Phase 6's
             // duplicate recognition is what refuses it — so the control exists, and the queue absorbs it.
@@ -76,6 +89,22 @@ object ViewerPresentation {
             // control that re-queues mid-upload is how a second copy of a photo gets made.
             BackupCellStatus.Queued, BackupCellStatus.Preparing, BackupCellStatus.Uploading ->
                 ViewerBackupAction.Busy(status = ViewerBackupStatus.Uploading)
+        }
+
+    /**
+     * Where the file's bytes are, as the details panel is allowed to say it.
+     *
+     * Two independent signals for one question — "is there a second copy somewhere" — because they are
+     * gathered by different parts of the app and neither is a superset of the other: the cloud index
+     * knows about files the queue never saw (anything uploaded before the queue existed, or dropped in
+     * by hand), and the queue knows about uploads the index is not allowed to read during a browse.
+     * A file that answers neither really is on this device alone, which is worth saying out loud.
+     */
+    fun storageLocation(status: ViewerBackupStatus, fromCloudIndex: Boolean): ViewerStorage =
+        if (fromCloudIndex || status == ViewerBackupStatus.BackedUp) {
+            ViewerStorage.DeviceAndCloud
+        } else {
+            ViewerStorage.DeviceOnly
         }
 
     /**
@@ -115,6 +144,9 @@ enum class ViewerRenderer { ZoomableImage, AnimatedImage, Video }
 
 /** What the viewer's backup control currently means. */
 enum class ViewerBackupStatus { NotBackedUp, Uploading, BackedUp, Failed }
+
+/** Whether a second copy of the file exists outside this phone, as the details panel may report it. */
+enum class ViewerStorage { DeviceOnly, DeviceAndCloud }
 
 /** The control's two shapes: an action the user can take, and a state they can only watch. */
 sealed interface ViewerBackupAction {

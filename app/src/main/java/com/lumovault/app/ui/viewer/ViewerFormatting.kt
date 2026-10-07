@@ -49,6 +49,29 @@ object ViewerFormatting {
     }
 
     /**
+     * The details panel's sentence for the same state, as a fact rather than as an offer.
+     *
+     * Kept apart from [backupLabel] because the two answer different questions: the bar's words are what
+     * the button *will do*, and under a row labelled "Backup" they read as instructions instead of as the
+     * answer that row was asked for. Three of the four are shared with the backup hub's own status
+     * vocabulary, so this screen invents one string rather than four.
+     */
+    @StringRes
+    fun backupStatus(status: ViewerBackupStatus): Int = when (status) {
+        ViewerBackupStatus.NotBackedUp -> R.string.viewer_status_not_backed_up
+        ViewerBackupStatus.Uploading -> R.string.backup_state_uploading
+        ViewerBackupStatus.BackedUp -> R.string.backup_state_backed_up
+        ViewerBackupStatus.Failed -> R.string.backup_state_failed
+    }
+
+    /** The details panel's sentence for where the file's bytes are. */
+    @StringRes
+    fun storageLabel(storage: ViewerStorage): Int = when (storage) {
+        ViewerStorage.DeviceOnly -> R.string.viewer_storage_device_only
+        ViewerStorage.DeviceAndCloud -> R.string.viewer_storage_device_and_cloud
+    }
+
+    /**
      * The label of one row.
      *
      * [ViewerField.TakenDateUnavailable] is labelled "Added", not "Taken": its value is the day the file

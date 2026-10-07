@@ -361,6 +361,18 @@ class MediaViewerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     /**
+     * The share sheet was not opened because nothing here was shareable.
+     *
+     * `MediaShare.share` answers that rather than raising an empty chooser, and until now the answer was
+     * dropped: a share button that opens nothing in silence is the same failure this screen already
+     * reports for every write that did not land, and the file it was pressed on can be gone a moment
+     * after the row it came from was drawn.
+     */
+    fun reportUnshareable() {
+        _messages.tryEmit(AppMessage(R.string.share_nothing))
+    }
+
+    /**
      * Runs a write the screen has already committed to, and stays honest when it throws.
      *
      * Cancellation is rethrown — the scope is shutting down, which is not a failure of the write — and

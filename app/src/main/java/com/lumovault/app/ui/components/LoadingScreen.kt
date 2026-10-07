@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.lumovault.app.ui.theme.RingStrokeBold
 import com.lumovault.app.ui.theme.RingWaiting
 
@@ -26,10 +28,18 @@ import com.lumovault.app.ui.theme.RingWaiting
 // answer, and the no-fake-fact rule runs both ways — no success the build cannot show, and no fact
 // (a title, a count, an "empty") that has not been read yet. Work that already knows what it is
 // doing and how far it has got is [WorkingScreen]'s to draw, not this one's.
+//
+// [color] exists for the one surface that is not the scheme's own: the viewer draws its body over
+// black, where the theme's primary is still legible but is not the mark the rest of that screen uses
+// for waiting. It defaults to the scheme, so no caller has to think about it, and only a caller on a
+// different background says otherwise.
 
 /** The body of a screen while its first answer is in flight. */
 @Composable
-internal fun LoadingScreen(modifier: Modifier = Modifier) {
+internal fun LoadingScreen(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -37,6 +47,7 @@ internal fun LoadingScreen(modifier: Modifier = Modifier) {
         CircularProgressIndicator(
             modifier = Modifier.size(RingWaiting),
             strokeWidth = RingStrokeBold,
+            color = color,
         )
     }
 }

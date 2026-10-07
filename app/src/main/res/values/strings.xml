@@ -305,10 +305,17 @@
     <string name="viewer_play">Play</string>
     <string name="viewer_pause">Pause</string>
 
+    <!--
+        The bar's words are what the *button* will do; the panel's are what the file *is*. "Back up" and
+        "Retry" under a row labelled "Backup" read as instructions rather than as an answer, so only the
+        state where the two differ — nothing has been sent — gets a string of its own. The other three
+        already say exactly what a fact would.
+    -->
     <string name="viewer_backup_action">Back up</string>
     <string name="viewer_uploading">Uploading…</string>
     <string name="viewer_backed_up">Backed up</string>
     <string name="viewer_retry_action">Retry</string>
+    <string name="viewer_status_not_backed_up">Not backed up</string>
 
     <string name="viewer_add_to_album">Add to album</string>
     <string name="viewer_trash_title">Move to Trash?</string>
@@ -330,6 +337,14 @@
     <string name="viewer_field_type">Type</string>
     <string name="viewer_field_duration">Length</string>
     <string name="viewer_open_map">View on map</string>
+
+    <!--
+        The panel's "Storage" row: whether a second copy exists anywhere other than the phone. Both
+        sentences are claims about *two* places on purpose — "in the cloud" alone would read as "not
+        here", which is the one thing a person looking at the picture can see for themselves is false.
+    -->
+    <string name="viewer_storage_device_only">This device only</string>
+    <string name="viewer_storage_device_and_cloud">This device and LumoVault Cloud</string>
 
     <plurals name="viewer_position">
         <item quantity="one">%1$d of %2$d</item>
