@@ -1,5 +1,6 @@
 package com.lumovault.app.util
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -112,6 +113,11 @@ object MediaShare {
         }
         val chooser = Intent.createChooser(intent, context.getString(R.string.share_action))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // A share button must not care which Context the composition held. An Activity may start
+        // an activity as itself; anything else is refused outright unless the launch declares a
+        // task of its own. The flag is added only for that case, so the Activity path every screen
+        // takes today behaves exactly as it did.
+        if (context !is Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
         return true
     }
