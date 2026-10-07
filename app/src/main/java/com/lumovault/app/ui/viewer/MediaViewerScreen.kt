@@ -12,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +39,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +74,9 @@ import com.lumovault.app.domain.model.MediaMetadata
 import com.lumovault.app.domain.model.ShareableMedia
 import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.LoadingScreen
+import com.lumovault.app.ui.components.MoreSheet
+import com.lumovault.app.ui.components.MoreSheetDivider
+import com.lumovault.app.ui.components.MoreSheetRow
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.navigation.ViewerTarget
 import com.lumovault.app.util.MediaShare
@@ -101,7 +102,7 @@ import com.lumovault.app.ui.theme.SyncingAccent
  *
  * Chrome is drawn over the media and vanishes on a tap, because the photograph is the screen and the controls
  * are borrowed from it for a moment. Two rows carry the actions: the top is the PRD's close-and-options bar,
- * and the bottom is the panel sketch's own four — heart, share, backup, information — with the overflow
+ * and the bottom is the panel sketch's own four â€” heart, share, backup, information â€” with the overflow
  * beside them. Everything those four have no room for is one sheet under the thumb rather than a menu
  * hanging off the top-right corner, and every one of them reaches the same repositories the grids use. There
  * is no second copy of that behaviour here, and no button on this screen can upload something that was not
@@ -124,7 +125,7 @@ fun MediaViewerScreen(
 
     LaunchedEffect(mediaStoreId, target) { viewModel.open(mediaStoreId, target) }
 
-    // Failed writes from this screen — the heart that would not move, the trash that would not take —
+    // Failed writes from this screen â€” the heart that would not move, the trash that would not take â€”
     // shown by the shell's one snackbar over the black frame, collected before any branch routes
     // around it.
     CollectAppMessages(viewModel.messages)
@@ -133,7 +134,7 @@ fun MediaViewerScreen(
 
     when (val state = listing) {
         // Room has not answered about this item's list yet. There is no picture to draw, so the frame stays
-        // black rather than opening on nothing — but the control that leaves is drawn regardless, and the
+        // black rather than opening on nothing â€” but the control that leaves is drawn regardless, and the
         // theme's waiting ring is drawn with it. A screen that is both black and silent reads as a crash,
         // and "the query answers promptly" is not a promise this screen gets to assume.
         Listing.Loading -> Box(
@@ -158,7 +159,7 @@ fun MediaViewerScreen(
         }
 
         // The list came back and does not hold the tapped photo. Say so, rather than opening some other
-        // photograph at index zero — which is the failure a pager with a fallback index always has. The exit
+        // photograph at index zero â€” which is the failure a pager with a fallback index always has. The exit
         // is drawn for the same reason the Loading branch draws one: with the system bars hidden, a screen
         // whose only way out is an uninstructed gesture reads as a crash.
         is Listing.Missing -> Box(modifier = modifier.fillMaxSize()) {
@@ -221,7 +222,7 @@ private fun ViewerPager(
 
     var chromeVisible by remember { mutableStateOf(true) }
     // Saveable, not remembered: the activity recreates on rotation and on theme toggle, and a sheet
-    // the user was filling in — or a trash confirmation they were about to answer — is their context,
+    // the user was filling in â€” or a trash confirmation they were about to answer â€” is their context,
     // not the pixels'. These are plain Booleans, which is what the default saver can carry.
     var showingDetails by rememberSaveable { mutableStateOf(false) }
     var showingMore by rememberSaveable { mutableStateOf(false) }
@@ -250,7 +251,7 @@ private fun ViewerPager(
             .collect { page -> if (page >= items.size - LOAD_AHEAD) viewModel.loadMore() }
     }
 
-    // The window can shrink under a pager that stayed composed — a retirement keeps this pager alive
+    // The window can shrink under a pager that stayed composed â€” a retirement keeps this pager alive
     // now, and trashing the last item leaves the kept page one past the new end. Land on the new last.
     LaunchedEffect(pagerState, items.size) {
         if (pagerState.currentPage > items.size - 1) pagerState.scrollToPage(items.size - 1)
@@ -265,8 +266,8 @@ private fun ViewerPager(
             state = pagerState,
             // Scrolling is left enabled unconditionally, which is the opposite of how this line used to read.
             // A page that knows its own zoom is the one that decides whether a horizontal drag is its business
-            // — see the `canPan` gate in [ZoomableImage] — and a flag up here could only ever be a *copy* of
-            // that fact, held by the wrong object: a page resets to 1× without announcing it, and a stale copy
+            // â€” see the `canPan` gate in [ZoomableImage] â€” and a flag up here could only ever be a *copy* of
+            // that fact, held by the wrong object: a page resets to 1Ã— without announcing it, and a stale copy
             // naming the page you are standing on turns every swipe into nothing.
             modifier = Modifier.fillMaxSize(),
         ) { page ->
@@ -275,7 +276,7 @@ private fun ViewerPager(
                 media = item,
                 // `targetPage`, not `settledPage`: held to the settled page, the outgoing clip keeps
                 // playing its audio for the whole swipe animation while the incoming one waits as a
-                // silent poster — two pages are "current" for the length of a swipe and only one of
+                // silent poster â€” two pages are "current" for the length of a swipe and only one of
                 // them is what the user is pointing at. (A modal does *not* go through this flag:
                 // deactivating releases the player, and restarting a half-watched clip from zero to
                 // close a details sheet is a worse interruption than hearing it under the sheet.)
@@ -288,7 +289,7 @@ private fun ViewerPager(
         // The band arrives and leaves on a fade rather than a swap, and the container is one AnimatedVisibility
         // rather than three: a control strip that snaps makes the screen feel twitchy under the finger, and all
         // three parts are one decision the user made with a tap. The inner box is because the animation's content
-        // is outside the screen box's scope — `align` still needs a Box to hang from — and because an ordinary
+        // is outside the screen box's scope â€” `align` still needs a Box to hang from â€” and because an ordinary
         // box passes a tap straight through to the pager, exactly as the old `if` did.
         AnimatedVisibility(
             visible = chromeVisible,
@@ -299,7 +300,7 @@ private fun ViewerPager(
             val shown = currentItem
             Box(modifier = Modifier.fillMaxSize()) {
                 // A band, not a bar: the controls are white and a bright photograph is full of white, but the
-                // picture is still the screen, so only the top of it is darkened — and only for as long as the
+                // picture is still the screen, so only the top of it is darkened â€” and only for as long as the
                 // chrome is up.
                 Box(
                     modifier = Modifier
@@ -372,7 +373,7 @@ private fun ViewerPager(
     }
 
     // The overflow lives in one place and is reached from either bar. It carries only what those two
-    // rows have no room for — favourite, backup and information are already drawn, and a second control
+    // rows have no room for â€” favourite, backup and information are already drawn, and a second control
     // for a decision the user can see is a menu nobody needs.
     if (showingMore) {
         ViewerMoreSheet(
@@ -456,7 +457,7 @@ private fun ViewerPage(
 /**
  * The bar across the top of the photograph: what it is, where in the list it sits, and the way out.
  *
- * Three controls and no more, which is the PRD's own count — close, the overflow, and nothing else. The
+ * Three controls and no more, which is the PRD's own count â€” close, the overflow, and nothing else. The
  * overflow is a sheet rather than the menu it used to be: a menu anchored to this corner draws over the
  * photograph at the top of a screen held out at arm's length, and its rows hang off an edge the thumb
  * cannot reach without re-gripping. The same actions, one gesture lower, are simply easier to hit.
@@ -487,7 +488,7 @@ private fun ViewerTopBar(
         }
 
         Text(
-            // The capture time when the file carries one, otherwise its name — never the day it was added,
+            // The capture time when the file carries one, otherwise its name â€” never the day it was added,
             // which is a fact about the device that would read as a fact about the moment.
             text = item?.let { media ->
                 media.dateTakenSeconds?.let { taken -> dateTime.format(Date(taken * 1000L)) }
@@ -514,7 +515,7 @@ private fun ViewerTopBar(
         IconButton(onClick = onMore) {
             Icon(
                 imageVector = Icons.Filled.MoreVert,
-                contentDescription = stringResource(R.string.viewer_more_actions),
+                contentDescription = stringResource(R.string.more_actions),
                 tint = OnMedia,
             )
         }
@@ -525,7 +526,7 @@ private fun ViewerTopBar(
  * The row under the media.
  *
  * Five controls in three groups: two to the left of the backup state, two to the right, and that state
- * between them — which is also what makes it land in the middle of the screen rather than a third of the
+ * between them â€” which is also what makes it land in the middle of the screen rather than a third of the
  * way across, as it did when the right-hand side held one glyph. The backup control is labelled by its
  * state rather than drawn as a bare glyph: PRD section 13's panel is the model, and a tick a person
  * cannot read as "nothing is owed" is worse than no tick. While the queue is working the control stays
@@ -622,12 +623,12 @@ private fun ViewerActionBar(
             }
 
             // The row's own copy of the top bar's overflow. The two appear and vanish together, so this
-            // is not a fallback for a hidden control — it is where the thumb already is. The actions
+            // is not a fallback for a hidden control â€” it is where the thumb already is. The actions
             // themselves are one sheet, defined once, reached from either.
             IconButton(onClick = onMore) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
-                    contentDescription = stringResource(R.string.viewer_more_actions),
+                    contentDescription = stringResource(R.string.more_actions),
                     tint = OnMedia,
                 )
             }
@@ -646,9 +647,8 @@ private fun ViewerActionBar(
  *
  * The divider *is* the grouping rather than a heading over each block. Two of these rows file the picture
  * and one hides it, and with three rows in total a heading above each would be taller than the actions it
- * names — the separation has to be visible without spending the space.
+ * names â€” the separation has to be visible without spending the space.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ViewerMoreSheet(
     canAddToAlbum: Boolean,
@@ -657,72 +657,26 @@ private fun ViewerMoreSheet(
     onArchive: () -> Unit,
     onTrash: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = SpaceXl),
-        ) {
-            Text(
-                text = stringResource(R.string.viewer_more_actions),
-                style = LumoVaultType.sectionHeader,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = SpaceXl, vertical = SpaceSm),
-            )
-
-            if (canAddToAlbum) {
-                MoreSheetRow(
-                    icon = Icons.Filled.Add,
-                    label = R.string.viewer_add_to_album,
-                    onClick = onAddToAlbum,
-                )
-            }
+    MoreSheet(title = R.string.more_actions, onDismiss = onDismiss) {
+        if (canAddToAlbum) {
             MoreSheetRow(
-                icon = Icons.Filled.Archive,
-                label = R.string.organization_archive_action,
-                onClick = onArchive,
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = SpaceSm))
-
-            MoreSheetRow(
-                icon = Icons.Filled.Delete,
-                label = R.string.organization_trash_action,
-                onClick = onTrash,
+                icon = Icons.Filled.Add,
+                label = R.string.viewer_add_to_album,
+                onClick = onAddToAlbum,
             )
         }
-    }
-}
-
-/**
- * One row of [ViewerMoreSheet].
- *
- * The glyph carries no content description of its own: it sits beside the words that name the action, so
- * a description would make TalkBack say the row twice — and an icon *without* text beside it is the case
- * the batch's accessibility section is really about, which this row is not. The row itself is the target,
- * and it is sized to the 48 dp floor rather than to its own contents, because a 24 dp glyph in an 8 dp
- * pad is a tap that misses.
- */
-@Composable
-private fun MoreSheetRow(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = SheetRowMinHeight)
-            .clickable(onClick = onClick)
-            .padding(horizontal = SpaceXl),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        MoreSheetRow(
+            icon = Icons.Filled.Archive,
+            label = R.string.organization_archive_action,
+            onClick = onArchive,
         )
-        Text(
-            text = stringResource(label),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = SpaceMd),
+
+        MoreSheetDivider()
+
+        MoreSheetRow(
+            icon = Icons.Filled.Delete,
+            label = R.string.organization_trash_action,
+            onClick = onTrash,
         )
     }
 }
@@ -738,7 +692,7 @@ private fun AlbumChooserDialog(
         title = { Text(stringResource(R.string.viewer_add_to_album)) },
         text = {
             // Scrollable and bounded: a library with forty albums currently renders forty rows and the
-            // last few below the dialog's own bottom edge, unreachable — the list is the choice, so
+            // last few below the dialog's own bottom edge, unreachable â€” the list is the choice, so
             // the choice has to fit.
             Column(
                 modifier = Modifier
@@ -774,8 +728,8 @@ private fun AlbumChooserDialog(
  * drawn only when it has something to say. Location is the one exception, and it is on the sheet because the
  * map is: someone deciding whether a photograph ever had a GPS fix needs to see that the question was asked.
  *
- * The last two rows are the two facts no file carries inside itself — whether it has been sent, and whether a
- * second copy exists anywhere else — and they are answered here rather than by [ViewerPresentation.detailFields]
+ * The last two rows are the two facts no file carries inside itself â€” whether it has been sent, and whether a
+ * second copy exists anywhere else â€” and they are answered here rather than by [ViewerPresentation.detailFields]
  * because neither belongs to the file: one is the queue's record and one is the cloud index's, and the panel
  * would otherwise have to be handed a database to draw a line about a photograph.
  */
@@ -870,8 +824,8 @@ private fun DetailRow(@StringRes label: Int, value: String) {
  * Hides the system bars while the viewer is on screen, and puts them back when it leaves.
  *
  * The framework API rather than a compatibility wrapper, because the wrapper is not a declared dependency of
- * this module and adding one for four calls is not worth it: API 30 has `WindowInsetsController`, and API 29 —
- * this app's floor — spells the same request with the deprecated `systemUiVisibility` flags. The deprecated
+ * this module and adding one for four calls is not worth it: API 30 has `WindowInsetsController`, and API 29 â€”
+ * this app's floor â€” spells the same request with the deprecated `systemUiVisibility` flags. The deprecated
  * branch is deliberate and lives nowhere else, which is the only thing that would make a wrapper worth it.
  */
 @Composable
@@ -931,7 +885,4 @@ private val AlbumChooserMaxHeight = 360.dp
 
 /** The metadata sheet's label column. Wide enough for "Exposure programme", narrow enough to leave a value room. */
 private val DetailLabelWidth = 116.dp
-
-/** The floor a More-sheet row holds regardless of what it contains: a glyph and its own padding is not a target. */
-private val SheetRowMinHeight = 48.dp
 

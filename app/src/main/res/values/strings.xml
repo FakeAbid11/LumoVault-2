@@ -293,7 +293,9 @@
         location — where an empty space reads as a bug rather than as a fact about the photograph.
     -->
     <string name="viewer_close">Close</string>
-    <string name="viewer_more_actions">More actions</string>
+    <!-- Shared by every overflow sheet (the viewer's and the album header's), which is why it is not
+         named after one of them: the phrase is the same wherever an overflow arrives as a sheet. -->
+    <string name="more_actions">More actions</string>
     <string name="viewer_info">About this file</string>
     <string name="viewer_details_title">File information</string>
     <string name="viewer_gone_title">This item is no longer here</string>
@@ -362,6 +364,9 @@
     <string name="map_locations_action">Allow photo locations</string>
     <string name="map_locations_settings_action">Open photo-location settings</string>
     <string name="map_no_positions">None of your photos record where they were taken.</string>
+    <!-- The read itself failed, which is a different silence from having nothing to show: the library
+         may well be full of positioned photographs. Says what the user is missing, never why. -->
+    <string name="map_locations_unavailable">Couldn\'t show where your photos were taken right now.</string>
     <string name="map_preview_open">View</string>
     <string name="map_preview_close">Close</string>
 

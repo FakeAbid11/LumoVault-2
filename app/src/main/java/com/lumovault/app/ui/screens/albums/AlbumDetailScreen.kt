@@ -21,8 +21,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SelectAll
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -57,6 +60,9 @@ import com.lumovault.app.ui.components.ActionIcon
 import com.lumovault.app.ui.components.CollectAppMessages
 import com.lumovault.app.ui.components.LoadingScreen
 import com.lumovault.app.ui.components.MediaCell
+import com.lumovault.app.ui.components.MoreSheet
+import com.lumovault.app.ui.components.MoreSheetDivider
+import com.lumovault.app.ui.components.MoreSheetRow
 import com.lumovault.app.ui.components.NoticeBanner
 import com.lumovault.app.ui.components.PlaceholderScreen
 import com.lumovault.app.ui.components.SelectionBar
@@ -115,6 +121,9 @@ fun AlbumDetailScreen(
     var confirming by remember { mutableStateOf<Confirmation?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var deletionUnsupported by rememberSaveable { mutableStateOf(false) }
+    // The overflow sheet. Saveable for the same reason as the prompts above: a rotation with it open
+    // should come back to the same sheet, not to a header whose second control has silently vanished.
+    var showingMore by rememberSaveable { mutableStateOf(false) }
 
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -155,9 +164,10 @@ fun AlbumDetailScreen(
                 }
             } ?: state.folderName?.let { stringResource(R.string.folder_album_readonly) },
             onAddMedia = { adding = true },
-            onRename = { renaming = true },
-            onDeleteAlbum = { confirming = Confirmation.DeleteAlbum },
             onEmptyTrash = { confirming = Confirmation.EmptyTrash },
+            // Two management actions get a sheet; one stays a button you can see. Rename and delete are
+            // the pair, and Empty Trash has no fellow action to share a surface with.
+            onMore = if (state.isUserAlbum) ({ showingMore = true }) else null,
             isTrash = isTrash,
         )
 
@@ -185,6 +195,7 @@ fun AlbumDetailScreen(
                 },
                 onCellLongClick = viewModel::onCellLongClick,
                 onLoadMore = viewModel::loadMore,
+                onAddMedia = if (state.isUserAlbum) ({ adding = true }) else null,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -222,6 +233,32 @@ fun AlbumDetailScreen(
                 viewModel.addMedia(ids)
             },
         )
+    }
+
+    if (showingMore) {
+        // The pair the header used to stretch out as two text buttons beside Add — which put three
+        // controls in a row that does not fit a 360 dp phone, at the top of a screen whose subject is the
+        // photographs below. Rename and Delete are not decisions the header has to advertise, and a sheet
+        // arrives under the thumb instead of running off the right edge.
+        MoreSheet(title = R.string.more_actions, onDismiss = { showingMore = false }) {
+            MoreSheetRow(
+                icon = Icons.Filled.Edit,
+                label = R.string.album_rename_title,
+                onClick = {
+                    showingMore = false
+                    renaming = true
+                },
+            )
+            MoreSheetDivider()
+            MoreSheetRow(
+                icon = Icons.Filled.Delete,
+                label = R.string.album_delete_action,
+                onClick = {
+                    showingMore = false
+                    confirming = Confirmation.DeleteAlbum
+                },
+            )
+        }
     }
 
     if (renaming) {
@@ -333,9 +370,8 @@ private fun AlbumHeader(
     isTrash: Boolean,
     explainer: String?,
     onAddMedia: () -> Unit,
-    onRename: () -> Unit,
-    onDeleteAlbum: () -> Unit,
     onEmptyTrash: () -> Unit,
+    onMore: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -361,26 +397,39 @@ private fun AlbumHeader(
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = SpaceSm),
-            horizontalArrangement = Arrangement.spacedBy(SpaceSm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (isUserAlbum) {
-                OutlinedButton(onClick = onAddMedia) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.album_add_media_action),
-                        modifier = Modifier.padding(start = SpaceSm),
-                    )
+        // Nothing to press on a read-only system album, so nothing is drawn — a Row with no children
+        // still spends its top padding, and eight dead pixels above every Camera and Screenshots grid is
+        // a header that forgot to leave.
+        if (isUserAlbum || isTrash || onMore != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = SpaceSm),
+                horizontalArrangement = Arrangement.spacedBy(SpaceSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isUserAlbum) {
+                    OutlinedButton(onClick = onAddMedia) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.album_add_media_action),
+                            modifier = Modifier.padding(start = SpaceSm),
+                        )
+                    }
                 }
-                TextButton(onClick = onRename) { Text(stringResource(R.string.album_rename_title)) }
-                TextButton(onClick = onDeleteAlbum) { Text(stringResource(R.string.album_delete_action)) }
-            }
-            if (isTrash) {
-                TextButton(onClick = onEmptyTrash) { Text(stringResource(R.string.trash_empty_action)) }
+                if (isTrash) {
+                    TextButton(onClick = onEmptyTrash) { Text(stringResource(R.string.trash_empty_action)) }
+                }
+                onMore?.let { openMore ->
+                    IconButton(onClick = openMore) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            // The words, not the glyph: three dots are the one mark a screen reader has
+                            // nothing to say about on its own.
+                            contentDescription = stringResource(R.string.more_actions),
+                        )
+                    }
+                }
             }
         }
     }
@@ -401,6 +450,7 @@ private fun MediaGrid(
     onCellLongClick: (Long) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
+    onAddMedia: (() -> Unit)? = null,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -414,9 +464,17 @@ private fun MediaGrid(
     if (items.isEmpty()) {
         // The body of the screen, so it takes the same framing as every other screen's empty body —
         // halo, heading, quiet line — instead of a lone sentence floating where the grid should be.
+        // An album with nothing in it is one the user is meant to fill, so the way in is offered here, in
+        // the middle of the screen, rather than only in a header above it that the eye has already left.
+        val add: (@Composable () -> Unit)? = onAddMedia?.let { open ->
+            {
+                Button(onClick = open) { Text(stringResource(R.string.album_add_media_action)) }
+            }
+        }
         PlaceholderScreen(
             title = stringResource(R.string.albums_no_items),
             icon = Icons.Filled.PhotoLibrary,
+            action = add,
             modifier = modifier.fillMaxSize(),
         )
         return

@@ -124,6 +124,8 @@ fun AlbumsScreen(
                                 count
                             },
                             coverUri = folder.coverUri,
+                            // A folder whose cover went is not an empty folder, and the tile may not say it is.
+                            hasMedia = folder.mediaCount > 0,
                             onClick = { onOpenAlbum(AlbumTarget.LocalFolder(folder.relativePath)) },
                         )
                     }
@@ -184,6 +186,7 @@ fun AlbumsScreen(
                         modifier = Modifier.animateItem(),
                         subtitle = pluralStringResource(R.plurals.album_items_count, album.itemCount, album.itemCount),
                         coverUri = album.coverUri,
+                        hasMedia = album.itemCount > 0,
                         onClick = { onOpenAlbum(AlbumTarget.User(album.id)) },
                     )
                 }

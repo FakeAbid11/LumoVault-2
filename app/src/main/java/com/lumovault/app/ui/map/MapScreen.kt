@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -363,6 +367,22 @@ fun MapScreen(
                     }
                 }
             }
+        } else if (state.locationsUnavailable) {
+            // The read failed. Saying "none of your photos record where they were taken" over a query
+            // error would be a false claim about the user's library, and "check your connection" would be
+            // a false claim about where this data lives — so the notice names only what it can stand
+            // behind: the map could not show them right now. It clears itself the next time a pan gets
+            // an answer back, so it does not outlive the failure.
+            NoticeBanner(
+                text = stringResource(R.string.map_locations_unavailable),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(
+                        start = SpaceMd,
+                        top = if (viewModel.tilesConfigured) SpaceSm else NoticeBelowTilesWarning,
+                        end = SpaceMd,
+                    ),
+            )
         } else if (!state.hasPins && state.extractionWaiting > 0) {
             NoticeBanner(
                 text = pluralStringResource(
@@ -372,14 +392,22 @@ fun MapScreen(
                 ),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(start = SpaceMd, top = SpaceSm, end = SpaceMd),
+                    .padding(
+                        start = SpaceMd,
+                        top = if (viewModel.tilesConfigured) SpaceSm else NoticeBelowTilesWarning,
+                        end = SpaceMd,
+                    ),
             )
         } else if (!state.hasPins && state.placedCount == 0) {
             NoticeBanner(
                 text = stringResource(R.string.map_no_positions),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(start = SpaceMd, top = SpaceSm, end = SpaceMd),
+                    .padding(
+                        start = SpaceMd,
+                        top = if (viewModel.tilesConfigured) SpaceSm else NoticeBelowTilesWarning,
+                        end = SpaceMd,
+                    ),
             )
         }
 
@@ -640,6 +668,10 @@ private fun MapPreviewCard(
  * Decoded to the slot's size by Coil, which is the whole reason the strip can show twenty photos at once: a
  * map viewport is not a place where 48-megapixel originals should be resident. Local `content://` only — the
  * map draws positions from the device, and never fetches a stored original to label a marker.
+ *
+ * The two slots matter here more than in the grid: a strip that renders twenty identical grey squares with
+ * no way to tell a still-decoding one from a broken one reads as twenty broken ones, and the preview card's
+ * first tile is the thing the user is looking at while the rest load.
  */
 @Composable
 private fun StripThumbnail(
@@ -657,7 +689,28 @@ private fun StripThumbnail(
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(role = Role.Button, onClick = onClick),
         contentScale = ContentScale.Crop,
+        loading = { StripThumbPlaceholder() },
+        error = { StripThumbPlaceholder(icon = Icons.Filled.BrokenImage) },
     )
+}
+
+@Composable
+private fun StripThumbPlaceholder(icon: ImageVector? = null) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(StripGlyphSize),
+                tint = MaterialTheme.colorScheme.outline,
+            )
+        }
+    }
 }
 
 /** Photos the preview card can show behind a cluster. */
@@ -686,6 +739,9 @@ private val MarkerLabelSize = 14.dp
 
 /** A strip small enough to read as a strip and large enough to tap: 56 dp is a target, not a thumbnail wall. */
 private val StripSize = 56.dp
+
+/** A broken-cover glyph on a 56 dp tile has to be legible without crowding the tile it sits in. */
+private val StripGlyphSize = 24.dp
 
 /** How much of the bottom edge belongs to the attribution line, so the strip is lifted above it. */
 private val AttributionReserve = 22.dp

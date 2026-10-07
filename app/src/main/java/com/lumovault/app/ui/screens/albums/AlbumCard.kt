@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Screenshot
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,12 +51,19 @@ import com.lumovault.app.ui.theme.SpaceXxs
  * There used to be a `Surface` behind those two lines, which made every tile a card — a raised, bordered,
  * clickable *thing* — where the screen's job is to show a picture and say what it is called. The picture is
  * the whole tile now, and the label under it takes no colour of its own, so a grid of twelve albums reads as
- * twelve covers rather than twelve boxes.
+ * twelve covers rather than twelve boxes. The label is inset from neither side, so a title's first letter
+ * sits over the cover's left edge rather than four pixels right of it — the alignment `ScreenEdge` exists to
+ * guarantee everywhere else.
  *
  * A system album gets an icon because it has no cover of its own — its "contents" are a predicate, and
  * using its newest item as artwork would make the tile change under the user every time a photo arrived,
  * which is a strange thing for a category to do. A user album and a device folder get a real thumbnail,
  * which is what `coverUri` is for: the screen draws a picture whenever the index has one to give it.
+ *
+ * [hasMedia] is what keeps the fallback honest. A tile with no picture and nothing in it may say so; a tile
+ * with a thousand photographs whose cover was deleted out from under it may not — "Empty album" under a
+ * count of 1,024 is a claim about the album that is simply false, and it was the claim this placeholder
+ * used to make in exactly that case.
  */
 @Composable
 fun AlbumCard(
@@ -62,6 +72,7 @@ fun AlbumCard(
     subtitle: String? = null,
     coverUri: String? = null,
     icon: ImageVector? = null,
+    hasMedia: Boolean = true,
     onClick: () -> Unit,
 ) {
     Column(modifier = modifier.clickable(onClick = onClick)) {
@@ -79,17 +90,17 @@ fun AlbumCard(
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
-                    error = { AlbumFallback(icon) },
+                    error = { AlbumFallback(icon, hasMedia) },
                 )
 
-                else -> AlbumFallback(icon)
+                else -> AlbumFallback(icon, hasMedia)
             }
         }
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = SpaceXs, end = SpaceXs, top = SpaceSm, bottom = SpaceXs),
+                .padding(top = SpaceSm, bottom = SpaceXs),
             verticalArrangement = Arrangement.spacedBy(SpaceXxs),
         ) {
             Text(
@@ -112,22 +123,70 @@ fun AlbumCard(
     }
 }
 
+/**
+ * Which of the three cover states a tile with no picture should draw.
+ *
+ * Named rather than inlined in [AlbumFallback] because "a cover-less album with media in it must not be
+ * called empty" is a product rule, not a rendering detail — and the `when` that used to hold it was only
+ * reachable by composing the tile.
+ */
+internal enum class AlbumCoverFallback {
+    /** A system album: a category's mark, not a photograph. */
+    Badge,
+
+    /** An album with nothing in it. The only state that may say "Empty album". */
+    Empty,
+
+    /** An album with photographs whose cover is missing or failed to decode. */
+    Missing,
+}
+
+/**
+ * The whole of [AlbumFallback]'s `when`, as a decision over two facts about the tile.
+ *
+ * The order is the rule: an icon answers first (a category is never empty or broken — it is a predicate
+ * over the library), and only a cover-less tile with media in it reaches [AlbumCoverFallback.Missing].
+ * Anything that returns [AlbumCoverFallback.Empty] for `hasMedia = true` would print a count underneath
+ * that contradicts the word above it.
+ */
+internal fun albumCoverFallback(hasIcon: Boolean, hasMedia: Boolean): AlbumCoverFallback = when {
+    hasIcon -> AlbumCoverFallback.Badge
+    !hasMedia -> AlbumCoverFallback.Empty
+    else -> AlbumCoverFallback.Missing
+}
+
+/**
+ * What a tile draws when it has no picture.
+ *
+ * Three cases, because they are three different facts: a category, which has a mark of its own; an album
+ * with nothing in it, which can say so; and an album with photographs in it whose cover is gone — deleted,
+ * or unreadable — which gets the same broken-image glyph a grid cell wears for the same event, rather than
+ * a sentence contradicting the count printed underneath it.
+ */
 @Composable
-private fun AlbumFallback(icon: ImageVector?) {
-    if (icon == null) {
-        // A user album with nothing in it has no thumbnail to draw. Named rather than left blank, because
-        // an empty tile is indistinguishable from a picture that failed to load.
-        Text(
+private fun AlbumFallback(icon: ImageVector?, hasMedia: Boolean) {
+    when (albumCoverFallback(hasIcon = icon != null, hasMedia = hasMedia)) {
+        AlbumCoverFallback.Badge -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // Reached only when `icon != null`: [albumCoverFallback] answers the icon question first.
+            requireNotNull(icon).Badge()
+        }
+
+        AlbumCoverFallback.Empty -> Text(
+            // A user album with nothing in it has no thumbnail to draw. Named rather than left blank,
+            // because an empty tile is indistinguishable from a picture that failed to load.
             text = stringResource(R.string.album_cover_unavailable),
             style = LumoVaultType.sectionDetail,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(SpaceMd),
         )
-        return
-    }
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        icon.Badge()
+
+        AlbumCoverFallback.Missing -> Icon(
+            imageVector = Icons.Filled.BrokenImage,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(BrokenCoverSize),
+        )
     }
 }
 
@@ -180,3 +239,11 @@ val SystemAlbum.icon: ImageVector
 
 private val BadgeSize = 40.dp
 private val BadgeIconSize = 20.dp
+
+/**
+ * The mark a lost cover leaves, smaller than a category's badge.
+ *
+ * A broken image is a fact about one tile, not the identity of a section, so it reads at the size a
+ * status glyph reads rather than at the coin size that says "this whole tile is a kind of thing".
+ */
+private val BrokenCoverSize = 28.dp

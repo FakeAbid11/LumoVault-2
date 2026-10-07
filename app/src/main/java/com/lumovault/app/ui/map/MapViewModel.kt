@@ -1,6 +1,7 @@
 package com.lumovault.app.ui.map
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
@@ -13,14 +14,17 @@ import com.lumovault.app.domain.map.MapViewport
 import com.lumovault.app.domain.model.MapBounds
 import com.lumovault.app.domain.model.MediaLocation
 import com.lumovault.app.domain.model.MapPhoto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -55,13 +59,29 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     val attribution: String = MapTileProvider.attribution
 
-    /** The positioned photos inside the current viewport, newest capture first. */
+    /**
+     * The positioned photos inside the current viewport, newest capture first.
+     *
+     * A failed read answers with nothing and says so, for the same reason the rest of this file keeps its
+     * silences apart: "there is nothing here" and "I could not find out" look identical as an empty list,
+     * and only one of them is worth a sentence on screen. The flag is cleared by the next answer that
+     * arrives, so a pan past a transient failure takes the notice down with it.
+     */
+    private val readFailed = MutableStateFlow(false)
+
     val photos: StateFlow<List<MapPhoto>> = viewport
         .flatMapLatest { window ->
             if (window == null) {
                 flowOf(emptyList())
             } else {
                 container.mediaMetadataRepository.observeMapPhotos(window.bounds, PHOTO_LIMIT)
+                    .onEach { readFailed.value = false }
+                    .catch { error ->
+                        // Class name only: a SQLite message can quote a path.
+                        Log.w(TAG, "map query failed: ${error.javaClass.simpleName}")
+                        readFailed.value = true
+                        emit(emptyList())
+                    }
             }
         }
         .stateIn(viewModelScope, STOP_POLICY, emptyList())
@@ -128,15 +148,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         locatedCount,
         pendingExtraction,
         locationsAllowed,
-    ) { drawn, placed, waiting, allowed ->
-        MapState(
-            hasPins = drawn.isNotEmpty(),
-            placedCount = placed,
-            locationsAllowed = allowed,
-            // The one silence worth breaking: nothing is plotted, files are still unread, and the reason
-            // they are unread is a permission the user has not been asked for.
-            shouldAskForLocations = !allowed && placed == 0 && waiting > 0,
-            extractionWaiting = waiting,
+        readFailed,
+    ) { drawn, placed, waiting, allowed, failed ->
+        mapStateFor(
+            drawnPins = drawn.size,
+            located = placed,
+            waiting = waiting,
+            allowed = allowed,
+            readFailed = failed,
         )
     }.stateIn(viewModelScope, STOP_POLICY, MapState())
 
@@ -235,10 +254,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** The photos behind a cluster, bounded — the preview card shows a handful and the viewer pages the rest. */
-    suspend fun photosIn(pin: MapPin, limit: Int): List<MapPhoto> =
+    suspend fun photosIn(pin: MapPin, limit: Int): List<MapPhoto> = try {
         container.mediaMetadataRepository.mapPhotos(pin.mediaStoreIds, limit)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        // The preview card is the caller, and it already knows how to show a pin with nothing behind it:
+        // a count and an Open button over the cluster that was tapped. An exception left to reach the
+        // composition instead would take the whole screen down over a preview strip.
+        Log.w(TAG, "pin photos failed: ${error.javaClass.simpleName}")
+        emptyList()
+    }
 
     private companion object {
+        private const val TAG = "LumoVaultMap"
+
         /** How long the pin layer waits for a burst of database invalidations to settle. */
         const val PINS_SAMPLE_MILLIS = 250L
 
@@ -258,13 +288,48 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-/** Which of the map's silences is on screen. Drawn by the screen, decided here. */
+/**
+ * Which of the map's silences is on screen. Drawn by the screen, decided here.
+ *
+ * The screen offers exactly four sentences, in this order: [shouldAskForLocations] (a permission nobody has
+ * asked for yet), [locationsUnavailable] (the read failed), "files are still being read", and "nothing here
+ * records where it was taken". They look identical from outside — an empty pin list — and only one of them
+ * is actionable, so telling them apart is the whole job of this data class. [locationsUnavailable] in
+ * particular must never be shown as an empty map: the photographs are probably still there.
+ */
 data class MapState(
     val hasPins: Boolean = false,
     val placedCount: Int = 0,
     /** Whether Android is currently handing this app unredacted EXIF at all. */
     val locationsAllowed: Boolean = false,
-    /** The one silence worth breaking with a request: see the derivation above for the conjunction. */
+    /** The one silence worth breaking with a request: see the derivation below. */
     val shouldAskForLocations: Boolean = false,
     val extractionWaiting: Int = 0,
+    /** The query failed rather than answered nothing. */
+    val locationsUnavailable: Boolean = false,
+)
+
+/**
+ * The whole of [MapState] as a decision over its five inputs, so it can be asked of without a view model,
+ * a Room instance or an Application.
+ *
+ * The conjunction that decides which silence is on top is the reason this is a function rather than five
+ * fields the screen would have to agree about on its own — and it is what the tests assert, because the
+ * alternative to a wrong conjunction is a notice that sends the user to fix the wrong thing.
+ */
+internal fun mapStateFor(
+    drawnPins: Int,
+    located: Int,
+    waiting: Int,
+    allowed: Boolean,
+    readFailed: Boolean,
+): MapState = MapState(
+    hasPins = drawnPins > 0,
+    placedCount = located,
+    locationsAllowed = allowed,
+    // The one silence worth breaking: nothing is plotted, files are still unread, and the reason they are
+    // unread is a permission the user has not been asked for.
+    shouldAskForLocations = !allowed && located == 0 && waiting > 0,
+    extractionWaiting = waiting,
+    locationsUnavailable = readFailed,
 )
