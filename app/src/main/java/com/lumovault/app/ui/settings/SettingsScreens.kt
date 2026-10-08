@@ -114,7 +114,7 @@ internal fun SettingsScaffold(
                         IconButton(onClick = onNavigateUp) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back),
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }

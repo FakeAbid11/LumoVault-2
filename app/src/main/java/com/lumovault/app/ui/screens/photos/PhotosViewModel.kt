@@ -53,8 +53,15 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
         .flatMapLatest { limit -> container.mediaRepository.observeWindow(limit) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
+    /**
+     * Null until Room answers, not zero.
+     *
+     * Three branches of the derivation read this as a number, and a flow that starts at zero lets
+     * "not asked yet" decide all three — most visibly by printing an empty library over a device full of
+     * photographs. The initial value has to be the one that claims nothing.
+     */
     private val totalCount = container.mediaRepository.observeCount()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
 
@@ -353,7 +360,7 @@ class PhotosViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun syncIfNeeded() {
-        if (totalCount.value > 0 && !scanning.value) return
+        if ((totalCount.value ?: 0) > 0 && !scanning.value) return
         sync()
     }
 

@@ -672,6 +672,11 @@ private fun MapPreviewCard(
  * The two slots matter here more than in the grid: a strip that renders twenty identical grey squares with
  * no way to tell a still-decoding one from a broken one reads as twenty broken ones, and the preview card's
  * first tile is the thing the user is looking at while the rest load.
+ *
+ * The label is null, not the file name. `MediaCell` withholds it for the same reason this file's own
+ * markers do — a photo's name is personal data, and a screen reader broadcasting a strip of twenty of them
+ * to assistive services is the one place the app was saying out loud what its markers refuse to say. The
+ * tap target keeps [Role.Button], so the control is still announced as one.
  */
 @Composable
 private fun StripThumbnail(
@@ -682,7 +687,7 @@ private fun StripThumbnail(
 ) {
     SubcomposeAsyncImage(
         model = Uri.parse(photo.contentUri),
-        contentDescription = photo.displayName,
+        contentDescription = null,
         modifier = modifier
             .size(size)
             .clip(MaterialTheme.shapes.medium)

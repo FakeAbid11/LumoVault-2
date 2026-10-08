@@ -39,8 +39,20 @@ sealed interface CloudUiState {
         val days: List<CloudDay>,
         val counts: List<Pair<MediaType, Int>>,
         val totalCount: Int,
-        /** Telegram could not be reached, so what is on screen is the cached index. */
+        /** The rows on screen came from the cached index rather than from a completed read. */
         val fromCache: Boolean,
+        /**
+         * The reason for that, narrowed to the one case where the cause is knowable.
+         *
+         * [fromCache] alone answers "are these rows current", which is what the derivation needs to decide
+         * to keep showing the library instead of replacing a healthy list with an error. It does not
+         * answer *why*, and the screen used it to print one sentence: "You're offline". Three different
+         * situations reach that state — Telegram unreachable, a build with no Telegram, and a specific
+         * failure such as a rejected channel marker — and only the first of them is offline. Saying
+         * "offline" for the other two sends the user to check a Wi-Fi connection that was never the
+         * problem. So the honest claim is a separate flag, true only where the app knows it.
+         */
+        val offline: Boolean = false,
         /** A refresh is running while the existing library stays visible. */
         val refreshing: Boolean,
         /** Message ids that also exist on the device: backed-up rather than cloud-only. */
@@ -68,11 +80,12 @@ fun deriveCloudState(
     refreshingOverride: Boolean = false,
     zone: ZoneId = ZoneId.systemDefault(),
 ): CloudUiState {
-    fun library(fromCache: Boolean, refreshing: Boolean) = CloudUiState.Library(
+    fun library(fromCache: Boolean, refreshing: Boolean, offline: Boolean = false) = CloudUiState.Library(
         days = items.groupIntoDays(zone),
         counts = counts.cloudCounts(),
         totalCount = totalCount,
         fromCache = fromCache,
+        offline = offline,
         refreshing = refreshing || refreshingOverride,
         localMatches = localMatches,
         hasMoreToLoad = totalCount > items.size,
@@ -92,6 +105,8 @@ fun deriveCloudState(
     return when (init) {
         CloudInitState.Idle -> CloudUiState.Idle
 
+        // offline stays false: this build has no Telegram at all, which is not a network condition,
+        // and telling the user to check their connection would name a cause the app knows is false.
         CloudInitState.TelegramUnavailable -> if (hasCachedLibrary) {
             library(fromCache = true, refreshing = false)
         } else {
@@ -114,8 +129,9 @@ fun deriveCloudState(
             CloudUiState.Scanning(init.found)
         }
 
+        // The one place offline is true: Telegram itself said it could not be reached.
         CloudInitState.Offline -> if (hasCachedLibrary) {
-            library(fromCache = true, refreshing = false)
+            library(fromCache = true, offline = true, refreshing = false)
         } else {
             CloudUiState.Failed(CloudFailure(CloudFailure.Kind.RequestFailed))
         }
@@ -128,6 +144,8 @@ fun deriveCloudState(
             else -> CloudUiState.NoMedia
         }
 
+        // Likewise: a rejected marker or an unusable channel is not an offline phone, and the failure
+        // carries its own kind precisely so the screen can stop guessing.
         is CloudInitState.Failed -> if (hasCachedLibrary) {
             library(fromCache = true, refreshing = false)
         } else {

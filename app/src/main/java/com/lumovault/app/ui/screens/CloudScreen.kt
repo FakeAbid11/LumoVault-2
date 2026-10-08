@@ -451,12 +451,18 @@ private fun CloudHeader(state: CloudUiState.Library, modifier: Modifier = Modifi
 
         // The two notices are mutually exclusive by construction: a stale library is not also being
         // refreshed, and saying both would be one claim too many. They wear chips now, like every other
-        // screen's answer to "what state am I in" — offline takes the outline rather than the error fill,
-        // because a phone with no signal is not broken and the library on screen is still correct, just not
-        // current; checking takes the quiet fill, because it is expected and over in a moment.
+        // screen's answer to "what state am I in" — stale takes the outline rather than the error fill,
+        // because the library on screen is still correct, just not current; checking takes the quiet fill,
+        // because it is expected and over in a moment.
+        //
+        // The stale chip says "offline" only when the app was told Telegram could not be reached. The other
+        // ways to end up here — a build with no Telegram, a rejected channel marker — are not network
+        // conditions, and one sentence covering all three named the wrong cause for two of them.
         when {
             state.fromCache -> StatusPill(
-                text = stringResource(R.string.cloud_offline_notice),
+                text = stringResource(
+                    if (state.offline) R.string.cloud_offline_notice else R.string.cloud_cached_notice,
+                ),
                 tone = PillTone.Missing,
             )
 

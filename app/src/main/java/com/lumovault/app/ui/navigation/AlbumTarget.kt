@@ -10,6 +10,11 @@ import com.lumovault.app.domain.model.SystemAlbum
  * take from, and a system album is a question asked of the library — "what is a screenshot" — that no
  * hand-edit can answer. Passing this instead of a bare id keeps the difference in the type rather than
  * in a flag the detail screen would have to remember to check.
+ *
+ * There is no parser here, deliberately. Routes are built by [AlbumRoutes] and read by hand in the nav
+ * host, so a `from(raw, id)` that nothing called was a second, untested way to name an album — and the
+ * stale-link case it handled is now the detail screen's own `null` target, which draws "this album is no
+ * longer here" rather than inventing one.
  */
 sealed interface AlbumTarget {
     data class User(val albumId: Long) : AlbumTarget
@@ -24,20 +29,6 @@ sealed interface AlbumTarget {
      * and neither one is wrong.
      */
     data class LocalFolder(val relativePath: String) : AlbumTarget
-
-    companion object {
-        /**
-         * Parses the argument off the route.
-         *
-         * `null` for anything unrecognised, including a system-album name from a newer build: a stale
-         * link should not invent an album, and the caller shows the empty state instead.
-         */
-        fun from(raw: String?, id: String?): AlbumTarget? {
-            raw ?: return null
-            id?.toLongOrNull()?.let { return User(it) }
-            return SystemAlbum.entries.firstOrNull { it.name == raw }?.let { System(it) }
-        }
-    }
 }
 
 /**

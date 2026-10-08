@@ -205,6 +205,10 @@
     <string name="cloud_error_title">Couldn\'t reach your cloud</string>
     <string name="cloud_error_body">We couldn\'t load your cloud library. Check your internet connection and try again — your device photos are unaffected.</string>
     <string name="cloud_offline_notice">You\'re offline. Showing the cloud library this device already has.</string>
+    <!-- The same rows on screen for a reason that is NOT an offline phone: a build without Telegram, or a
+         channel this app cannot use. One sentence that claims only what every one of those cases can
+         support, because the alternative was "You're offline" over a broken channel association. -->
+    <string name="cloud_cached_notice">Showing the cloud library this device already has.</string>
     <string name="cloud_refreshing_notice">Checking for new items…</string>
     <string name="cloud_badge_on_device">On this device</string>
     <string name="cloud_badge_cloud_only">In the cloud only</string>
@@ -567,7 +571,6 @@
     </plurals>
     <string name="health_no_scan">Backup has not scanned this library yet.</string>
     <string name="health_no_backup">Backup has not finished an item yet.</string>
-    <string name="action_back">Back</string>
     <string name="action_save">Save</string>
 
     <string name="diagnostics_title">Diagnostics</string>

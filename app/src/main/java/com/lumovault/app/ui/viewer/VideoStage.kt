@@ -204,7 +204,13 @@ fun VideoStage(
             Text(
                 text = stringResource(R.string.viewer_video_failed_body),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // OnMedia, not the scheme's onSurfaceVariant. This paragraph sits on a black stage in both
+                // themes, and the scheme role follows the *screen*, so in Light it resolved to
+                // LightOnSurfaceVariant — 2.5:1 against black, where the title above it was 21:1. The one
+                // sentence explaining why the video will not play was the least readable text in the app,
+                // and only in the theme the user chose. Hierarchy here is size and weight, as it is
+                // everywhere else on a black surface.
+                color = OnMedia,
                 modifier = Modifier.padding(horizontal = SpaceXl),
             )
             // Not the pager's chrome: the viewer hides its bars on a tap, and a failure the user can only

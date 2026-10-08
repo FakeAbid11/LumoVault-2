@@ -21,6 +21,17 @@ sealed interface PhotosUiState {
     /** Access is granted and there is nothing indexed yet — the very first scan is running. */
     data object Scanning : PhotosUiState
 
+    /**
+     * The library count has not come back from Room yet.
+     *
+     * Its own state because `0` cannot carry both meanings. Room's `COUNT(*)` answers `0` for a device
+     * with no media *and* for a query that has not run, and a flow that starts at its initial value has to
+     * pick one of them — picking zero printed "No photos yet" over a library of thousands, on the first
+     * frame and again every time the subscription lapsed and the flow reset. Nothing is claimed here
+     * either: not that there is media, and not that there is none.
+     */
+    data object CheckingIndex : PhotosUiState
+
     /** The scan finished and the device genuinely has no supported media. */
     data object Empty : PhotosUiState
 
@@ -56,7 +67,7 @@ sealed interface PhotosUiState {
 internal fun derivePhotosState(
     access: MediaAccessStatus,
     items: List<Media>,
-    totalCount: Int,
+    totalCount: Int?,
     isScanning: Boolean,
     scanFailed: Boolean,
     days: List<MediaDay>,
@@ -64,6 +75,10 @@ internal fun derivePhotosState(
     access == MediaAccessStatus.Unknown -> PhotosUiState.CheckingAccess
 
     !access.allowsScanning -> PhotosUiState.PermissionRequired
+
+    // The count is still out. This has to come before every branch that reads it as a number, because
+    // `null` and `0` are different facts about the same device and only one of them is "no photos".
+    totalCount == null -> PhotosUiState.CheckingIndex
 
     // A failed scan with nothing indexed is an error; with rows already present the library is
     // still there to show, and Content flags the failed refresh so the grid can say the rows are

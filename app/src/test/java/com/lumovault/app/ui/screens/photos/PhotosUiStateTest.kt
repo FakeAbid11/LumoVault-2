@@ -33,7 +33,7 @@ class PhotosUiStateTest {
     private fun derive(
         access: MediaAccessStatus,
         items: List<Media> = emptyList(),
-        total: Int = items.size,
+        total: Int? = items.size,
         scanning: Boolean = false,
         failed: Boolean = false,
     ) = derivePhotosState(
@@ -48,6 +48,29 @@ class PhotosUiStateTest {
     @Test
     fun `an unread permission is neither granted nor denied`() {
         assertEquals(PhotosUiState.CheckingAccess, derive(MediaAccessStatus.Unknown))
+    }
+
+    /**
+     * Room's `COUNT(*)` answers zero for a device with no media *and* for a query that has not run, so a
+     * flow that starts at zero lets "not asked yet" decide the screen. This is that claim, in the form a
+     * user would have seen it: a library full of photographs described as empty.
+     */
+    @Test
+    fun `a count that has not answered claims neither media nor its absence`() {
+        assertEquals(
+            PhotosUiState.CheckingIndex,
+            derive(MediaAccessStatus.Granted, items = listOf(media(1)), total = null),
+        )
+        assertEquals(
+            "and it outranks the empty state even when nothing else is in flight",
+            PhotosUiState.CheckingIndex,
+            derive(MediaAccessStatus.Granted, total = null),
+        )
+        assertEquals(
+            "a real zero still means empty, once the query has answered",
+            PhotosUiState.Empty,
+            derive(MediaAccessStatus.Granted, total = 0),
+        )
     }
 
     @Test

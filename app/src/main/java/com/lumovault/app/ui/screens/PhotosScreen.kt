@@ -165,6 +165,11 @@ fun PhotosScreen(
             // a device that has thousands.
             PhotosUiState.CheckingAccess -> LoadingScreen()
 
+            // Room has not said how many rows there are. The same ring as above, because it is the same
+            // claim — a question is pending — and deliberately not [PhotosUiState.Empty], which would be
+            // a second, different answer to "why is nothing on screen".
+            PhotosUiState.CheckingIndex -> LoadingScreen()
+
             PhotosUiState.PermissionRequired -> PermissionRequired(
                 onRequestAccess = {
                     permissionLauncher.launch(viewModel.mediaPermissionsToRequest().toTypedArray())

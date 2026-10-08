@@ -134,11 +134,16 @@ fun AlbumDetailScreen(
 
     val isTrash = state.systemAlbum == SystemAlbum.Trash
 
-    if (state.items != null && state.isUnresolved) {
+    if (target == null || (state.items != null && state.isUnresolved)) {
         // A link to an album this build cannot name, or one deleted since: both used to draw a titleless
         // "0 items" screen — silent, with no Add, Rename or Delete, and no sentence saying why. The
         // `items != null` test keeps this from firing during the first load, when the album row simply
         // has not arrived yet.
+        //
+        // `target == null` is the other half, and it was the half that left a permanent spinner: with no
+        // target there is nothing for `open` to resolve, so `contentsOf` answers `null` forever, `items`
+        // is never non-null, and the branch below drew a "0 items" header above a waiting ring that never
+        // resolved. A route this build cannot name is precisely what this placeholder says out loud.
         PlaceholderScreen(
             title = stringResource(R.string.album_gone_title),
             description = stringResource(R.string.album_gone_body),

@@ -3,6 +3,7 @@ package com.lumovault.app.ui.screens.cloud
 import com.lumovault.app.domain.model.CloudDateSource
 import com.lumovault.app.domain.model.CloudMedia
 import com.lumovault.app.domain.model.MediaType
+import com.lumovault.app.domain.telegram.CloudFailure
 import com.lumovault.app.domain.telegram.CloudInitState
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
@@ -89,6 +90,47 @@ class CloudUiStateTest {
         assertTrue(library.refreshing)
         assertFalse(library.fromCache)
         assertEquals(2, library.totalCount)
+    }
+
+    /**
+     * "You're offline" is a cause, and only one of these states knows it.
+     *
+     * Three unrelated situations end with the cached library on screen, and all three used to print the
+     * offline notice because the screen only knew *that* the rows were stale. A rejected channel marker
+     * or a build with no Telegram is not a phone with no signal, and telling a user to check their
+     * connection when the connection was never the problem sends them away from the real one.
+     */
+    @Test
+    fun `only a state that was told Telegram is unreachable claims the user is offline`() {
+        fun libraryFor(init: CloudInitState) = deriveCloudState(
+            init,
+            cached,
+            totalCount = 2,
+            counts = emptyList(),
+            zone = zone,
+        ) as CloudUiState.Library
+
+        assertTrue(
+            "the one case that is genuinely offline",
+            libraryFor(CloudInitState.Offline).offline,
+        )
+        assertFalse(
+            "a build with no Telegram is not a network condition",
+            libraryFor(CloudInitState.TelegramUnavailable).offline,
+        )
+        assertFalse(
+            "nor is a specific failure, which carries its own kind precisely so this guessing can stop",
+            libraryFor(CloudInitState.Failed(CloudFailure(CloudFailure.Kind.MarkerRejected))).offline,
+        )
+
+        // Whatever the cause, all three keep the rows: that part of the rule is unchanged.
+        listOf(
+            CloudInitState.Offline,
+            CloudInitState.TelegramUnavailable,
+            CloudInitState.Failed(CloudFailure(CloudFailure.Kind.MarkerRejected)),
+        ).forEach { init ->
+            assertTrue("$init must not replace a healthy library", libraryFor(init).fromCache)
+        }
     }
 
     private companion object {

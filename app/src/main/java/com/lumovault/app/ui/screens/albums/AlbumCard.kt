@@ -90,6 +90,11 @@ fun AlbumCard(
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
+                    // No `loading` slot on purpose. The Box behind it is already filled with the scheme's
+                    // surfaceVariant, which is exactly what MediaCell's and the map strip's loading slots
+                    // draw, so a cover mid-decode looks the same as every other thumbnail mid-decode.
+                    // Adding a spinner here would make album covers the one image in the app that says
+                    // "wait" rather than simply being quiet.
                     error = { AlbumFallback(icon, hasMedia) },
                 )
 

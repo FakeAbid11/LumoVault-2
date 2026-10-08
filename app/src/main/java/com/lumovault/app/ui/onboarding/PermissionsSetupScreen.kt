@@ -159,7 +159,12 @@ internal fun MediaAccessStatus.label(): String = stringResource(
 internal fun NotificationsStatus.label(): String = stringResource(
     when (this) {
         NotificationsStatus.Granted -> R.string.status_allowed
-        NotificationsStatus.NotRequired -> R.string.status_done
+        // One word for this state in both places that report it. "Done" said the user had completed
+        // something, when what happened is that this Android version has nothing to ask; Settings'
+        // permissions screen said "Not required", so the same grant read two different ways depending on
+        // which door the user came through. This `when` exists to be the only one, so it does not get to
+        // disagree with itself.
+        NotificationsStatus.NotRequired -> R.string.status_not_required
         NotificationsStatus.Denied -> R.string.status_skipped
         NotificationsStatus.Unknown -> R.string.status_not_set
     },

@@ -27,6 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -89,7 +93,18 @@ fun MediaCell(
                 if (onClick == null && onLongClick == null) {
                     Modifier
                 } else {
-                    Modifier.combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick)
+                    Modifier
+                        .combinedClickable(onClick = onClick ?: {}, onClickLabel = null, onLongClick = onLongClick)
+                        // Selected is a state, and it is announced as one. The tick glyph above carries the
+                        // word "Selected", but it is a separate node: a screen-reader user sweeping a grid
+                        // in selection mode heard every chosen cell exactly like every unchosen one, because
+                        // the only difference was a border. `selected` says it on the cell itself, and
+                        // `Role.Checkbox` says what kind of thing is being toggled, which is what a long
+                        // press starts.
+                        .semantics {
+                            this.selected = selected
+                            role = Role.Checkbox
+                        }
                 },
             )
             .border(
