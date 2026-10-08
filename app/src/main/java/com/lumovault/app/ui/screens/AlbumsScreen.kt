@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lumovault.app.R
 import com.lumovault.app.domain.model.SystemAlbum
+import com.lumovault.app.ui.components.SectionHeader
 import com.lumovault.app.ui.navigation.AlbumTarget
 import com.lumovault.app.ui.screens.albums.AlbumCard
 import com.lumovault.app.ui.screens.albums.AlbumsViewModel
@@ -225,16 +226,6 @@ fun AlbumsScreen(
     }
 }
 
-@Composable
-private fun SectionHeader(@StringRes label: Int, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(label),
-        style = LumoVaultType.sectionHeader,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = SpaceSm, bottom = SpaceXs),
-    )
-}
+
 
 private val CardMinSize = 150.dp

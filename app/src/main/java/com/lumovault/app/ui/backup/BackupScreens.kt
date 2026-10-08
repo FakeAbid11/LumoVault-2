@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,7 +47,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumovault.app.R
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -56,7 +54,10 @@ import com.lumovault.app.domain.backup.BackupFailureItem
 import com.lumovault.app.domain.model.BackupHealth
 import com.lumovault.app.domain.model.BackupPreferences
 import com.lumovault.app.domain.restore.FreeUpSpaceCandidate
+import com.lumovault.app.ui.components.DetailRow
+import com.lumovault.app.ui.components.EntryRow
 import com.lumovault.app.ui.components.PillTone
+import com.lumovault.app.ui.components.SectionHeader
 import com.lumovault.app.ui.components.StatusPill
 import com.lumovault.app.ui.onboarding.onboardingBackdrop
 import com.lumovault.app.ui.screens.photos.backupFailureReasonRes
@@ -132,7 +133,7 @@ fun BackupHubScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(SpaceXs),
         ) {
-            item { SectionLabel(R.string.backup_hub_section_backup) }
+            item { SectionHeader(R.string.backup_hub_section_backup) }
             item {
                 // A switch that cannot start a pass is not a switch: with nothing chosen to back up, the
                 // honest control is the door to the folders, while somebody with it already on can still
@@ -186,7 +187,7 @@ fun BackupHubScreen(
 
             // The rule between sections is gone: a heading that is a heading does the separating, and two
             // hairlines plus their margins were 24 dp of decoration saying what four words already said.
-            item { SectionLabel(R.string.backup_hub_section_status) }
+            item { SectionHeader(R.string.backup_hub_section_status) }
             item { HealthSummary(health = health, onOpenDetails = onOpenHealth) }
 
             // Below the numbers rather than above them: the figures are what the user came to read, and this
@@ -196,7 +197,7 @@ fun BackupHubScreen(
                 item { StopCard(reason = reason, onOpenCloudTab = onOpenCloudTab, onConnectTelegram = onConnectTelegram) }
             }
 
-            item { SectionLabel(R.string.backup_hub_section_storage) }
+            item { SectionHeader(R.string.backup_hub_section_storage) }
             item {
                 EntryRow(
                     title = stringResource(R.string.free_space_title),
@@ -213,19 +214,6 @@ fun BackupHubScreen(
             }
         }
     }
-}
-
-/** A section of the hub: a heading that separates, with no rule to do it for it. */
-@Composable
-private fun SectionLabel(@androidx.annotation.StringRes label: Int) {
-    Text(
-        text = stringResource(label),
-        style = LumoVaultType.sectionHeader,
-        // onSurface, like every other section heading in the app: this tint was the one screen that
-        // muted it, and a heading that changes weight by room reads as a different kind of heading.
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = SpaceMd, bottom = SpaceXs),
-    )
 }
 
 /**
@@ -483,17 +471,17 @@ fun DiagnosticsScreen(
                 item { CircularProgressIndicator(modifier = Modifier.padding(top = SpaceXl)) }
                 return@LazyColumn
             }
-            item { Row(R.string.diag_local_media, current.health.localTotal.toString()) }
-            item { Row(R.string.diag_backed_up, current.health.backedUp.toString()) }
-            item { Row(R.string.diag_cloud_only, current.health.cloudOnly.toString()) }
-            item { Row(R.string.diag_waiting, current.health.waiting.toString()) }
-            item { Row(R.string.diag_uploading, current.health.uploading.toString()) }
-            item { Row(R.string.diag_failed, current.health.failed.toString()) }
+            item { DetailRow(R.string.diag_local_media, current.health.localTotal.toString()) }
+            item { DetailRow(R.string.diag_backed_up, current.health.backedUp.toString()) }
+            item { DetailRow(R.string.diag_cloud_only, current.health.cloudOnly.toString()) }
+            item { DetailRow(R.string.diag_waiting, current.health.waiting.toString()) }
+            item { DetailRow(R.string.diag_uploading, current.health.uploading.toString()) }
+            item { DetailRow(R.string.diag_failed, current.health.failed.toString()) }
             // The count and this list come from the same table through two queries, so the list says plainly
             // when it is only part of the story: a short list that reads as complete is the worse of the two
             // failures here.
             if (failures.isNotEmpty()) {
-                item { SectionLabel(R.string.backup_failure_section) }
+                item { SectionHeader(R.string.backup_failure_section) }
                 items(failures, key = { failure -> failure.mediaStoreId }) { failure ->
                     FailureRow(failure = failure, onOpen = { onOpenMedia(failure.mediaStoreId) })
                 }
@@ -513,7 +501,7 @@ fun DiagnosticsScreen(
                 }
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_last_backup,
                     current.health.lastBackupSeconds?.asText() ?: stringResource(R.string.health_never),
                     // "Not yet" is a state wearing a value's clothes: the outline chip is the same mark the
@@ -523,14 +511,14 @@ fun DiagnosticsScreen(
                 )
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_last_scan,
                     current.health.lastScanSeconds?.asText() ?: stringResource(R.string.health_never),
                     tone = if (current.health.lastScanSeconds == null) PillTone.Missing else null,
                 )
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_telegram,
                     stringResource(current.telegram.labelRes),
                     // The same four answers the setup checklist gives, in its colours: connected is Done,
@@ -546,7 +534,7 @@ fun DiagnosticsScreen(
                 )
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_channel,
                     stringResource(
                         if (current.channelAvailable) R.string.diag_channel_available else R.string.diag_channel_missing,
@@ -555,7 +543,7 @@ fun DiagnosticsScreen(
                 )
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_automatic,
                     stringResource(
                         if (current.preferences.automatic) R.string.state_enabled else R.string.state_disabled,
@@ -567,13 +555,13 @@ fun DiagnosticsScreen(
                 )
             }
             item {
-                Row(
+                DetailRow(
                     R.string.diag_constraints,
                     stringResource(current.preferences.constraintsSummaryRes()),
                 )
             }
-            item { Row(R.string.diag_database_version, current.databaseVersion.toString()) }
-            item { Row(R.string.diag_staging_space, current.stagingSpaceFreeBytes.toByteText()) }
+            item { DetailRow(R.string.diag_database_version, current.databaseVersion.toString()) }
+            item { DetailRow(R.string.diag_staging_space, current.stagingSpaceFreeBytes.toByteText()) }
             item {
                 Text(
                     text = stringResource(R.string.diagnostics_secrets_note),
@@ -582,34 +570,6 @@ fun DiagnosticsScreen(
                     modifier = Modifier.padding(top = SpaceMd),
                 )
             }
-        }
-    }
-}
-
-/**
- * One line of the technical panel: the label, and the value in the form it should be read in.
- *
- * A value that *is* a state — Connected, Available, Enabled, "not yet" — earns a [StatusPill], so the words
- * that say how things stand are the same words in the same colours as every other screen's. Figures,
- * timestamps and constraints stay plain text: they are data about a state rather than the state itself, and
- * a chip around a number only makes the row harder to scan.
- */
-@Composable
-private fun Row(@androidx.annotation.StringRes label: Int, value: String, tone: PillTone? = null) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SpaceSm),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(label),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (tone == null) {
-            Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-        } else {
-            StatusPill(text = value, tone = tone)
         }
     }
 }
@@ -983,44 +943,5 @@ private fun ToggleRow(
             )
         }
         androidx.compose.material3.Switch(checked = checked, onCheckedChange = null, enabled = enabled)
-    }
-}
-
-/**
- * A row that opens another screen.
- *
- * The mark at its end used to be a tick. On the folders row that could be read as "these are chosen", but the
- * same component draws "Free up space" and "Diagnostics", and a tick on those says nothing true — the screen
- * they open is not a state this one can confirm. A chevron says the one thing that is always true about an
- * entry row: there is somewhere to go.
- *
- * Internal because the settings hub is the same row — a titled door with a quiet note under it — and two
- * copies of the chevron's reasoning is how they would start drawing different chevrons.
- */
-@Composable
-internal fun EntryRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = MinTouchTarget)
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .padding(horizontal = SpaceXs, vertical = SpaceSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SpaceMd),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = LumoVaultType.itemTitle, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                text = subtitle,
-                style = LumoVaultType.sectionDetail,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
-        )
     }
 }

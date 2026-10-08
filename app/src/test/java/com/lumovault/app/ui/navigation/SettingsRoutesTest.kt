@@ -91,6 +91,7 @@ class SettingsRoutesTest {
         SettingsRoutes.CLOUD,
         SettingsRoutes.APPEARANCE,
         SettingsRoutes.NOTIFICATIONS,
+        SettingsRoutes.PERMISSIONS,
         SettingsRoutes.ABOUT,
     )
 }

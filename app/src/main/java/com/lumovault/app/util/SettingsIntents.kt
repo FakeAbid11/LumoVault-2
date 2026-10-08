@@ -21,3 +21,18 @@ fun Context.openAppDetailsSettings() = runCatching {
         ),
     )
 }
+
+/**
+ * Opens the system page that governs battery restrictions.
+ *
+ * Not a permission and not the same page: this is the one exit for the background row on both the setup
+ * card and the Settings permissions screen, which is why it lives here rather than being written twice.
+ * Like [openAppDetailsSettings] it is wrapped, and for the same reason — a device that does not offer the
+ * page makes this a tap that visibly did nothing, which is the same as a dead button and not a crash.
+ *
+ * Nothing is recorded from the act of opening it. The battery status is read live when the screen comes
+ * back (PRD section 38.3), so LumoVault can never claim a restriction was lifted because a page was shown.
+ */
+fun Context.openBatterySettings() = runCatching {
+    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+}

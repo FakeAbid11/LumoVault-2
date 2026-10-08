@@ -768,15 +768,15 @@ private fun MediaDetailsSheet(
                 val value = ViewerFormatting.fieldValue(field, media, metadata, dateTime)
                 val missing = ViewerFormatting.fieldMissing(field)
                 if (value != null || missing != null) {
-                    DetailRow(
+                    FactRow(
                         label = ViewerFormatting.fieldLabel(field),
                         value = value ?: stringResource(requireNotNull(missing)),
                     )
                 }
             }
 
-            DetailRow(label = R.string.backup_hub_section_backup, value = backupRow)
-            DetailRow(label = R.string.backup_hub_section_storage, value = storageRow)
+            FactRow(label = R.string.backup_hub_section_backup, value = backupRow)
+            FactRow(label = R.string.backup_hub_section_storage, value = storageRow)
 
             if (onOpenMap != null) {
                 TextButton(
@@ -796,9 +796,15 @@ private fun MediaDetailsSheet(
  * resolution sat alone on the right, and a list whose rows break at different points is a list you have to
  * re-read to parse. Extracted because the panel now draws rows from two sources and a component that exists
  * once cannot drift from the others.
+ *
+ * Named [FactRow] rather than `DetailRow` because it is a different component from the shared one of that
+ * name: that row is a status line that puts a word or a chip at the far edge of a settings list, and this
+ * one is a fixed two-column table whose label column is deliberately narrow. Sharing a name would have
+ * made the two look interchangeable in a code review, which is how one of them eventually gets edited as
+ * if it were the other.
  */
 @Composable
-private fun DetailRow(@StringRes label: Int, value: String) {
+private fun FactRow(@StringRes label: Int, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(SpaceMd),

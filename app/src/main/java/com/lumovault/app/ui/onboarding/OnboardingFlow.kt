@@ -3,8 +3,6 @@ package com.lumovault.app.ui.onboarding
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +33,7 @@ import com.lumovault.app.ui.navigation.navExitTransition
 import com.lumovault.app.ui.navigation.navPopEnterTransition
 import com.lumovault.app.ui.navigation.navPopExitTransition
 import com.lumovault.app.util.openAppDetailsSettings
+import com.lumovault.app.util.openBatterySettings
 
 /** The seven routes behind the six onboarding screens — folder picking is a sub-screen, not a step. */
 internal enum class OnboardingStep(val route: String) {
@@ -236,14 +235,10 @@ fun OnboardingFlow(
 }
 
 /**
- * "Check Settings" opens the system page and stops there. Nothing is recorded from the act of
- * opening it: the battery status is read live on resume, so LumoVault never claims a setting was
- * changed because a screen was shown (PRD section 38.3).
+ * The battery page's own exit now lives in [openBatterySettings], beside the app-details page it is a
+ * sibling of: the setup card and the Settings permissions screen both offer it, and two copies of an
+ * intent is how one of them ends up opening a different page than the other.
  */
-private fun Context.openBatterySettings() = runCatching {
-    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-}
-
 private fun Activity.shouldShowPermissionRationaleAny(permissions: List<String>): Boolean =
     permissions.any { shouldShowRequestPermissionRationale(it) }
 

@@ -25,6 +25,7 @@ import com.lumovault.app.ui.settings.AccountSettingsScreen
 import com.lumovault.app.ui.settings.AppearanceSettingsScreen
 import com.lumovault.app.ui.settings.CloudSettingsScreen
 import com.lumovault.app.ui.settings.NotificationsSettingsScreen
+import com.lumovault.app.ui.settings.PermissionsSettingsScreen
 import com.lumovault.app.ui.settings.SettingsHubScreen
 import com.lumovault.app.ui.viewer.MediaViewerScreen
 
@@ -80,6 +81,15 @@ object SettingsRoutes {
     const val CLOUD = PREFIX + "cloud"
     const val APPEARANCE = PREFIX + "appearance"
     const val NOTIFICATIONS = PREFIX + "notifications"
+
+    /**
+     * Everything Android decides about what LumoVault may read, in one list.
+     *
+     * A separate screen rather than a fourth row on Notifications because two thirds of what it reports is
+     * about something else entirely — the library, the coordinates inside photographs, the device's power
+     * budget — and burying those under a screen the user only visits when alerts are the wrong thing.
+     */
+    const val PERMISSIONS = PREFIX + "permissions"
     const val ABOUT = PREFIX + "about"
 }
 
@@ -204,8 +214,9 @@ fun LumoVaultNavHost(
                 onOpenCloud = { navController.navigate(SettingsRoutes.CLOUD) },
                 onOpenStorage = { navController.navigate(BackupRoutes.FREE_SPACE) },
                 onOpenAppearance = { navController.navigate(SettingsRoutes.APPEARANCE) },
-                onOpenNotifications = { navController.navigate(SettingsRoutes.NOTIFICATIONS) },
-                onOpenAbout = { navController.navigate(SettingsRoutes.ABOUT) },
+onOpenNotifications = { navController.navigate(SettingsRoutes.NOTIFICATIONS) },
+        onOpenPermissions = { navController.navigate(SettingsRoutes.PERMISSIONS) },
+        onOpenAbout = { navController.navigate(SettingsRoutes.ABOUT) },
             )
         }
         composable(SettingsRoutes.ACCOUNT) {
@@ -223,12 +234,24 @@ fun LumoVaultNavHost(
         composable(SettingsRoutes.APPEARANCE) {
             AppearanceSettingsScreen(onNavigateUp = navController::navigateUp)
         }
-        composable(SettingsRoutes.NOTIFICATIONS) {
-            NotificationsSettingsScreen(onNavigateUp = navController::navigateUp)
-        }
-        composable(SettingsRoutes.ABOUT) {
-            AboutSettingsScreen(onNavigateUp = navController::navigateUp)
-        }
+composable(SettingsRoutes.NOTIFICATIONS) {
+    NotificationsSettingsScreen(onNavigateUp = navController::navigateUp)
+}
+composable(SettingsRoutes.PERMISSIONS) {
+    PermissionsSettingsScreen(
+        onNavigateUp = navController::navigateUp,
+        // The notification channel is not a permission, so it stays on the notifications screen; this is
+        // only the way there, and it is one press rather than two back-and-forths.
+        onOpenNotifications = {
+            navController.navigate(SettingsRoutes.NOTIFICATIONS) {
+                popUpTo(SettingsRoutes.PERMISSIONS) { inclusive = true }
+            }
+        },
+    )
+}
+composable(SettingsRoutes.ABOUT) {
+    AboutSettingsScreen(onNavigateUp = navController::navigateUp)
+}
 
         composable(BackupRoutes.HUB) {
             BackupHubScreen(

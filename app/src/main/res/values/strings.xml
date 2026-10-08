@@ -52,9 +52,13 @@
     <string name="how_point_originals">Originals download only when you ask for them.</string>
     <string name="how_action">Continue</string>
 
-    <!-- Screen 3: Connect Telegram -->
-    <string name="connect_title">Connect Telegram</string>
-    <string name="connect_description">Connect your Telegram account to use it as your private cloud storage.</string>
+    <!-- Screen 3: LumoVault Cloud. The step is titled for what the user gets rather than for the transport.
+         They are about to type a Telegram phone number and receive a Telegram code, so the copy names
+         LumoVault Cloud here and says plainly, one line below, that it is their own Telegram account doing
+         the storing. "Connect Telegram" as the screen's own heading read as a configuration step for
+         something the user had not been told about yet. -->
+    <string name="connect_title">LumoVault Cloud</string>
+    <string name="connect_description">Your backup goes into your own Telegram account, and nowhere else. Connect it to turn on backup.</string>
     <!-- Skipping is a choice about when, not whether: everything except the upload itself works without an account. -->
     <string name="connect_skip">Skip for now</string>
     <string name="connect_skip_note">Browsing, albums, favourites and the map all work without Telegram. Only backing up needs it, and photos chosen now queue on this phone until you connect.</string>
@@ -648,6 +652,7 @@
          reach the screens that already exist, and these are the five that had no home. Same
          no-apostrophe rule as above. -->
     <string name="settings_title">Settings</string>
+    <string name="settings_section_account">Account</string>
     <string name="settings_account">Account</string>
     <string name="settings_account_note">Telegram connection, reconnect and sign out</string>
     <string name="settings_backup">Backup</string>
@@ -655,18 +660,51 @@
     <string name="settings_cloud">Cloud</string>
     <string name="settings_cloud_note">Channel, verification and what is indexed</string>
     <string name="settings_storage">Storage</string>
+    <!-- The hub row is a door, so its note says what is behind it rather than quoting the free-up-space
+         screen — a settings list that borrowed another screen's sentence for one of its rows read as if
+         the two rows were the same setting. -->
+    <string name="settings_storage_note">Remove local copies that are proven to be in your backup</string>
+    <string name="settings_section_backup">Backup and storage</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_note">Dark, light, or follow the system</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_note">What the app posts and what Android allows</string>
+    <string name="settings_section_app">App</string>
     <string name="settings_about">About</string>
     <string name="settings_about_note">Version, privacy and licenses</string>
     <string name="settings_cloud_indexed">Indexed items</string>
+    <!-- Room has not answered yet. This says the check is running and nothing about its result, because
+         "Not found yet" over a lookup still in flight is the app claiming a check it has not made. -->
+    <string name="settings_cloud_checking">Checking your backup channel…</string>
+
+    <string name="settings_cloud_account">LumoVault Cloud</string>
+    <string name="settings_permissions">Permissions</string>
+    <string name="settings_permissions_note">Photos, notifications and background work</string>
+    <string name="permissions_note">What LumoVault asks Android for, and what Android currently allows. Change any of these in system settings.</string>
+    <string name="permissions_media">Photos and videos</string>
+    <string name="permissions_notifications">Notifications</string>
+    <!-- The one permission the photo map needs and the library does not. Without it Android hands the app
+         the same file with its coordinates stripped, so the map simply has nothing to place. -->
+    <string name="permissions_photo_location">Photo locations</string>
+    <string name="permissions_photo_location_description">Lets LumoVault read the place a photo was taken. Without it the map cannot put anything on the map.</string>
+    <string name="permissions_background">Background backup</string>
+    <string name="permissions_open_system">Open system settings</string>
+    <string name="permissions_open_battery">Open battery settings</string>
+    <!-- Printed instead of a button on a device that offers no battery page, so the row explains itself
+         rather than offering a trip that would go nowhere. -->
+    <string name="permissions_no_way_to_fix">This device has no battery settings page, so LumoVault cannot ask for that here.</string>
+    <string name="permissions_notifications_door_note">The channel LumoVault posts backup progress to</string>
+    <string name="status_not_required">Not required</string>
 
     <string name="account_reconnect">Reconnect</string>
     <string name="account_reconnect_note">Sign in to Telegram again</string>
     <string name="account_sign_out">Sign out</string>
     <string name="account_sign_out_note">Clears the session on this phone. Backups stay in the channel.</string>
+    <!-- Signing out loses nothing, but getting back in costs a phone number and a two-step password. The
+         dialog says both halves: what stays, and what it will take to return. -->
+    <string name="account_sign_out_confirm_title">Sign out of LumoVault Cloud?</string>
+    <string name="account_sign_out_confirm_body">Your backups stay in your channel. You will need your phone number and a two-step password to sign back in on this phone.</string>
+    <string name="account_sign_out_confirm_action">Sign out</string>
 
     <string name="appearance_note">Dark is the default. Follow system matches the phone.</string>
     <string name="appearance_system">Follow system</string>
@@ -680,4 +718,10 @@
     <string name="about_privacy">Privacy</string>
     <string name="about_privacy_text">Your photos stay on this phone until you back them up to your own Telegram account. LumoVault has no servers and collects no analytics: your library index and settings live on this device, and the only copy of your library outside it is the one you choose to send.</string>
     <string name="about_licenses">Open-source licenses</string>
+    <!-- translatable="false": these are the names of artifacts and the titles of their licenses, and
+         translating either would make the notice wrong. A resource rather than a Kotlin literal because
+         hard-coded user-facing text is the one kind of string nothing in the build reports as missing.
+         The break between the two licenses is an escaped \n rather than a newline in the file: AAPT2
+         collapses a literal one to a single space, which would put both licenses on one line. -->
+    <string name="about_licenses_notice" translatable="false">Telegram TDLib — GNU LGPL 2.1\nApache License 2.0 — osmdroid, Coil, AndroidX Compose, Room, WorkManager, Media3, libphonenumber, kotlinx.coroutines</string>
 </resources>

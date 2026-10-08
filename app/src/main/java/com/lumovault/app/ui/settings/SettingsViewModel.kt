@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumovault.app.LumoVaultApplication
+import com.lumovault.app.domain.model.BackgroundBackupStatus
+import com.lumovault.app.domain.model.MediaAccessStatus
 import com.lumovault.app.domain.model.NotificationsStatus
 import com.lumovault.app.domain.model.ThemeMode
 import com.lumovault.app.domain.telegram.TelegramAuthState
@@ -62,12 +64,39 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val notificationsStatus: StateFlow<NotificationsStatus> = _notificationsStatus.asStateFlow()
 
     /**
+     * Every permission this app holds, as one snapshot.
+     *
+     * Four answers, one object, because a Settings screen that listed them from four separate reads is a
+     * screen that can draw a grant and a refusal from different moments. [refreshPermissions] re-reads all
+     * four together, so a user who changed one in system settings comes back to a screen where every row
+     * belongs to the same instant.
+     */
+    private val _permissions = MutableStateFlow(readPermissions())
+    val permissions: StateFlow<PermissionOverview> = _permissions.asStateFlow()
+
+    /**
      * Re-read the notification permission. It is granted and revoked in a window this app never sees,
      * so the answer is fetched each time the screen is shown rather than held from whenever it was
      * first asked — a stale "Allowed" is how a settings screen stops being a report.
      */
     fun refreshNotifications() {
         _notificationsStatus.value = container.permissionRepository.notificationsStatus()
+    }
+
+    /** Re-read all four grants, for the same reason [refreshNotifications] re-reads one. */
+    fun refreshPermissions() {
+        _permissions.value = readPermissions()
+    }
+
+    private fun readPermissions(): PermissionOverview {
+        val permissions = container.permissionRepository
+        return PermissionOverview(
+            media = permissions.mediaStatus(),
+            notifications = permissions.notificationsStatus(),
+            photoLocationGranted = permissions.mediaLocationGranted(),
+            backgroundBackup = permissions.backgroundBackupStatus(),
+            canOpenBatterySettings = permissions.canOpenBatterySettings(),
+        )
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -77,8 +106,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * The session goes; the channel and every backup in it stay put — the account row's note says so,
-     * which is why the screen confirms nothing before calling: there is no data here to lose.
+     * The session goes; the channel and every backup in it stay put. The account row's own note says so,
+     * and the screen asks first anyway — not because the data is at risk, but because the answer is not
+     * obvious enough to be made by accident, and a confirmation that states the consequence costs one tap.
      */
     fun signOut() {
         viewModelScope.launch {
@@ -91,3 +121,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val SUBSCRIPTION_MILLIS = 5_000L
     }
 }
+
+/**
+ * Every permission LumoVault can hold, read at one moment.
+ *
+ * Not a store and not a cache of a decision: [PermissionRepository] answers from the system each time,
+ * so this type exists only to carry one instant's four answers to the screen. [canOpenBatterySettings]
+ * travels with them rather than beside them because it is the same kind of fact — a question about what
+ * this device offers, asked at the same time as the four about what the user has allowed.
+ */
+data class PermissionOverview(
+    val media: MediaAccessStatus = MediaAccessStatus.Unknown,
+    val notifications: NotificationsStatus = NotificationsStatus.Unknown,
+    val photoLocationGranted: Boolean = false,
+    val backgroundBackup: BackgroundBackupStatus = BackgroundBackupStatus.Unknown,
+    val canOpenBatterySettings: Boolean = false,
+)
