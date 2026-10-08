@@ -44,23 +44,26 @@ class SettingsHubItemsTest {
 
     @Test
     fun everyGroupIsIntroducedByAHeadingAndHoldsSomething() {
-        var currentHeader = -1
         var doorsInGroup = 0
+        var groupsSeen = 0
         items.forEach { item ->
             when (item) {
                 is SettingsHubHeader -> {
+                    // Only the *second* heading onward has a group to have been left empty behind it: the
+                    // first one has nothing before it, which is the whole point of starting with a heading.
                     assertTrue(
-                        "a heading with nothing under it is a heading that promises a section that is not there",
-                        doorsInGroup > 0,
+                        "the group before this heading had no doors in it, so the heading promises a "
+                            + "section that is not there",
+                        groupsSeen == 0 || doorsInGroup > 0,
                     )
-                    currentHeader = item.labelRes
+                    groupsSeen++
                     doorsInGroup = 0
                 }
 
                 is SettingsHubDoor -> {
                     assertTrue(
                         "${item.door} sits under no heading, so the list reads as one undifferentiated run",
-                        currentHeader >= 0,
+                        groupsSeen > 0,
                     )
                     doorsInGroup++
                 }
